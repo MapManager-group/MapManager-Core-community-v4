@@ -43,6 +43,7 @@ MapManager-v4/
 | `MapAccessServiceImpl.decide` | `MapRepository.findById` → `MapRoleService.hasRole` | 按 MMC 地图状态、角色和公开状态决定准入；不读取 LP |
 | `WorldLifeCycleServiceImpl.create/importWorld` | 存储、Multiverse、`WorldBaseProjection`、`MapAliasService` | 创建或导入地图、写入首位管理员、初始化地图并转换状态 |
 | `MapTravelServiceImpl.teleport` | `MapAccessService`、`WorldLifeCycleService.load`、`PlayerGateway` | 准入通过后加载并传送 |
+| `MapWorldCommand.kick` → `MapTravelServiceImpl.kickFromMap` | Bukkit 在线玩家、内部地图存储、`MapAccessService.decide`、Multiverse 默认世界 | 服务按操作者当前世界定位地图，确认管理员及目标在同图，再使用 MV 默认世界出生点传送 |
 
 ## 地图人员权限调用关系
 

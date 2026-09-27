@@ -16,12 +16,12 @@ public interface MapTravelService {
     OperationResult<Void> teleport(UUID playerId, UUID mapId);
 
     /**
-     * 将玩家从地图送回已配置的安全位置。
+     * 由当前地图组管理员将在线玩家送至 Multiverse 默认世界的出生点。
+     * 只有操作者和目标玩家都位于操作者当前的 MMC 地图时才会执行。
      *
      * @param operatorId 执行移出操作的玩家 UUID
      * @param playerId 要移出的玩家 UUID
-     * @param mapId 要将玩家移出的地图标识
      * @return 操作结果
      */
-    OperationResult<Void> kickFromMap(UUID operatorId, UUID playerId, UUID mapId);
+    OperationResult<Void> kickFromMap(UUID operatorId, UUID playerId);
 }

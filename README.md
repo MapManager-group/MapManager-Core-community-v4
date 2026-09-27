@@ -27,6 +27,8 @@ After Multiverse creates or imports a world, MMC initializes its Multiverse diff
 
 Players can enter an active map with `/world tp <name>` or its shorthand `/wtp <name>`. The command requires `mapmanager.world`; MMC checks the player's map access, loads the world if needed, then teleports to the saved map spawn or the world's default spawn.
 
+An MMC administrator can run `/world kick <online-player>` while in a managed map. The target must be in the same map. MMC moves them to Multiverse-Core's default world spawn and reports a structured `KICK` result. The command requires `mapmanager.world`; Tab completion lists only online players in the current map.
+
 ## Map members
 
 In a managed world, `/world admins`, `/world builders`, and `/world visitors` list players directly assigned each role. `admin` and `builder` assignments cover every map in the current map group; `visitor` applies only to the current map. An admin also has effective builder and visitor access, and a builder has effective visitor access. Public maps allow everyone to visit regardless of the explicit visitor list.

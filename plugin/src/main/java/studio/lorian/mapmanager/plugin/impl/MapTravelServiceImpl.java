@@ -2,7 +2,10 @@ package studio.lorian.mapmanager.plugin.impl;
 
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.mvplugins.multiverse.core.MultiverseCoreApi;
 import studio.lorian.mapmanager.api.model.MapInstance;
+import studio.lorian.mapmanager.api.model.MapRole;
 import studio.lorian.mapmanager.api.model.SpawnPoint;
 import studio.lorian.mapmanager.api.result.FailureReason;
 import studio.lorian.mapmanager.api.result.OperationName;
@@ -83,8 +86,45 @@ public final class MapTravelServiceImpl implements MapTravelService {
     }
 
     @Override
-    public OperationResult<Void> kickFromMap(UUID operatorId, UUID playerId, UUID mapId) {
-        // TODO: 检查管理权限并将玩家送至安全世界。
-        return new OperationResult.Failure<>(OperationName.KICK, UUID.randomUUID(), FailureReason.INTERNAL_ERROR);
+    public OperationResult<Void> kickFromMap(UUID operatorId, UUID playerId) {
+        UUID operationId = UUID.randomUUID();
+        if (!Bukkit.isPrimaryThread() || operatorId == null || playerId == null)
+            return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.INVALID_INPUT);
+        Player operator = Bukkit.getPlayer(operatorId);
+        Player target = Bukkit.getPlayer(playerId);
+        if (operator == null || target == null)
+            return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.PLAYER_NOT_FOUND);
+        if (!operator.getWorld().equals(target.getWorld()))
+            return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.PLAYER_NOT_IN_MAP);
+
+        final MapInstance map;
+        final AccessDecision decision;
+        try {
+            map = maps.findByWorldName(operator.getWorld().getName());
+            if (map == null)
+                return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.MAP_NOT_FOUND);
+            decision = access.decide(operatorId, map.id());
+        } catch (StorageException exception) {
+            return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.STORAGE_FAILED);
+        }
+        if (!decision.allowed())
+            return new OperationResult.Failure<>(OperationName.KICK, operationId,
+                    decision.denialReason() == null ? FailureReason.ACCESS_DENIED : decision.denialReason());
+        if (decision.effectiveRole() != MapRole.ADMIN)
+            return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.NO_PERMISSION);
+        try {
+            var defaultWorld = MultiverseCoreApi.get().getWorldManager().getDefaultWorld().getOrNull();
+            if (defaultWorld == null || map.worldName().equals(defaultWorld.getName()))
+                return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.WORLD_BACKEND_FAILED);
+            var location = defaultWorld.getSpawnLocation();
+            if (location == null || location.getWorld() == null
+                    || !defaultWorld.getName().equals(location.getWorld().getName()))
+                return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.WORLD_BACKEND_FAILED);
+            if (!target.teleport(location))
+                return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.WORLD_BACKEND_FAILED);
+            return new OperationResult.Success<>(OperationName.KICK, operationId, null);
+        } catch (RuntimeException exception) {
+            return new OperationResult.Failure<>(OperationName.KICK, operationId, FailureReason.WORLD_BACKEND_FAILED);
+        }
     }
 }

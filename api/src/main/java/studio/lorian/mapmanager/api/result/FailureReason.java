@@ -12,6 +12,8 @@ public enum FailureReason {
     INVALID_INPUT,
     /** 无法解析请求中的玩家。 */
     PLAYER_NOT_FOUND,
+    /** 玩家不在要操作的地图内。 */
+    PLAYER_NOT_IN_MAP,
     /** 操作者没有执行该操作的权限。 */
     NO_PERMISSION,
     /** 玩家无权进入请求的地图。 */

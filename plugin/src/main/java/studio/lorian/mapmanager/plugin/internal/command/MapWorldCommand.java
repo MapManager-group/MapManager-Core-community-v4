@@ -77,6 +77,7 @@ public final class MapWorldCommand extends Command {
                 Map.entry("import", new Subcommand(true, null, OperationName.IMPORT, this::importWorld)),
                 Map.entry("init", new Subcommand(true, null, OperationName.INITIALIZE, this::initialize)),
                 Map.entry("tp", new Subcommand(false, "mapmanager.world", OperationName.TELEPORT, this::teleport)),
+                Map.entry("kick", new Subcommand(false, "mapmanager.world", OperationName.KICK, this::kick)),
                 Map.entry("admins", new Subcommand(false, "mapmanager.world", OperationName.LIST_MEMBERS,
                         (sender, target, args) -> listMembers(sender, target, args, MapRole.ADMIN))),
                 Map.entry("builders", new Subcommand(false, "mapmanager.world", OperationName.LIST_MEMBERS,
@@ -91,7 +92,7 @@ public final class MapWorldCommand extends Command {
                         (sender, target, args) -> changeMember(sender, target, args, MapRole.VISITOR)))
         );
         setUsage(name.equals("wtp") ? "/wtp <地图名>"
-                : "/world <create|import|init|tp|admins|builders|visitors|admin|builder|visitor> ...");
+                : "/world <create|import|init|tp|kick|admins|builders|visitors|admin|builder|visitor> ...");
         registerPlayerPermissions();
     }
 
@@ -150,7 +151,7 @@ public final class MapWorldCommand extends Command {
                 return suggestions(args[0], subcommands.entrySet().stream()
                         .filter(entry -> entry.getValue().consoleOnly ? sender instanceof ConsoleCommandSender
                                 : playerCommandAllowed(sender))
-                        .filter(entry -> !Set.of("admin", "builder", "visitor").contains(entry.getKey()) || admin)
+                        .filter(entry -> !Set.of("admin", "builder", "visitor", "kick").contains(entry.getKey()) || admin)
                         .filter(entry -> !Set.of("admins", "builders", "visitors").contains(entry.getKey()) || current != null)
                         .map(Map.Entry::getKey).toList());
             }
@@ -162,6 +163,8 @@ public final class MapWorldCommand extends Command {
             return switch (command) {
                 case "tp" -> args.length == 2
                         ? suggestions(currentArg, accessibleWorldNames((Player) sender)) : List.of();
+                case "kick" -> args.length == 2
+                        ? kickSuggestions((Player) sender, currentArg) : List.of();
                 case "init" -> args.length == 2
                         ? suggestions(currentArg, maps.listMaps().stream()
                                 .filter(map -> map.status() != MapStatus.DELETED).map(MapInstance::worldName).toList())
@@ -183,6 +186,13 @@ public final class MapWorldCommand extends Command {
 
     private List<String> accessibleWorldNames(Player player) {
         return access.accessibleMaps(player.getUniqueId()).stream().map(MapInstance::worldName).toList();
+    }
+
+    private List<String> kickSuggestions(Player sender, String prefix) {
+        MapInstance map = maps.findByWorldName(sender.getWorld().getName());
+        if (map == null || map.status() != MapStatus.ACTIVE
+                || !roles.hasRole(map.id(), sender.getUniqueId(), MapRole.ADMIN)) return List.of();
+        return suggestions(prefix, sender.getWorld().getPlayers().stream().map(Player::getName).toList());
     }
 
     private static List<String> importableWorldNames() {
@@ -387,6 +397,26 @@ public final class MapWorldCommand extends Command {
         notifier.notify(target, travel.teleport(player.getUniqueId(), map.id()));
     }
 
+    /** 将当前 MMC 地图中的在线玩家送至 Multiverse 默认世界出生点。 */
+    private void kick(CommandSender sender, NotificationTarget target, String[] args) {
+        if (args.length != 2) {
+            fail(target, OperationName.KICK, FailureReason.INVALID_INPUT);
+            return;
+        }
+        Player operator = (Player) sender;
+        Player member = Bukkit.getPlayerExact(args[1]);
+        if (member == null) {
+            fail(target, OperationName.KICK, FailureReason.PLAYER_NOT_FOUND);
+            return;
+        }
+        String worldName = operator.getWorld().getName();
+        OperationResult<Void> result = travel.kickFromMap(operator.getUniqueId(), member.getUniqueId());
+        notifier.notify(target, result);
+        if (result instanceof OperationResult.Success<?>)
+            notifier.notify(NotificationTarget.player(member.getName()),
+                    "§7你已被 " + operator.getName() + " 移出地图 " + worldName + "。");
+    }
+
     /** 当前地图决定角色作用范围；名单只显示直接授予的成员。 */
     private void listMembers(CommandSender sender, NotificationTarget target, String[] args, MapRole role) {
         if (args.length != 1) {
@@ -448,7 +478,7 @@ public final class MapWorldCommand extends Command {
                             : roles.removeMember(map.id(), memberId, role);
                     notifier.notify(target, result);
                     if (result instanceof OperationResult.Success<?>)
-                        currentActor.sendMessage("§a已" + (operation == OperationName.ADD_MEMBER ? "添加" : "移除")
+                        notifier.notify(target, "§a已" + (operation == OperationName.ADD_MEMBER ? "添加" : "移除")
                                 + " " + args[2] + " 的" + roleName(role) + "角色。");
                 } catch (StorageException exception) {
                     fail(target, operation, FailureReason.STORAGE_FAILED);

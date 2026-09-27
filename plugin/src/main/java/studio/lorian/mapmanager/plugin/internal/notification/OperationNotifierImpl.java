@@ -16,6 +16,11 @@ public final class OperationNotifierImpl implements OperationNotifier {
             message = "failed, " + partial.reason() + ", " + partial.operation()
                     + " (pending, " + partial.operationId() + ")";
         } else return;
+        notify(target, message);
+    }
+
+    @Override
+    public void notify(NotificationTarget target, String message) {
         if (target.kind() == NotificationTarget.Kind.LOG_ONLY) {
             Bukkit.getLogger().info(message);
         } else if (target.kind() == NotificationTarget.Kind.CONSOLE) {
