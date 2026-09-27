@@ -15,4 +15,5 @@ public interface MapRepository {
     void save(MapInstance map);
     void delete(UUID mapId);
     void saveGroup(MapGroup group);
+    void deleteGroup(String groupId);
 }

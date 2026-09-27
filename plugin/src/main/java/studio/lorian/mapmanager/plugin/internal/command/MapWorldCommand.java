@@ -29,14 +29,20 @@ import studio.lorian.mapmanager.plugin.internal.storage.StorageException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
  * 注册并分派 /world 子命令；玩家操作由 MMC 地图角色与准入规则授权。
  */
 public final class MapWorldCommand extends Command {
+    private static final String CONFIRM_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final long DELETE_CONFIRM_NANOS = TimeUnit.SECONDS.toNanos(10);
+    private static final SecureRandom RANDOM = new SecureRandom();
     private final JavaPlugin plugin;
     private final MapService maps;
     private final MapAccessService access;
@@ -45,15 +51,20 @@ public final class MapWorldCommand extends Command {
     private final WorldLifeCycleService lifeCycle;
     private final PlayerGateway players;
     private final OperationNotifier notifier;
+    private final Pattern deletionPattern;
     private final Map<String, Subcommand> subcommands;
+    private PendingDeletion pendingDeletion;
+
+    private record PendingDeletion(UUID mapId, String worldName, String code, long issuedAtNanos) {}
 
     /**
      * 创建 /world 主命令。
      */
     public MapWorldCommand(JavaPlugin plugin, MapService maps, MapRoleService roles, MapAccessService access,
                            MapTravelService travel,
-                           WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier) {
-        this("world", plugin, maps, roles, access, travel, lifeCycle, players, notifier);
+                           WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier,
+                           Pattern deletionPattern) {
+        this("world", plugin, maps, roles, access, travel, lifeCycle, players, notifier, deletionPattern);
     }
 
     /**
@@ -61,7 +72,8 @@ public final class MapWorldCommand extends Command {
      */
     public MapWorldCommand(String name, JavaPlugin plugin, MapService maps, MapRoleService roles,
                            MapAccessService access, MapTravelService travel,
-                           WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier) {
+                           WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier,
+                           Pattern deletionPattern) {
         super(name);
         this.plugin = plugin;
         this.maps = maps;
@@ -71,10 +83,12 @@ public final class MapWorldCommand extends Command {
         this.lifeCycle = lifeCycle;
         this.players = players;
         this.notifier = notifier;
+        this.deletionPattern = deletionPattern;
         this.subcommands = Map.ofEntries(
                 Map.entry("create", new Subcommand(true, OperationName.CREATE, this::create)),
                 Map.entry("import", new Subcommand(true, OperationName.IMPORT, this::importWorld)),
                 Map.entry("init", new Subcommand(true, OperationName.INITIALIZE, this::initialize)),
+                Map.entry("delete", new Subcommand(true, OperationName.DELETE, this::delete)),
                 Map.entry("tp", new Subcommand(false, OperationName.TELEPORT, this::teleport)),
                 Map.entry("kick", new Subcommand(false, OperationName.KICK, this::kick)),
                 Map.entry("admins", new Subcommand(false, OperationName.LIST_MEMBERS,
@@ -91,7 +105,7 @@ public final class MapWorldCommand extends Command {
                         (sender, target, args) -> changeMember(sender, target, args, MapRole.VISITOR)))
         );
         setUsage(name.equals("wtp") ? "/wtp <地图名>"
-                : "/world <create|import|init|tp|kick|admins|builders|visitors|admin|builder|visitor> ...");
+                : "/world <create|import|init|delete|tp|kick|admins|builders|visitors|admin|builder|visitor> ...");
     }
 
     @Override
@@ -164,6 +178,12 @@ public final class MapWorldCommand extends Command {
                 case "init" -> args.length == 2
                         ? suggestions(currentArg, maps.listMaps().stream()
                         .filter(map -> map.status() != MapStatus.DELETED).map(MapInstance::worldName).toList())
+                        : List.of();
+                case "delete" -> args.length == 2
+                        ? suggestions(currentArg, maps.listMaps().stream()
+                                .filter(map -> map.status() == MapStatus.ACTIVE || map.status() == MapStatus.DELETING)
+                                .filter(map -> deletionPattern.matcher(map.worldName()).matches())
+                                .map(MapInstance::worldName).toList())
                         : List.of();
                 case "import" -> args.length == 2 ? suggestions(currentArg, importableWorldNames())
                         : creationSuggestions(command, args);
@@ -367,6 +387,69 @@ public final class MapWorldCommand extends Command {
             return;
         }
         notifier.notify(target, lifeCycle.initialize(args[1]));
+    }
+
+    /** 控制台先选地图，再用十秒内有效的一次性确认码执行删除。 */
+    private void delete(CommandSender sender, NotificationTarget target, String[] args) {
+        if (args.length != 2) {
+            fail(target, OperationName.DELETE, FailureReason.INVALID_INPUT);
+            notifier.notify(target, "用法: /world delete <地图名>，然后在 10 秒内执行 /world delete <确认码>");
+            return;
+        }
+        String input = args[1];
+        PendingDeletion pending = pendingDeletion;
+        if (pending != null && pending.code().equals(input)) {
+            pendingDeletion = null;
+            if (System.nanoTime() - pending.issuedAtNanos() >= DELETE_CONFIRM_NANOS) {
+                fail(target, OperationName.DELETE, FailureReason.INVALID_INPUT);
+                notifier.notify(target, "删除确认码已过期，请重新指定地图。");
+                return;
+            }
+            try {
+                MapInstance current = maps.findByWorldName(pending.worldName());
+                if (current == null || !current.id().equals(pending.mapId())
+                        || !deletionPattern.matcher(current.worldName()).matches()) {
+                    fail(target, OperationName.DELETE, FailureReason.INVALID_INPUT);
+                    return;
+                }
+                notifier.notify(target, lifeCycle.delete(current.worldName()));
+            } catch (StorageException exception) {
+                fail(target, OperationName.DELETE, FailureReason.STORAGE_FAILED);
+            }
+            return;
+        }
+        if (pending != null) {
+            if (System.nanoTime() - pending.issuedAtNanos() < DELETE_CONFIRM_NANOS) {
+                fail(target, OperationName.DELETE, FailureReason.INVALID_INPUT);
+                notifier.notify(target, "确认码不正确；请使用上一步提供的 6 位字符串。");
+                return;
+            }
+            pendingDeletion = null;
+        }
+        if (!deletionPattern.matcher(input).matches()) {
+            fail(target, OperationName.DELETE, FailureReason.ACCESS_DENIED);
+            notifier.notify(target, "地图名不符合 deletion.allowed-world-name-regex，或确认码无效。");
+            return;
+        }
+        try {
+            MapInstance map = maps.findByWorldName(input);
+            if (map == null) {
+                fail(target, OperationName.DELETE, FailureReason.MAP_NOT_FOUND);
+                return;
+            }
+            if (map.status() != MapStatus.ACTIVE && map.status() != MapStatus.DELETING) {
+                fail(target, OperationName.DELETE, FailureReason.OPERATION_IN_PROGRESS);
+                return;
+            }
+            char[] chars = new char[6];
+            for (int i = 0; i < chars.length; i++)
+                chars[i] = CONFIRM_CHARACTERS.charAt(RANDOM.nextInt(CONFIRM_CHARACTERS.length()));
+            String code = new String(chars);
+            pendingDeletion = new PendingDeletion(map.id(), map.worldName(), code, System.nanoTime());
+            notifier.notify(target, "确认删除地图 " + map.worldName() + "：请在 10 秒内执行 /world delete " + code);
+        } catch (StorageException exception) {
+            fail(target, OperationName.DELETE, FailureReason.STORAGE_FAILED);
+        }
     }
 
     private void teleport(CommandSender sender, NotificationTarget target, String[] args) {

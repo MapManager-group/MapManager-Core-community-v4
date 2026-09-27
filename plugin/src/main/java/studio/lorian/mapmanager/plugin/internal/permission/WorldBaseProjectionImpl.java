@@ -67,7 +67,23 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
 
     @Override
     public boolean removeGroup(String groupId) {
-        // TODO: 清理地图权限组投影。
-        return false;
+        if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE)) return false;
+        GroupManager manager = luckPerms.getGroupManager();
+        var group = manager.loadGroup(groupId).join();
+        if (group.isEmpty()) return true;
+        manager.deleteGroup(group.get()).join();
+        return true;
+    }
+
+    @Override
+    public boolean removeWorldInheritance(String groupId, String worldName) {
+        if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE)) return false;
+        GroupManager manager = luckPerms.getGroupManager();
+        var group = manager.loadGroup(groupId).join();
+        if (group.isEmpty()) return false;
+        group.get().data().remove(InheritanceNode.builder(WORLD_BASE)
+                .withContext(DefaultContextKeys.WORLD_KEY, worldName).build());
+        manager.saveGroup(group.get()).join();
+        return true;
     }
 }

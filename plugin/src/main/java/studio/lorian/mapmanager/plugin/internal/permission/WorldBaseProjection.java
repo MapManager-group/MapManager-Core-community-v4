@@ -11,4 +11,5 @@ public interface WorldBaseProjection {
     CompletableFuture<Boolean> ensureGroupInheritance(String groupId, Set<String> worldNames);
     boolean setBuilderAccess(String groupId, UUID playerId, boolean enabled);
     boolean removeGroup(String groupId);
+    boolean removeWorldInheritance(String groupId, String worldName);
 }

@@ -128,6 +128,7 @@ public final class MySqlStorage implements MapRepository, RoleRepository, Operat
         });
     }
     @Override public void delete(UUID id) { update("DELETE FROM mm_maps WHERE id=?", id.toString()); }
+    @Override public void deleteGroup(String groupId) { update("DELETE FROM mm_groups WHERE id=?", groupId); }
     @Override public void saveGroup(MapGroup group) {
         StorageValidation.groupId(group.id());
         inConnection(connection -> {

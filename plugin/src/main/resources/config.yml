@@ -7,3 +7,11 @@ storage:
     username: mapmanager
     password: change-me
     use-ssl: true
+
+deletion:
+  # 仅允许删除名称以 _bak 结尾的地图；使用 Java 正则，匹配整个地图名。
+  allowed-world-name-regex: '.*_bak$'
+
+creation:
+  # 额外禁止创建或导入的地图名；Java 正则匹配整个名称。内置保留名始终生效。
+  blocked-world-name-regex: '.*_bak$'

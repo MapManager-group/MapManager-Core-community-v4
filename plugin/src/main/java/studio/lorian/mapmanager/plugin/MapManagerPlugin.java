@@ -15,6 +15,7 @@ import studio.lorian.mapmanager.plugin.internal.storage.StorageConfig;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 
 /** Paper 插件入口；加载配置和选定的持久化后端。 */
 public final class MapManagerPlugin extends JavaPlugin {
@@ -25,6 +26,10 @@ public final class MapManagerPlugin extends JavaPlugin {
         saveDefaultConfig();
         try {
             StorageConfig config = StorageConfig.load(getConfig());
+            Pattern deletionPattern = Pattern.compile(getConfig().getString(
+                    "deletion.allowed-world-name-regex", ".*_bak$"));
+            Pattern blockedCreationPattern = Pattern.compile(getConfig().getString(
+                    "creation.blocked-world-name-regex", ".*_bak$"));
             Path directory = getDataFolder().toPath();
             Files.createDirectories(directory);
             Path marker = directory.resolve("storage-backend.txt");
@@ -41,11 +46,14 @@ public final class MapManagerPlugin extends JavaPlugin {
             var projection = new WorldBaseProjectionImpl(luckPerms);
             var players = new PlayerGatewayImpl(this);
             var notifier = new OperationNotifierImpl();
-            api = new MapManagerImpl(repository, repository, repository, projection, players, getLogger());
+            api = new MapManagerImpl(repository, repository, repository, projection, players,
+                    deletionPattern, blockedCreationPattern, getLogger());
             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players, notifier));
+                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
+                    notifier, deletionPattern));
             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
-                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players, notifier));
+                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
+                    notifier, deletionPattern));
             getLogger().info("地图存储已加载: " + selected);
             projection.ensureWorldBase().whenComplete((created, error) -> {
                 if (error != null) {

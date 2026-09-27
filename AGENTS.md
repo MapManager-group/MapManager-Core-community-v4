@@ -13,103 +13,102 @@
 
 源码根目录：`api/src/main/java/studio/lorian/mapmanager/api/`。
 
-| 类型 | 作用 | 状态与待办 |
-|---|---|---|
-| `MapManager` | 地图、角色、准入、设置、别名、传送、生命周期服务的统一入口 | 契约；待所有服务可用后由插件注册到服务管理器 |
-| `CreateMapRequest` | 创建地图所需名称、组、可选首位管理员、世界类型和多组生成参数 | 数据；参数在创建用例中校验 |
-| `ImportMapRequest` | 导入服务端根目录现有世界所需参数 | 数据；导入流程会校验目录和 `level.dat` |
-| `MapGroup` | 组 ID 与组内世界名的不可变快照 | 数据；世界名由地图的 `groupId` 关联计算 |
-| `MapInstance` | 地图 UUID、世界名、组、展示名、设置、持久状态及出生点快照 | 数据；生命周期状态转移待接入 |
-| `MapRole` | `ADMIN`、`BUILDER`、`VISITOR` 三种角色 | 数据；组角色已接 LP 投影，MMC 仍为权威来源 |
-| `MapSettings` | 单地图物理、爆炸、公开状态 | 数据；不包含 PVP 或全局覆盖 |
-| `MapStatus` | `PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED` | 数据；创建及导入流程会从 `PENDING` 转为 `ACTIVE`，失败恢复仍待实现 |
-| `SpawnPoint` | 不依赖 Bukkit 的世界名、坐标与朝向 | 数据；与 Multiverse 出生点同步待实现 |
-| `WorldLoadState` | 世界不存在、未加载、已加载的运行时状态 | 数据；查询实现待接入 |
-| `WorldType` | 普通、平坦、虚空、下界、末地世界类型 | 数据；生成/导入映射待实现 |
-| `FailureReason` | 统一失败原因代码 | 数据；随业务实现补充必要原因，避免在命令中散写字符串 |
-| `OperationName` | 统一操作名称代码 | 数据；随业务操作使用 |
-| `OperationResult` | `Success`、`Failure`、`Partial` 及 operation ID | 契约/数据；通知器用它分发成功、失败和部分完成消息 |
+| 类型               | 作用                                                         | 状态与待办                                                         |
+|--------------------|--------------------------------------------------------------|--------------------------------------------------------------------|
+| `MapManager`       | 地图、角色、准入、设置、别名、传送、生命周期服务的统一入口   | 契约；待所有服务可用后由插件注册到服务管理器                       |
+| `CreateMapRequest` | 创建地图所需名称、组、可选首位管理员、世界类型和多组生成参数 | 数据；参数在创建用例中校验                                         |
+| `ImportMapRequest` | 导入服务端根目录现有世界所需参数                             | 数据；导入流程会校验目录和 `level.dat`                             |
+| `MapGroup`         | 组 ID 与组内世界名的不可变快照                               | 数据；世界名由地图的 `groupId` 关联计算                            |
+| `MapInstance`      | 地图 UUID、世界名、组、展示名、设置、持久状态及出生点快照    | 数据；生命周期状态转移待接入                                       |
+| `MapRole`          | `ADMIN`、`BUILDER`、`VISITOR` 三种角色                       | 数据；组角色已接 LP 投影，MMC 仍为权威来源                         |
+| `MapSettings`      | 单地图物理、爆炸、公开状态                                   | 数据；不包含 PVP 或全局覆盖                                        |
+| `MapStatus`        | `PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`       | 数据；创建及导入流程会从 `PENDING` 转为 `ACTIVE`，失败恢复仍待实现 |
+| `SpawnPoint`       | 不依赖 Bukkit 的世界名、坐标与朝向                           | 数据；与 Multiverse 出生点同步待实现                               |
+| `WorldType`        | 普通、平坦、虚空、下界、末地世界类型                         | 数据；生成/导入映射待实现                                          |
+| `FailureReason`    | 统一失败原因代码                                             | 数据；随业务实现补充必要原因，避免在命令中散写字符串               |
+| `OperationName`    | 统一操作名称代码                                             | 数据；随业务操作使用                                               |
+| `OperationResult`  | `Success`、`Failure`、`Partial` 及 operation ID              | 契约/数据；通知器用它分发成功、失败和部分完成消息                  |
 
 ## api 模块：服务接口
 
-| 类型 | 作用 | 状态与待办 |
-|---|---|---|
-| `AccessDecision` | 准入结果、有效角色及拒绝原因 | 数据；规则由 `MapAccessServiceImpl` 计算 |
-| `MapAccessService` | 判断能否入图，列出可访问及可管理地图 | 契约；事件层全路径准入拦截和进入后复核待实现 |
-| `MapRoleService` | 查询有效角色与直接授予成员、授予和撤销地图角色 | 契约；组角色写入后同步 LP 投影；接口无操作者参数，调用方授权由命令层处理 |
-| `MapService` | 地图和地图组快照查询 | 契约；已有存储实现 |
-| `MapSettingsService` | 修改单地图公开、展示名、物理、爆炸和出生点 | 契约；外部世界设置同步及调用方授权待实现 |
-| `MapAliasService` | 两个重载按地图公开状态同步 MV 别名：不传别名用地图名，传别名用指定文字 | 契约；公开图使用 `&2`，非公开图使用 `&3` |
-| `MapTravelService` | 入图传送和踢出地图 | 契约；入图按 MMC 准入和按需加载；踢出根据操作者当前世界定位 MMC 地图，仅由该地图管理员执行，目标须在同图，目的地为 MV 默认世界出生点 |
-| `PlayerGateway` | 异步解析用户名到 UUID；在线状态、当前世界、传送与断线操作 | 契约；UUID 查询及前两项在线查询已实现，传送/断线待实现 |
-| `WorldGateway` | 根据 `level-name` 和维度目录定位地图父目录及地图目录 | 契约；目录实现已完成，`level-name` 不可用时回退到第一个已加载世界 |
-| `WorldLifeCycleService` | 创建、导入、初始化、删除、加载及延迟卸载地图 | 契约；创建、导入和初始化已实现，其余世界操作仍占位；世界操作只在这里编排 |
+| 类型                    | 作用                                                                   | 状态与待办                                                                                                                           |
+|-------------------------|------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `AccessDecision`        | 准入结果、有效角色及拒绝原因                                           | 数据；规则由 `MapAccessServiceImpl` 计算                                                                                             |
+| `MapAccessService`      | 判断能否入图，列出可访问及可管理地图                                   | 契约；事件层全路径准入拦截和进入后复核待实现                                                                                         |
+| `MapRoleService`        | 查询有效角色与直接授予成员、授予和撤销地图角色                         | 契约；组角色写入后同步 LP 投影；接口无操作者参数，调用方授权由命令层处理                                                             |
+| `MapService`            | 地图和地图组快照查询                                                   | 契约；已有存储实现                                                                                                                   |
+| `MapSettingsService`    | 修改单地图公开、展示名、物理、爆炸和出生点                             | 契约；外部世界设置同步及调用方授权待实现                                                                                             |
+| `MapAliasService`       | 两个重载按地图公开状态同步 MV 别名：不传别名用地图名，传别名用指定文字 | 契约；公开图使用 `&2`，非公开图使用 `&3`                                                                                             |
+| `MapTravelService`      | 入图传送和踢出地图                                                     | 契约；入图按 MMC 准入和按需加载；踢出根据操作者当前世界定位 MMC 地图，仅由该地图管理员执行，目标须在同图，目的地为 MV 默认世界出生点 |
+| `PlayerGateway`         | 异步解析用户名到 UUID；在线状态、当前世界、传送与断线操作              | 契约；UUID 查询及前两项在线查询已实现，传送/断线待实现                                                                               |
+| `WorldGateway`          | 根据 `level-name` 和维度目录定位地图父目录及地图目录                   | 契约；目录实现已完成，`level-name` 不可用时回退到第一个已加载世界                                                                    |
+| `WorldLifeCycleService` | 创建、导入、初始化、删除及加载地图                                     | 契约；创建、导入、初始化、删除和加载已实现；世界操作只在这里编排                                                                     |
 
 ## plugin 模块：入口与业务实现
 
 源码根目录：`plugin/src/main/java/studio/lorian/mapmanager/plugin/`。
 
-| 类型 | 作用 | 状态与待办 |
-|---|---|---|
-| `MapManagerPlugin` | Paper 主类；加载配置/存储，装配生命周期服务和 `/world`、`/wtp` 命令，并取得 LuckPerms API 异步初始化 `worldbase` | 部分实现；LP 初始化失败会禁用插件；尚未注册准入监听器，也未发布完整 API |
-| `MapWorldCommand` | 分派 `/world create|import|init|tp|kick`、`admins|builders|visitors`、`admin|builder|visitor add|remove`，并把 `/wtp` 映射到 `tp` | 已实现这些命令及 Tab 补全：`create/import/init` 仅控制台；所有玩家可执行 `tp`，由 MMC 准入决定能否入图；名单查询要求可进入当前地图，角色变更及 `kick` 要求当前地图 MMC 管理员；玩家命令无 Bukkit 权限节点；按 MMC 角色过滤补全，用户名异步解析后复核地图及身份，成员操作也接受 UUID |
-| `MapManagerImpl` | 组装并返回各业务服务 | 部分实现；已注入别名服务、存储、操作记录、LP 投影和玩家网关；旅行服务接入准入、生命周期加载和踢出地图，其他生命周期用例仍待实现 |
-| `MapServiceImpl` | 从 repository 查询地图及组 | 已实现；尚未通过主类发布 API |
-| `MapRoleServiceImpl` | 组管理员/建筑者和单图访客的直接与有效角色查询、持久化、LP 投影 | 已实现基本角色管理；仅允许修改 `ACTIVE` 地图，组角色变更会同步 LP，另一种组角色存在时保留 LP 成员；LP 同步失败返回 `Partial`，自动重试与异步执行待实现 |
-| `MapAccessServiceImpl` | 依据 `ACTIVE` 状态、MMC 角色和 `isPublic` 计算准入 | 部分实现；没有 Bukkit 监听器拦截传送、登录、重生及实际换世界 |
-| `MapSettingsServiceImpl` | 将单地图设置及出生点写入 repository；公开状态切换时读取 MV 原别名、去除前导颜色代码后换色；展示名修改委托别名服务 | 部分实现；出生点与世界后端同步、调用方授权待接入；别名同步失败返回 Partial |
-| `MapAliasServiceImpl` | 无别名参数时使用地图名；显式别名时清除颜色代码并保存纯文本，再根据 MMC `isPublic` 设置、保存 MV 别名 | 已实现；存储别名不含颜色代码，MV 非公开为 `&3<name>`、公开为 `&2<name>`，需在主线程调用 |
-| `MapTravelServiceImpl` | 检查入图准入、按需加载并传送玩家；将玩家移出地图 | 已实现这些操作；`teleport` 要求主线程、检查在线状态和 MMC 准入，加载地图后传送至保存出生点或世界默认出生点；`kickFromMap` 要求主线程、双方在线且同在操作者当前 MMC 地图、操作者为管理员，目标为 MV 默认世界出生点；跨插件准入监听仍待实现 |
-| `WorldLifeCycleServiceImpl` | 创建、导入、初始化、删除、加载和延迟卸载的用例入口 | 部分实现；创建校验 4–16 位小写地图名并生成世界，创建/导入拒绝 `default`、`worldbase` 作为有效组名；导入只接收服务端根目录下含 `level.dat` 的同名目录；两者通过 `registerWorld` 共用状态、角色、LP 投影并调用 `initializeWorld`，未传别名时用地图名、传别名时用指定文字；手动 `initialize` 使用已保存别名；之后应用 MV 属性、生物生成与 gamerule；失败留下 `PENDING` 供恢复；加载操作已实现，删除及延迟卸载仍占位；调用要求主线程且 LP 写入目前会同步等待 |
+| 类型                        | 作用                                                                                                                                                   | 状态与待办                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `MapManagerPlugin`          | Paper 主类；加载配置/存储、删除名称正则及额外禁用的创建名称正则，装配生命周期服务和 `/world`、`/wtp` 命令，并取得 LuckPerms API 异步初始化 `worldbase` | 部分实现；删除或创建名称正则无效会阻止启动；LP 初始化失败会禁用插件；尚未注册准入监听器，也未发布完整 API                                                                                                                                                                                                                                                                                                                                                                                          |
+| `MapWorldCommand`           | 分派 `/world create                                                                                                                                    | import                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |init|delete|tp|kick`、`admins|builders|visitors`、`admin|builder|visitor add|remove`，并把 `/wtp` 映射到 `tp` | 已实现这些命令及 Tab 补全：`create/import/init/delete` 仅控制台；删除先输入受正则允许的地图名，再于 10 秒内输入绑定该地图 UUID 的一次性 6 位确认码；所有玩家可执行 `tp`，由 MMC 准入决定能否入图；名单查询要求可进入当前地图，角色变更及 `kick` 要求当前地图 MMC 管理员；玩家命令无 Bukkit 权限节点；按 MMC 角色过滤补全，用户名异步解析后复核地图及身份，成员操作也接受 UUID |
+| `MapManagerImpl`            | 组装并返回各业务服务                                                                                                                                   | 部分实现；已注入别名服务、存储、操作记录、LP 投影、玩家网关、删除名称正则及额外禁用的创建名称正则；旅行服务接入准入、生命周期加载和踢出地图，其他生命周期用例仍待实现                                                                                                                                                                                                                                                                                                                              |
+| `MapServiceImpl`            | 从 repository 查询地图及组                                                                                                                             | 已实现；尚未通过主类发布 API                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `MapRoleServiceImpl`        | 组管理员/建筑者和单图访客的直接与有效角色查询、持久化、LP 投影                                                                                         | 已实现基本角色管理；仅允许修改 `ACTIVE` 地图，组角色变更会同步 LP，另一种组角色存在时保留 LP 成员；LP 同步失败返回 `Partial`，自动重试与异步执行待实现                                                                                                                                                                                                                                                                                                                                             |
+| `MapAccessServiceImpl`      | 依据 `ACTIVE` 状态、MMC 角色和 `isPublic` 计算准入                                                                                                     | 部分实现；没有 Bukkit 监听器拦截传送、登录、重生及实际换世界                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `MapSettingsServiceImpl`    | 将单地图设置及出生点写入 repository；公开状态切换时读取 MV 原别名、去除前导颜色代码后换色；展示名修改委托别名服务                                      | 部分实现；出生点与世界后端同步、调用方授权待接入；别名同步失败返回 Partial                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `MapAliasServiceImpl`       | 无别名参数时使用地图名；显式别名时清除颜色代码并保存纯文本，再根据 MMC `isPublic` 设置、保存 MV 别名                                                   | 已实现；存储别名不含颜色代码，MV 非公开为 `&3<name>`、公开为 `&2<name>`，需在主线程调用                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `MapTravelServiceImpl`      | 检查入图准入、按需加载并传送玩家；将玩家移出地图                                                                                                       | 已实现这些操作；`teleport` 要求主线程、检查在线状态和 MMC 准入，加载地图后传送至保存出生点或世界默认出生点；`kickFromMap` 要求主线程、双方在线且同在操作者当前 MMC 地图、操作者为管理员，目标为 MV 默认世界出生点；跨插件准入监听仍待实现                                                                                                                                                                                                                                                          |
+| `WorldLifeCycleServiceImpl` | 创建、导入、初始化、删除和加载的用例入口                                                                                                               | 部分实现；创建/导入共用名称校验，以固定正则拒绝精确保留名 `cache/config/world/log/test/overworld/default/worldbase/apply/public/private` 及前缀 `plugin/version/admin/mapmanager/builder/visitor/lib/mmc`，另以配置正则（默认 `.*_bak$`）拒绝额外名称；失败留下 `PENDING`；删除需匹配配置正则（默认仅 `_bak` 后缀），拒绝主世界、在线玩家、异常目录，记录阶段并转为 `DELETING` 后调用 MV 删除世界，清理 LP 投影和 MMC 数据，失败保留状态供重试；加载已实现；调用要求主线程且 LP 写入目前会同步等待 |
 
 ## plugin 模块：迁移、通知、权限和玩家
 
-| 类型 | 作用 | 状态与待办 |
-|---|---|---|
-| `LegacyRoleGrant` | v3 成员授予的中间数据，保留世界、角色、玩家名与 UUID | 数据；迁移读取和名称解析待接入 |
-| `LegacySnapshot` | v3 地图、角色及告警的只读快照 | 数据；由迁移器填充；正式导入尚未实现 |
-| `V3MigrationSource` | 读取旧格式的内部端口 | 契约；只读源文件解析待实现 |
-| `V3MigrationSourceImpl` | v3 源数据读取实现位置 | 占位；`read` 返回 `null`；需读 `worlds.json`、`groups.json` 与相关设置 |
-| `NotificationTarget` | 通知目标：玩家、控制台或仅日志 | 数据；由通知实现按目标分发 |
-| `OperationNotifier` | 统一分发操作结果及普通提示文本的内部端口 | 契约；由命令调用其实现 |
-| `OperationNotifierImpl` | 将成功、失败、部分完成转换为消息，并发送给在线玩家或控制台；普通提示走同一分发方法 | 已实现基本格式；失败统一输出 `failed, <reason>, <operation>`；本地化和更细的通知策略待补 |
-| `WorldBaseProjection` | LP `worldbase` 创建及地图组继承、成员、清理的内部端口 | 契约；不能作为 MMC 准入判断来源 |
-| `WorldBaseProjectionImpl` | 缺失时创建 `worldbase` 并继承 `default`；维护同名 LP 地图组在世界上下文继承 `worldbase`，设置或撤销玩家 LP 地图组节点 | 部分实现；禁止把 `default` 或 `worldbase` 当地图组投影；已有 `worldbase` 不修改；移除地图组仍占位，失败自动重试待完成 |
-| `PlayerGatewayImpl` | Paper 在线/缓存 UUID 查询、online-mode 判定、异步 Mojang 查询、离线 UUID 计算及玩家操作 | 部分实现；在线玩家传送已实现且要求主线程，`disconnect` 仍占位；使用 Bukkit 对象时注意主线程 |
+| 类型                      | 作用                                                                                                                                                              | 状态与待办                                                                                          |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| `LegacyRoleGrant`         | v3 成员授予的中间数据，保留世界、角色、玩家名与 UUID                                                                                                              | 数据；迁移读取和名称解析待接入                                                                      |
+| `LegacySnapshot`          | v3 地图、角色及告警的只读快照                                                                                                                                     | 数据；由迁移器填充；正式导入尚未实现                                                                |
+| `V3MigrationSource`       | 读取旧格式的内部端口                                                                                                                                              | 契约；只读源文件解析待实现                                                                          |
+| `V3MigrationSourceImpl`   | v3 源数据读取实现位置                                                                                                                                             | 占位；`read` 返回 `null`；需读 `worlds.json`、`groups.json` 与相关设置                              |
+| `NotificationTarget`      | 通知目标：玩家、控制台或仅日志                                                                                                                                    | 数据；由通知实现按目标分发                                                                          |
+| `OperationNotifier`       | 统一分发操作结果及普通提示文本的内部端口                                                                                                                          | 契约；由命令调用其实现                                                                              |
+| `OperationNotifierImpl`   | 将成功、失败、部分完成转换为消息，并发送给在线玩家或控制台；普通提示走同一分发方法                                                                                | 已实现基本格式；失败统一输出 `failed, <reason>, <operation>`；本地化和更细的通知策略待补            |
+| `WorldBaseProjection`     | LP `worldbase` 创建及地图组继承、成员、清理的内部端口                                                                                                             | 契约；不能作为 MMC 准入判断来源                                                                     |
+| `WorldBaseProjectionImpl` | 缺失时创建 `worldbase` 并继承 `default`；维护同名 LP 地图组在世界上下文继承 `worldbase`，设置或撤销玩家 LP 地图组节点；删除地图时移除对应世界继承或最后一个地图组 | 部分实现；禁止把 `default` 或 `worldbase` 当地图组投影；已有 `worldbase` 不修改；失败自动重试待完成 |
+| `PlayerGatewayImpl`       | Paper 在线/缓存 UUID 查询、online-mode 判定、异步 Mojang 查询、离线 UUID 计算及玩家操作                                                                           | 部分实现；在线玩家传送已实现且要求主线程，`disconnect` 仍占位；使用 Bukkit 对象时注意主线程         |
 
 ## plugin 模块：存储与世界目录
 
-| 类型 | 作用 | 状态与待办 |
-|---|---|---|
-| `MapRepository` | 地图和组的内部持久化接口 | 契约；不得移入公开 API |
-| `RoleRepository` | 组角色和地图访客的内部持久化接口 | 契约；不得移入公开 API |
-| `OperationRepository` | 生命周期操作记录的内部持久化接口 | 契约；恢复流程尚未消费这些记录 |
-| `OperationRecord` | 操作 ID、名称、世界、阶段和失败原因 | 数据；创建流程已写入各阶段；恢复流程尚未消费 |
-| `OperationStage` | 开始、世界已变更、数据已保存、完成、失败 | 数据；创建流程已使用；崩溃恢复流程待实现 |
-| `StorageConfig` | 解析并校验 JSON/MySQL 配置 | 已实现；对应资源为 `plugin/src/main/resources/config.yml` |
-| `StorageException` | 存储异常的统一运行时类型 | 已实现 |
-| `StorageValidation` | 校验地图、组 ID、出生点及世界名规范化键 | 已实现；为 plugin 内部工具类 |
-| `JsonStorage` | 单文件保存地图、组、授权与操作；临时文件原子替换 | 已实现；真实服务器故障恢复与压力验证尚未完成 |
-| `MySqlStorage` | JDBC 保存地图、组、角色与操作；建表、唯一索引、外键 | 已实现；实际 MySQL 集成、建表升级和连接性能尚未验证 |
-| `WorldGatewayImpl` | 读取 `server.properties` 的 `level-name` 并按目录结构定位地图 | 已实现；缺失/无效/读取失败时取 `Bukkit.getWorlds().get(0)`；不负责创建世界 |
-| `WorldVersionValidator` | 世界导入前的版本兼容性检查端口 | 契约；实现待完成 |
-| `WorldVersionValidatorImpl` | 世界版本检查实现位置 | 占位；`canImport` 固定返回 `false` |
+| 类型                        | 作用                                                          | 状态与待办                                                                 |
+|-----------------------------|---------------------------------------------------------------|----------------------------------------------------------------------------|
+| `MapRepository`             | 地图和组的内部持久化接口，支持删除空组                        | 契约；不得移入公开 API                                                     |
+| `RoleRepository`            | 组角色和地图访客的内部持久化接口                              | 契约；不得移入公开 API                                                     |
+| `OperationRepository`       | 生命周期操作记录的内部持久化接口                              | 契约；恢复流程尚未消费这些记录                                             |
+| `OperationRecord`           | 操作 ID、名称、世界、阶段和失败原因                           | 数据；创建流程已写入各阶段；恢复流程尚未消费                               |
+| `OperationStage`            | 开始、世界已变更、数据已保存、完成、失败                      | 数据；创建流程已使用；崩溃恢复流程待实现                                   |
+| `StorageConfig`             | 解析并校验 JSON/MySQL 配置                                    | 已实现；对应资源为 `plugin/src/main/resources/config.yml`                  |
+| `StorageException`          | 存储异常的统一运行时类型                                      | 已实现                                                                     |
+| `StorageValidation`         | 校验地图、组 ID、出生点及世界名规范化键                       | 已实现；为 plugin 内部工具类                                               |
+| `JsonStorage`               | 单文件保存地图、组、授权与操作；临时文件原子替换              | 已实现；真实服务器故障恢复与压力验证尚未完成                               |
+| `MySqlStorage`              | JDBC 保存地图、组、角色与操作；建表、唯一索引、外键           | 已实现；实际 MySQL 集成、建表升级和连接性能尚未验证                        |
+| `WorldGatewayImpl`          | 读取 `server.properties` 的 `level-name` 并按目录结构定位地图 | 已实现；缺失/无效/读取失败时取 `Bukkit.getWorlds().get(0)`；不负责创建世界 |
+| `WorldVersionValidator`     | 世界导入前的版本兼容性检查端口                                | 契约；实现待完成                                                           |
+| `WorldVersionValidatorImpl` | 世界版本检查实现位置                                          | 占位；`canImport` 固定返回 `false`                                         |
 
 ## 嵌套类型
 
-| 类型 | 作用 | 状态与待办 |
-|---|---|---|
-| `OperationResult.Success`、`Failure`、`Partial` | 成功、失败和外部同步待完成的结果记录 | 数据；由各业务用例按真实执行结果返回 |
-| `NotificationTarget.Kind` | 玩家、控制台、仅日志三种通知目标 | 数据；通知分发待实现 |
-| `StorageConfig.Type` | JSON/MySQL 后端选择值 | 数据；由配置解析使用 |
-| `JsonStorage.Grant` | JSON 文件中的角色授予项 | 内部数据；随角色记录读写 |
-| `JsonStorage.Document` | 带版本号的 JSON 文件整体结构 | 内部数据；格式升级迁移待设计 |
-| `JsonStorage.State` | JSON 后端的内存状态及写入前副本 | 内部实现；用于原子写入 |
-| `MySqlStorage.SqlTask` | JDBC 连接上的数据库操作函数 | 内部实现；由 `inConnection` 统一执行和转换异常 |
+| 类型                                            | 作用                                 | 状态与待办                                     |
+|-------------------------------------------------|--------------------------------------|------------------------------------------------|
+| `OperationResult.Success`、`Failure`、`Partial` | 成功、失败和外部同步待完成的结果记录 | 数据；由各业务用例按真实执行结果返回           |
+| `NotificationTarget.Kind`                       | 玩家、控制台、仅日志三种通知目标     | 数据；通知分发待实现                           |
+| `StorageConfig.Type`                            | JSON/MySQL 后端选择值                | 数据；由配置解析使用                           |
+| `JsonStorage.Grant`                             | JSON 文件中的角色授予项              | 内部数据；随角色记录读写                       |
+| `JsonStorage.Document`                          | 带版本号的 JSON 文件整体结构         | 内部数据；格式升级迁移待设计                   |
+| `JsonStorage.State`                             | JSON 后端的内存状态及写入前副本      | 内部实现；用于原子写入                         |
+| `MySqlStorage.SqlTask`                          | JDBC 连接上的数据库操作函数          | 内部实现；由 `inConnection` 统一执行和转换异常 |
 
 ## 当前主要待办
 
-1. 完成 Multiverse 删除、创建与导入失败恢复和延迟卸载；世界创建/导入只在 `WorldLifeCycleService` 编排。
+1. 完成创建与导入失败恢复、删除跨后端中断恢复；世界创建、导入和删除只在 `WorldLifeCycleService` 编排。
 2. 完成全路径 Bukkit 准入监听，并把高频判断从直接同步 I/O 调整为适合主线程的读取方式。
 3. 角色变更已同步 LP；仍需将 LP 写入改为不阻塞主线程的流程、补自动失败重试，并完成玩家断线和其他命令。
 4. 完成 v3 dry-run、备份、正式迁移与冲突报告；完成 JSON/MySQL 后端切换的显式迁移。

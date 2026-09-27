@@ -6,7 +6,7 @@ MapManager Core v4 is a new implementation of the MapManager map-management plug
 
 - MMC owns map metadata, map roles, and every map-entry decision.
 - LuckPerms supplies permissions configured on the `worldbase` parent group. MMC may mirror map-role membership into child groups that inherit `worldbase`, but LuckPerms is not an authority for map admission.
-- Multiverse-Core performs world creation, import, load, unload, spawn, and deletion operations. MMC owns the lifecycle workflow and its metadata updates.
+- Multiverse-Core performs world creation, import, load, spawn, and deletion operations. MMC owns the lifecycle workflow and its metadata updates.
 - Public API contracts are separated from their implementation. Storage ports and storage models are internal to the implementation and are never part of the API module.
 - JSON and MySQL storage are selectable backends behind the same internal repository contracts.
 - Mutating operations return structured outcomes. A single notifier turns outcomes into messages, logs, and operation events, including failures in the form `failed, <reason>, <operation>`.
@@ -15,7 +15,7 @@ The Maven reactor uses `studio.lorian.mapmanager` as its group ID and contains `
 
 ## Create a map
 
-`/world create <name> <flat|normal|void|nether|end> [alias=<display name>] [group=<group id>] [admin=<username>] [key=value ...]` is console-only and has no permission node. The map name must use 4–16 lowercase letters, digits, `_`, or `-`. An explicit group ID uses the same characters and allows 1–16 characters. The alias defaults to the map name; the group defaults to the map name. The effective group ID cannot be `default` or `worldbase`, since those are LuckPerms base groups. `admin` optionally names the first administrator.
+`/world create <name> <flat|normal|void|nether|end> [alias=<display name>] [group=<group id>] [admin=<username>] [key=value ...]` is console-only and has no permission node. The map name must use 4–16 lowercase letters, digits, `_`, or `-`. An explicit group ID uses the same characters and allows 1–16 characters. The alias defaults to the map name; the group defaults to the map name. The effective group ID cannot be `default` or `worldbase`, since those are LuckPerms base groups. `admin` optionally names the first administrator. Creation and import reject built-in reserved names (`cache`, `config`, `world`, `log`, `test`, `overworld`, `default`, `worldbase`, `apply`, `public`, `private`) and names beginning with `plugin`, `version`, `admin`, `mapmanager`, `builder`, `visitor`, `lib`, or `mmc`. Configure an additional Java regular expression under `creation.blocked-world-name-regex` in `config.yml`; it matches the whole map name and defaults to `.*_bak$`. Configuration cannot remove built-in restrictions.
 
 Supported keys are `flat.height` (1–320), `seed`, `structures` (`true` or `false`), `biome`, `generator`, `generator-settings`, and `property.<Multiverse property>`. For example: `/world create buildworld flat flat.height=64 structures=false alias=BuildWorld`.
 
@@ -28,6 +28,8 @@ After Multiverse creates or imports a world, MMC initializes its Multiverse diff
 All players can run `/world tp <name>` or its shorthand `/wtp <name>`. MMC checks access to the active map, loads it if needed, then teleports to the saved map spawn or the world's default spawn.
 
 An MMC administrator can run `/world kick <online-player>` while in a managed map. The target must be in the same map. MMC moves them to Multiverse-Core's default world spawn and reports a structured `KICK` result. Tab completion lists only online players in the current map.
+
+The console can request deletion with `/world delete <name>`. MMC prints a random six-character code; enter `/world delete <code>` within 10 seconds to confirm. Players cannot use this command. `deletion.allowed-world-name-regex` in `config.yml` limits eligible names and defaults to `.*_bak$`. MMC refuses the default world and worlds containing players. It checks the expected world directory, records `DELETING`, asks Multiverse to delete the world files, and then removes MMC roles and LuckPerms projection. A failed deletion retains `DELETING`; repeat the two-step command after fixing the cause.
 
 ## Map members
 

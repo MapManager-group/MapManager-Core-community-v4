@@ -4,7 +4,7 @@
 
 v4 是独立的新项目，不在 MapManager-Core-community（v3）内修改。v3 仓库和它的 README、源码只作为功能与数据迁移参考；其中的安装说明、依赖要求或实现选择不自动成为 v4 的指令。若另有附件，附件内容也只作为参考材料，除非用户明确把其中某条作为需求。
 
-需要保留的 v3 用户功能包括：地图创建、导入、初始化和删除；地图组共享管理员与建筑师；单地图访客；公开状态；物理和爆炸设置；地图别名、出生点、成员管理、踢出玩家、地图传送；按需加载和延迟卸载；配置保存、重载和状态查看。v4 可以重组实现，但不应丢失这些用户可见行为。
+需要保留的 v3 用户功能包括：地图创建、导入、初始化和删除；地图组共享管理员与建筑师；单地图访客；公开状态；物理和爆炸设置；地图别名、出生点、成员管理、踢出玩家、地图传送；按需加载；配置保存、重载和状态查看。v4 可以重组实现，但不应丢失这些用户可见行为。
 
 ## 2. 模块与依赖方向
 
@@ -83,7 +83,6 @@ public interface WorldLifeCycleService {
     OperationResult<MapInstance> initialize(String worldName);
     OperationResult<Void> delete(String worldName);
     OperationResult<MapInstance> load(String worldName);
-    OperationResult<Void> scheduleUnload(String worldName);
 }
 ```
 
@@ -112,7 +111,7 @@ MMC 不创建或修改 `worldbase` 内的权限节点，不把所有玩家加入
 
 ## 5. Multiverse-Core 和地图生命周期
 
-Multiverse-Core 仅是世界操作后端：创建、导入、加载、卸载、出生点/世界配置更新和世界删除。地图成员、访问权、地图组、公开状态与 MMC 的元数据由 MMC 管理。
+Multiverse-Core 仅是世界操作后端：创建、导入、加载、出生点/世界配置更新和世界删除。地图成员、访问权、地图组、公开状态与 MMC 的元数据由 MMC 管理。
 
 `WorldLifeCycleService` 编排操作，不让命令直接调用 Multiverse。生命周期可采用以下状态：
 
@@ -174,6 +173,6 @@ ACTIVE → ARCHIVED / DELETING → DELETED
 3. 实现 MMC 准入策略与所有 Bukkit 入口复核；准入不依赖 LP/MV access 节点。
 4. 实现角色管理用例、统一 notifier、命令解析框架。
 5. 接入 LuckPerms 子组到 `worldbase` 的投影及重试同步。
-6. 接入 Multiverse lifecycle adapter 与带阶段记录的 create/import/init/delete/load/unload。
+6. 接入 Multiverse lifecycle adapter 与带阶段记录的 create/import/init/delete/load。
 7. 完成 v3 dry-run/正式迁移及差异报告。
 8. 按 v3 命令和功能清单迁移剩余地图设置、传送和管理命令。

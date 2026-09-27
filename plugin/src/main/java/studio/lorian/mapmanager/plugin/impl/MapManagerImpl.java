@@ -15,6 +15,7 @@ import studio.lorian.mapmanager.plugin.internal.storage.OperationRepository;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjection;
 
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /** API 入口的占位实现；完成业务实现后再由主类注册。 */
 public final class MapManagerImpl implements MapManager {
@@ -27,13 +28,15 @@ public final class MapManagerImpl implements MapManager {
     private final WorldLifeCycleService worldLifeCycle;
 
     public MapManagerImpl(MapRepository repository, RoleRepository roleRepository, OperationRepository operations,
-                          WorldBaseProjection permissions, PlayerGateway players, Logger logger) {
+                          WorldBaseProjection permissions, PlayerGateway players, Pattern deletionPattern,
+                          Pattern blockedCreationPattern, Logger logger) {
         this.maps = new MapServiceImpl(repository);
         this.aliases = new MapAliasServiceImpl(repository);
         this.settings = new MapSettingsServiceImpl(repository, aliases);
         this.roles = new MapRoleServiceImpl(repository, roleRepository, permissions);
         this.access = new MapAccessServiceImpl(repository, roles);
-        this.worldLifeCycle = new WorldLifeCycleServiceImpl(repository, roleRepository, operations, permissions, aliases, logger);
+        this.worldLifeCycle = new WorldLifeCycleServiceImpl(repository, roleRepository, operations,
+                permissions, aliases, deletionPattern, blockedCreationPattern, logger);
         this.travel = new MapTravelServiceImpl(repository, access, players, worldLifeCycle);
     }
 
