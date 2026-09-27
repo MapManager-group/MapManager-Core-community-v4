@@ -1,0 +1,21 @@
+name: MapManager-Core
+version: '${project.version}'
+main: studio.lorian.mapmanager.plugin.MapManagerPlugin
+description: MapManager v4 map and world management framework
+api-version: '1.20'
+authors:
+  - LorianStudio
+dependencies:
+  server:
+    LuckPerms:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    Multiverse-Core:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    VoidGen:
+      load: BEFORE
+      required: false
+      join-classpath: true

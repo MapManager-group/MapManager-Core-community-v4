@@ -1,0 +1,9 @@
+storage:
+  type: json # json | mysql；切换后端不会自动迁移数据
+  mysql:
+    host: localhost
+    port: 3306
+    database: mapmanager
+    username: mapmanager
+    password: change-me
+    use-ssl: true
