@@ -370,9 +370,40 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     }
 
     @Override
-    public OperationResult<MapInstance> load(String worldName) {
-        // TODO: 按需加载世界。
-        return null;
+    public synchronized OperationResult<MapInstance> load(String worldName) {
+        UUID operationId = UUID.randomUUID();
+        if (!Bukkit.isPrimaryThread() || worldName == null || worldName.isBlank())
+            return new OperationResult.Failure<>(OperationName.LOAD, operationId, FailureReason.INVALID_INPUT);
+        MapInstance map;
+        try {
+            map = maps.findByWorldName(worldName);
+        } catch (StorageException exception) {
+            return new OperationResult.Failure<>(OperationName.LOAD, operationId, FailureReason.STORAGE_FAILED);
+        }
+        if (map == null) return new OperationResult.Failure<>(OperationName.LOAD, operationId, FailureReason.MAP_NOT_FOUND);
+        if (map.status() != MapStatus.ACTIVE)
+            return new OperationResult.Failure<>(OperationName.LOAD, operationId, FailureReason.ACCESS_DENIED);
+        try {
+            var manager = MultiverseCoreApi.get().getWorldManager();
+            var existing = manager.getLoadedWorld(worldName).getOrNull();
+            if (existing != null) return new OperationResult.Success<>(OperationName.LOAD, operationId, map);
+            if (!manager.isWorld(worldName))
+                return new OperationResult.Failure<>(OperationName.LOAD, operationId, FailureReason.WORLD_NOT_FOUND);
+            operations.save(new OperationRecord(operationId, OperationName.LOAD, worldName, OperationStage.STARTED, null));
+            var loaded = manager.loadWorld(worldName);
+            if (loaded.isFailure()) {
+                logger.warning("加载世界失败 " + worldName + ": " + loaded.getFailureReason());
+                return failed(operationId, worldName, FailureReason.WORLD_BACKEND_FAILED, OperationName.LOAD);
+            }
+            operations.save(new OperationRecord(operationId, OperationName.LOAD, worldName, OperationStage.WORLD_CHANGED, null));
+            operations.save(new OperationRecord(operationId, OperationName.LOAD, worldName, OperationStage.COMPLETED, null));
+            return new OperationResult.Success<>(OperationName.LOAD, operationId, map);
+        } catch (StorageException exception) {
+            return failed(operationId, worldName, FailureReason.STORAGE_FAILED, OperationName.LOAD);
+        } catch (RuntimeException exception) {
+            logger.warning("加载世界失败 " + worldName + ": " + exception.getMessage());
+            return failed(operationId, worldName, FailureReason.WORLD_BACKEND_FAILED, OperationName.LOAD);
+        }
     }
 
     @Override

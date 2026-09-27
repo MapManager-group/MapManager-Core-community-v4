@@ -1,6 +1,7 @@
 package studio.lorian.mapmanager.plugin;
 
 import net.luckperms.api.LuckPerms;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
 import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
@@ -38,15 +39,13 @@ public final class MapManagerPlugin extends JavaPlugin {
             LuckPerms luckPerms = getServer().getServicesManager().load(LuckPerms.class);
             if (luckPerms == null) throw new IllegalStateException("LuckPerms API 服务不可用");
             var projection = new WorldBaseProjectionImpl(luckPerms);
-            api = new MapManagerImpl(repository, repository, repository, projection, getLogger());
             var players = new PlayerGatewayImpl(this);
             var notifier = new OperationNotifierImpl();
-            getServer().getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                    api.worldLifeCycle(), players, notifier));
-            getServer().getCommandMap().register("mapmanager", new MapWorldCommand("create", this,
-                    api.worldLifeCycle(), players, notifier));
-            getServer().getCommandMap().register("mapmanager", new MapWorldCommand("import", this,
-                    api.worldLifeCycle(), players, notifier));
+            api = new MapManagerImpl(repository, repository, repository, projection, players, getLogger());
+            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
+                    api.maps(), api.travel(), api.worldLifeCycle(), players, notifier));
+            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
+                    api.maps(), api.travel(), api.worldLifeCycle(), players, notifier));
             getLogger().info("地图存储已加载: " + selected);
             projection.ensureWorldBase().whenComplete((created, error) -> {
                 if (error != null) {

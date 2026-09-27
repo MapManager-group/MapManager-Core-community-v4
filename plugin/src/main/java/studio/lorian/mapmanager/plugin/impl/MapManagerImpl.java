@@ -7,6 +7,7 @@ import studio.lorian.mapmanager.api.service.MapRoleService;
 import studio.lorian.mapmanager.api.service.MapService;
 import studio.lorian.mapmanager.api.service.MapSettingsService;
 import studio.lorian.mapmanager.api.service.MapTravelService;
+import studio.lorian.mapmanager.api.service.PlayerGateway;
 import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
 import studio.lorian.mapmanager.plugin.internal.storage.MapRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
@@ -22,17 +23,18 @@ public final class MapManagerImpl implements MapManager {
     private final MapAccessService access;
     private final MapAliasServiceImpl aliases;
     private final MapSettingsService settings;
-    private final MapTravelService travel = new MapTravelServiceImpl();
+    private final MapTravelService travel;
     private final WorldLifeCycleService worldLifeCycle;
 
     public MapManagerImpl(MapRepository repository, RoleRepository roleRepository, OperationRepository operations,
-                          WorldBaseProjection permissions, Logger logger) {
+                          WorldBaseProjection permissions, PlayerGateway players, Logger logger) {
         this.maps = new MapServiceImpl(repository);
         this.aliases = new MapAliasServiceImpl(repository);
         this.settings = new MapSettingsServiceImpl(repository, aliases);
         this.roles = new MapRoleServiceImpl(repository, roleRepository);
         this.access = new MapAccessServiceImpl(repository, roles);
         this.worldLifeCycle = new WorldLifeCycleServiceImpl(repository, roleRepository, operations, permissions, aliases, logger);
+        this.travel = new MapTravelServiceImpl(repository, access, players, worldLifeCycle);
     }
 
     @Override
