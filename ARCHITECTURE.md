@@ -26,7 +26,7 @@ plugin (mapmanager-plugin)
 | `api` | 对外模型、服务接口、操作结果 | 不依赖 plugin、存储、LuckPerms 或 Multiverse 的类型 |
 | `plugin` | 插件入口、业务用例、地图准入、生命周期编排、命令和事件适配 | 依赖 api；存储与适配接口留在内部包 |
 
-包结构建议：
+当前包结构以 [STRUCTURE.md](STRUCTURE.md) 的源码目录和方法依赖为准。下面保留早期的能力划分作为后续扩展参考：
 
 ```text
 api/src/main/java/studio/lorian/mapmanager/api/

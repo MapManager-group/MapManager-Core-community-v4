@@ -31,7 +31,7 @@ public final class MapManagerImpl implements MapManager {
         this.maps = new MapServiceImpl(repository);
         this.aliases = new MapAliasServiceImpl(repository);
         this.settings = new MapSettingsServiceImpl(repository, aliases);
-        this.roles = new MapRoleServiceImpl(repository, roleRepository);
+        this.roles = new MapRoleServiceImpl(repository, roleRepository, permissions);
         this.access = new MapAccessServiceImpl(repository, roles);
         this.worldLifeCycle = new WorldLifeCycleServiceImpl(repository, roleRepository, operations, permissions, aliases, logger);
         this.travel = new MapTravelServiceImpl(repository, access, players, worldLifeCycle);

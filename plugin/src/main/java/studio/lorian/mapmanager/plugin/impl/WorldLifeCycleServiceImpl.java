@@ -124,6 +124,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     private static boolean validMapInput(String worldName, String groupId, String displayName) {
         return worldName != null && worldName.matches("[a-z0-9_-]{4,16}")
                 && (blank(groupId) || groupId.matches("[a-z0-9_-]{1,16}"))
+                && !Set.of("default", "worldbase").contains(blank(groupId) ? worldName : groupId)
                 && (blank(displayName) || displayName.length() <= 255);
     }
 

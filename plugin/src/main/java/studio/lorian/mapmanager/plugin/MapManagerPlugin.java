@@ -43,9 +43,9 @@ public final class MapManagerPlugin extends JavaPlugin {
             var notifier = new OperationNotifierImpl();
             api = new MapManagerImpl(repository, repository, repository, projection, players, getLogger());
             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                    api.maps(), api.travel(), api.worldLifeCycle(), players, notifier));
+                    api.maps(), api.roles(), api.travel(), api.worldLifeCycle(), players, notifier));
             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
-                    api.maps(), api.travel(), api.worldLifeCycle(), players, notifier));
+                    api.maps(), api.roles(), api.travel(), api.worldLifeCycle(), players, notifier));
             getLogger().info("地图存储已加载: " + selected);
             projection.ensureWorldBase().whenComplete((created, error) -> {
                 if (error != null) {
@@ -59,7 +59,7 @@ public final class MapManagerPlugin extends JavaPlugin {
                             : "LuckPerms worldbase 权限组已存在");
                 }
             });
-            getLogger().warning("其他地图生命周期、准入和角色权限同步仍未实现，尚未发布完整 API 服务。");
+            getLogger().warning("其他地图生命周期和准入监听仍未实现，尚未发布完整 API 服务。");
         } catch (Exception ex) {
             getLogger().severe("MapManager 启动初始化失败: " + ex.getMessage());
             getServer().getPluginManager().disablePlugin(this);

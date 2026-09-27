@@ -14,6 +14,16 @@ import java.util.UUID;
  */
 public interface MapRoleService {
     /**
+     * 查询直接授予指定角色的玩家，不包含从更高角色继承的成员。
+     * 管理员和建筑者按地图组查询，访客按单张地图查询。
+     *
+     * @param mapId 要查询成员的地图标识
+     * @param role 要查询的角色
+     * @return 直接授予该角色的玩家 UUID 集合；地图不存在时返回空集合
+     */
+    Set<UUID> assignedMembers(UUID mapId, MapRole role);
+
+    /**
      * 查询在指定地图上具有该有效角色的玩家。
      *
      * @param mapId 要查询成员的地图标识

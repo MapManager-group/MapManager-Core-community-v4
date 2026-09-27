@@ -2,6 +2,7 @@ package studio.lorian.mapmanager.plugin.impl;
 
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
+import studio.lorian.mapmanager.api.model.MapStatus;
 import studio.lorian.mapmanager.api.result.FailureReason;
 import studio.lorian.mapmanager.api.result.OperationName;
 import studio.lorian.mapmanager.api.result.OperationResult;
@@ -9,6 +10,7 @@ import studio.lorian.mapmanager.api.service.MapRoleService;
 import studio.lorian.mapmanager.plugin.internal.storage.MapRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageException;
+import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjection;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,9 +20,19 @@ import java.util.UUID;
 public final class MapRoleServiceImpl implements MapRoleService {
     private final MapRepository maps;
     private final RoleRepository roles;
-    public MapRoleServiceImpl(MapRepository maps, RoleRepository roles) { this.maps = maps; this.roles = roles; }
+    private final WorldBaseProjection permissions;
+    public MapRoleServiceImpl(MapRepository maps, RoleRepository roles, WorldBaseProjection permissions) {
+        this.maps = maps;
+        this.roles = roles;
+        this.permissions = permissions;
+    }
     private String scope(MapInstance map, MapRole role) {
         return role == MapRole.VISITOR ? map.id().toString() : map.groupId();
+    }
+    @Override public Set<UUID> assignedMembers(UUID mapId, MapRole role) {
+        MapInstance map = maps.findById(mapId);
+        if (map == null || role == null) return Set.of();
+        return Set.copyOf(roles.members(scope(map, role), role));
     }
     @Override public Set<UUID> members(UUID mapId, MapRole role) {
         MapInstance map = maps.findById(mapId);
@@ -33,7 +45,7 @@ public final class MapRoleServiceImpl implements MapRoleService {
     @Override public boolean hasRole(UUID mapId, UUID playerId, MapRole role) {
         return playerId != null && members(mapId, role).contains(playerId);
     }
-    private OperationResult<Void> change(UUID mapId, UUID playerId, MapRole role, boolean add) {
+    private synchronized OperationResult<Void> change(UUID mapId, UUID playerId, MapRole role, boolean add) {
         OperationName operation = add ? OperationName.ADD_MEMBER : OperationName.REMOVE_MEMBER;
         UUID id = UUID.randomUUID();
         if (mapId == null || playerId == null || role == null)
@@ -41,10 +53,31 @@ public final class MapRoleServiceImpl implements MapRoleService {
         try {
             MapInstance map = maps.findById(mapId);
             if (map == null) return new OperationResult.Failure<>(operation, id, FailureReason.MAP_NOT_FOUND);
+            if (map.status() != MapStatus.ACTIVE)
+                return new OperationResult.Failure<>(operation, id, FailureReason.ACCESS_DENIED);
             String scope = scope(map, role);
             if (add) roles.add(scope, role, playerId); else roles.remove(scope, role, playerId);
-            if (role != MapRole.VISITOR)
-                return new OperationResult.Partial<>(operation, id, null, FailureReason.PERMISSION_SYNC_FAILED);
+            if (role != MapRole.VISITOR) {
+                // MMC 已写入；此后的读取或 LP 错误必须报告 Partial，避免将已生效的修改误报为失败。
+                boolean enabled;
+                Set<String> worldNames;
+                try {
+                    enabled = roles.members(scope, MapRole.ADMIN).contains(playerId)
+                            || roles.members(scope, MapRole.BUILDER).contains(playerId);
+                    var group = maps.findGroup(scope);
+                    worldNames = group == null ? Set.of(map.worldName()) : group.worldNames();
+                } catch (StorageException exception) {
+                    return new OperationResult.Partial<>(operation, id, null, FailureReason.STORAGE_FAILED);
+                }
+                // 两种组角色共用同一个 LP 地图组；撤销其中一种时保留另一种的建造权限。
+                try {
+                    permissions.ensureGroupInheritance(scope, worldNames).join();
+                    if (!permissions.setBuilderAccess(scope, playerId, enabled))
+                        return new OperationResult.Partial<>(operation, id, null, FailureReason.PERMISSION_SYNC_FAILED);
+                } catch (RuntimeException exception) {
+                    return new OperationResult.Partial<>(operation, id, null, FailureReason.PERMISSION_SYNC_FAILED);
+                }
+            }
             return new OperationResult.Success<>(operation, id, null);
         } catch (StorageException ex) {
             return new OperationResult.Failure<>(operation, id, FailureReason.STORAGE_FAILED);

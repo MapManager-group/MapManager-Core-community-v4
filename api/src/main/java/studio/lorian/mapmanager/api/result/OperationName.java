@@ -18,6 +18,8 @@ public enum OperationName {
     ADD_MEMBER,
     /** 撤销玩家的地图角色。 */
     REMOVE_MEMBER,
+    /** 查询地图角色成员。 */
+    LIST_MEMBERS,
     /** 修改地图的公开状态。 */
     SET_PUBLIC,
     /** 修改地图显示名称。 */
