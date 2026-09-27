@@ -118,13 +118,13 @@ public final class MapWorldCommand extends Command {
             System.arraycopy(input, 0, args, 1, input.length);
         }
         if (args.length == 0) {
-            sender.sendMessage(getUsage());
+            sender.sendMessage(Messages.component(getName().equals("wtp") ? "command.usage_wtp" : "command.usage_world"));
             return true;
         }
 
         Subcommand subcommand = subcommands.get(args[0].toLowerCase(Locale.ROOT));
         if (subcommand == null) {
-            sender.sendMessage(getUsage());
+            sender.sendMessage(Messages.component(getName().equals("wtp") ? "command.usage_wtp" : "command.usage_world"));
             return true;
         }
         NotificationTarget target = sender instanceof Player player

@@ -20,7 +20,7 @@ MapManager-v4/
 │     │  └─ internal/
 │     │     ├─ command/                       /world 与 /wtp 适配
 │     │     ├─ migration/                     v3 数据迁移入口及模型
-│     │     ├─ notification/                  OperationResult 通知
+│     │     ├─ notification/                  OperationResult 通知与 MiniMessage 语言文件
 │     │     ├─ permission/                    LuckPerms worldbase 投影
 │     │     ├─ player/                        Paper 玩家适配
 │     │     ├─ storage/                       内部仓储接口、JSON/MySQL 实现
@@ -37,7 +37,8 @@ MapManager-v4/
 
 | 入口或方法 | 直接依赖 | 结果或副作用 |
 |---|---|---|
-| `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；`V3Migration`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl` | 装配服务、检测旧文件并完成迁移后注册命令、异步确保 `worldbase` 存在 |
+| `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；`V3Migration`；`Messages`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl` | 装配服务、检测旧文件并完成迁移后注册命令、异步确保 `worldbase` 存在 |
+| `Messages` | `config.yml` 的 `language`、`langs/<语言代码>.yml`、内置中文资源 | 生成 MiniMessage Component；缺项回退中文，日志与异常使用纯文本 |
 | `V3Migration.migrate` | `V3MigrationSourceImpl`、LP 默认组只读节点、MV 别名/出生点只读元数据、`PlayerGateway.resolveId`、`MapRepository`、`RoleRepository` | 校验并备份 v3 JSON；UUID 全部解析成功后写入 MMC 存储，成功写完成标记；不写 LP 或 MV |
 | `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家与服务端世界目录 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标 |
 | `MapManagerImpl` | `MapRepository`、`RoleRepository`、`OperationRepository`、`WorldBaseProjection`、`PlayerGateway` | 组装地图、角色、准入、别名、设置、传送和生命周期服务 |

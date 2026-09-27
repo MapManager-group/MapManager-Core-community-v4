@@ -137,7 +137,7 @@ ACTIVE → ARCHIVED / DELETING → DELETED
 
 `OperationResult` 声明为 `Success`、`Failure`、`Partial` 三种结果；每个结果都包含 `OperationName` 和 UUID 类型的 operation ID。`Partial` 表示 MMC 状态已成功写入，但 LuckPerms 等外部投影仍待同步。具体签名见 `api/src/main/java/studio/lorian/mapmanager/api/result/OperationResult.java`。
 
-`FailureReason` 使用稳定代码（如 `MAP_NOT_FOUND`、`ALREADY_EXISTS`、`INVALID_NAME`、`NO_PERMISSION`、`WORLD_BACKEND_FAILED`、`STORAGE_FAILED`、`LP_SYNC_FAILED`），展示文本通过语言文件本地化。统一 `OperationNotifier` 面向命令发送者、控制台日志和扩展事件分发结果。失败的标准结构是 `failed, <reason>, <operation>`；玩家界面可以翻译为自然语言，但日志/API 事件保留稳定代码、operation ID 和 operation 名称。
+`FailureReason` 使用稳定代码，展示文本通过 `langs/<语言代码>.yml` 本地化。`OperationNotifier` 将操作名和失败原因渲染为 MiniMessage Component，发送给命令调用者；日志使用相同模板的纯文本。API 结果继续保留原因代码、operation ID 和操作名称，供调用方处理。
 
 命令层只做参数解析、发送者上下文检查和权限节点校验，然后调用一个应用用例并交给 notifier。Tab 补全也使用同一个准入/可见性规则，不根据 LP `multiverse.access.*` 单独过滤。
 

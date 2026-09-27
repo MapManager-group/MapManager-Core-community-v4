@@ -1,7 +1,12 @@
 result:
-  success: '<green><operation>成功。操作 ID：<operationId>'
-  failure: '<red><operation>失败：<reason>。操作 ID：<operationId>'
-  partial: '<yellow><operation>部分完成：<reason>。待处理操作 ID：<operationId>'
+  success: '<green><operation>成功。操作 ID：<operation_id>'
+  failure: '<red><operation>失败：<reason>。操作 ID：<operation_id>'
+  partial: '<yellow><operation>部分完成：<reason>。待处理操作 ID：<operation_id>'
+language:
+  invalid_code: language 必须是类似 zh_CN 的语言代码
+  missing_file: '语言文件不存在：<file>'
+  invalid_yaml: '语言文件格式无效：<file>'
+  invalid_arguments: 语言参数必须是名称和值配对
 operations:
   CREATE: 创建地图
   IMPORT: 导入地图

@@ -1,7 +1,12 @@
 result:
-  success: '<green><operation> succeeded. Operation ID: <operationId>'
-  failure: '<red><operation> failed: <reason>. Operation ID: <operationId>'
-  partial: '<yellow><operation> partially completed: <reason>. Pending operation ID: <operationId>'
+  success: '<green><operation> succeeded. Operation ID: <operation_id>'
+  failure: '<red><operation> failed: <reason>. Operation ID: <operation_id>'
+  partial: '<yellow><operation> partially completed: <reason>. Pending operation ID: <operation_id>'
+language:
+  invalid_code: language must be a code such as zh_CN
+  missing_file: 'Language file does not exist: <file>'
+  invalid_yaml: 'Language file is invalid YAML: <file>'
+  invalid_arguments: Language arguments must be name/value pairs
 operations:
   CREATE: Create map
   IMPORT: Import map

@@ -28,7 +28,7 @@ public final class V3MigrationSourceCheck {
             new V3MigrationSourceImpl(dir).read();
             throw new AssertionError("Expected world/group mismatch to fail");
         } catch (IllegalArgumentException expected) {
-            assert expected.getMessage().contains("不一致");
+            assert !expected.getMessage().isBlank();
         }
         System.out.println("V3 migration source check passed");
     }

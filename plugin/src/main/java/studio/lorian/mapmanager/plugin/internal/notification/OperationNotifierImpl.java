@@ -12,13 +12,13 @@ public final class OperationNotifierImpl implements OperationNotifier {
         Component message;
         if (result instanceof OperationResult.Success<?> success) {
             message = Messages.component("result.success", "operation", Messages.text("operations." + success.operation()),
-                    "operationId", success.operationId());
+                    "operation_id", success.operationId());
         } else if (result instanceof OperationResult.Failure<?> failure) {
             message = Messages.component("result.failure", "reason", Messages.text("reasons." + failure.reason()),
-                    "operation", Messages.text("operations." + failure.operation()), "operationId", failure.operationId());
+                    "operation", Messages.text("operations." + failure.operation()), "operation_id", failure.operationId());
         } else if (result instanceof OperationResult.Partial<?> partial) {
             message = Messages.component("result.partial", "reason", Messages.text("reasons." + partial.reason()),
-                    "operation", Messages.text("operations." + partial.operation()), "operationId", partial.operationId());
+                    "operation", Messages.text("operations." + partial.operation()), "operation_id", partial.operationId());
         } else return;
         notify(target, message);
     }
