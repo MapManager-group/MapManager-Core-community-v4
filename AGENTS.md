@@ -52,7 +52,7 @@
 | 类型 | 作用 | 状态与待办 |
 |---|---|---|
 | `MapManagerPlugin` | Paper 主类；加载配置/存储，装配生命周期服务和 `/world`、`/wtp` 命令，并取得 LuckPerms API 异步初始化 `worldbase` | 部分实现；LP 初始化失败会禁用插件；尚未注册准入监听器，也未发布完整 API |
-| `MapWorldCommand` | 分派 `/world create|import|init|tp`、`admins|builders|visitors`、`admin|builder|visitor add|remove`，并把 `/wtp` 映射到 `tp` | 已实现这些命令；`create/import/init` 仅控制台，玩家命令要求默认关闭的 `mapmanager.world`，修改成员还要求当前地图 MMC 管理员；用户名异步解析后复核地图及身份 |
+| `MapWorldCommand` | 分派 `/world create|import|init|tp`、`admins|builders|visitors`、`admin|builder|visitor add|remove`，并把 `/wtp` 映射到 `tp` | 已实现这些命令及 Tab 补全：按执行方和权限补子命令，按 MMC 准入补传送地图，补创建/导入类型与参数、导入目录、角色操作及成员；`create/import/init` 仅控制台，玩家命令要求默认关闭的 `mapmanager.world`，修改成员还要求当前地图 MMC 管理员；用户名异步解析后复核地图及身份，成员操作也接受 UUID |
 | `MapManagerImpl` | 组装并返回各业务服务 | 部分实现；已注入别名服务、存储、操作记录、LP 投影和玩家网关；旅行服务接入准入及生命周期加载，踢出与其他生命周期用例仍待实现 |
 | `MapServiceImpl` | 从 repository 查询地图及组 | 已实现；尚未通过主类发布 API |
 | `MapRoleServiceImpl` | 组管理员/建筑者和单图访客的直接与有效角色查询、持久化、LP 投影 | 已实现基本角色管理；仅允许修改 `ACTIVE` 地图，组角色变更会同步 LP，另一种组角色存在时保留 LP 成员；LP 同步失败返回 `Partial`，自动重试与异步执行待实现 |

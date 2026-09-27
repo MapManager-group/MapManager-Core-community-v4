@@ -43,9 +43,9 @@ public final class MapManagerPlugin extends JavaPlugin {
             var notifier = new OperationNotifierImpl();
             api = new MapManagerImpl(repository, repository, repository, projection, players, getLogger());
             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                    api.maps(), api.roles(), api.travel(), api.worldLifeCycle(), players, notifier));
+                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players, notifier));
             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
-                    api.maps(), api.roles(), api.travel(), api.worldLifeCycle(), players, notifier));
+                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players, notifier));
             getLogger().info("地图存储已加载: " + selected);
             projection.ensureWorldBase().whenComplete((created, error) -> {
                 if (error != null) {

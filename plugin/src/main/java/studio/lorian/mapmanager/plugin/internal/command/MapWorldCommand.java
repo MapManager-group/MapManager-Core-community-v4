@@ -12,11 +12,13 @@ import studio.lorian.mapmanager.api.model.CreateMapRequest;
 import studio.lorian.mapmanager.api.model.ImportMapRequest;
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
+import studio.lorian.mapmanager.api.model.MapStatus;
 import studio.lorian.mapmanager.api.model.WorldType;
 import studio.lorian.mapmanager.api.result.FailureReason;
 import studio.lorian.mapmanager.api.result.OperationName;
 import studio.lorian.mapmanager.api.result.OperationResult;
 import studio.lorian.mapmanager.api.service.MapService;
+import studio.lorian.mapmanager.api.service.MapAccessService;
 import studio.lorian.mapmanager.api.service.MapRoleService;
 import studio.lorian.mapmanager.api.service.MapTravelService;
 import studio.lorian.mapmanager.api.service.PlayerGateway;
@@ -25,7 +27,12 @@ import studio.lorian.mapmanager.plugin.internal.notification.NotificationTarget;
 import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifier;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageException;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 /**
  * 注册并分派 /world 子命令；每个子命令在注册时声明执行方和权限。
@@ -33,6 +40,7 @@ import java.util.*;
 public final class MapWorldCommand extends Command {
     private final JavaPlugin plugin;
     private final MapService maps;
+    private final MapAccessService access;
     private final MapRoleService roles;
     private final MapTravelService travel;
     private final WorldLifeCycleService lifeCycle;
@@ -43,19 +51,22 @@ public final class MapWorldCommand extends Command {
     /**
      * 创建 /world 主命令。
      */
-    public MapWorldCommand(JavaPlugin plugin, MapService maps, MapRoleService roles, MapTravelService travel,
+    public MapWorldCommand(JavaPlugin plugin, MapService maps, MapRoleService roles, MapAccessService access,
+                           MapTravelService travel,
                            WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier) {
-        this("world", plugin, maps, roles, travel, lifeCycle, players, notifier);
+        this("world", plugin, maps, roles, access, travel, lifeCycle, players, notifier);
     }
 
     /**
      * 创建主命令或 /wtp 传送别名。
      */
-    public MapWorldCommand(String name, JavaPlugin plugin, MapService maps, MapRoleService roles, MapTravelService travel,
+    public MapWorldCommand(String name, JavaPlugin plugin, MapService maps, MapRoleService roles,
+                           MapAccessService access, MapTravelService travel,
                            WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier) {
         super(name);
         this.plugin = plugin;
         this.maps = maps;
+        this.access = access;
         this.roles = roles;
         this.travel = travel;
         this.lifeCycle = lifeCycle;
@@ -122,6 +133,131 @@ public final class MapWorldCommand extends Command {
         }
         subcommand.handler.execute(sender, target, args);
         return true;
+    }
+
+    @Override
+    public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
+        if (args.length == 0) return List.of();
+        try {
+            if (getName().equals("wtp"))
+                return args.length == 1 && playerCommandAllowed(sender)
+                        ? suggestions(args[0], accessibleWorldNames((Player) sender)) : List.of();
+            if (args.length == 1) {
+                MapInstance current = sender instanceof Player player && playerCommandAllowed(sender)
+                        ? maps.findByWorldName(player.getWorld().getName()) : null;
+                boolean admin = current != null && current.status() == MapStatus.ACTIVE
+                        && roles.hasRole(current.id(), ((Player) sender).getUniqueId(), MapRole.ADMIN);
+                return suggestions(args[0], subcommands.entrySet().stream()
+                        .filter(entry -> entry.getValue().consoleOnly ? sender instanceof ConsoleCommandSender
+                                : playerCommandAllowed(sender))
+                        .filter(entry -> !Set.of("admin", "builder", "visitor").contains(entry.getKey()) || admin)
+                        .filter(entry -> !Set.of("admins", "builders", "visitors").contains(entry.getKey()) || current != null)
+                        .map(Map.Entry::getKey).toList());
+            }
+            String command = args[0].toLowerCase(Locale.ROOT);
+            Subcommand subcommand = subcommands.get(command);
+            if (subcommand == null || (subcommand.consoleOnly && !(sender instanceof ConsoleCommandSender))
+                    || (!subcommand.consoleOnly && !playerCommandAllowed(sender))) return List.of();
+            String currentArg = args[args.length - 1];
+            return switch (command) {
+                case "tp" -> args.length == 2
+                        ? suggestions(currentArg, accessibleWorldNames((Player) sender)) : List.of();
+                case "init" -> args.length == 2
+                        ? suggestions(currentArg, maps.listMaps().stream()
+                                .filter(map -> map.status() != MapStatus.DELETED).map(MapInstance::worldName).toList())
+                        : List.of();
+                case "import" -> args.length == 2 ? suggestions(currentArg, importableWorldNames())
+                        : creationSuggestions(command, args);
+                case "create" -> creationSuggestions(command, args);
+                case "admin", "builder", "visitor" -> roleSuggestions((Player) sender, command, args);
+                default -> List.of();
+            };
+        } catch (StorageException exception) {
+            return List.of();
+        }
+    }
+
+    private boolean playerCommandAllowed(CommandSender sender) {
+        return sender instanceof Player && sender.hasPermission("mapmanager.world");
+    }
+
+    private List<String> accessibleWorldNames(Player player) {
+        return access.accessibleMaps(player.getUniqueId()).stream().map(MapInstance::worldName).toList();
+    }
+
+    private static List<String> importableWorldNames() {
+        try (Stream<Path> entries = Files.list(Path.of("").toAbsolutePath())) {
+            return entries.filter(path -> !Files.isSymbolicLink(path) && Files.isDirectory(path))
+                    .filter(path -> Files.isRegularFile(path.resolve("level.dat")))
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> name.matches("[a-z0-9_-]{4,16}"))
+                    .toList();
+        } catch (IOException exception) {
+            return List.of();
+        }
+    }
+
+    private List<String> creationSuggestions(String command, String[] args) {
+        boolean creating = command.equals("create");
+        String current = args[args.length - 1];
+        if (args.length == 3 && (creating || !current.contains("="))) {
+            List<String> types = Arrays.stream(WorldType.values())
+                    .map(type -> type.name().toLowerCase(Locale.ROOT)).toList();
+            if (creating) return suggestions(current, types);
+            List<String> choices = new ArrayList<>(types);
+            choices.addAll(optionKeys(false, args));
+            return suggestions(current, choices);
+        }
+        if (args.length < 3) return List.of();
+        if (current.startsWith("group=")) {
+            List<String> choices = new ArrayList<>();
+            choices.add("group=");
+            maps.listMaps().stream().map(MapInstance::groupId).distinct()
+                    .forEach(group -> choices.add("group=" + group));
+            return suggestions(current, choices);
+        }
+        if (current.startsWith("admin="))
+            return suggestions(current, Bukkit.getOnlinePlayers().stream()
+                    .map(player -> "admin=" + player.getName()).toList());
+        if (current.startsWith("structures="))
+            return suggestions(current, List.of("structures=true", "structures=false"));
+        return suggestions(current, optionKeys(creating, args));
+    }
+
+    private static List<String> optionKeys(boolean creating, String[] args) {
+        List<String> keys = new ArrayList<>(List.of("alias=", "group=", "admin="));
+        if (creating) keys.addAll(List.of("flat.height=", "seed=", "structures=", "biome=",
+                "generator=", "generator-settings=", "property."));
+        Set<String> used = new HashSet<>();
+        for (int index = 2; index < args.length - 1; index++) {
+            int separator = args[index].indexOf('=');
+            if (separator > 0) used.add(args[index].substring(0, separator));
+        }
+        keys.removeIf(key -> used.contains(key.substring(0, key.length() - 1)));
+        return keys;
+    }
+
+    private List<String> roleSuggestions(Player sender, String command, String[] args) {
+        if (args.length > 3) return List.of();
+        MapInstance map = maps.findByWorldName(sender.getWorld().getName());
+        if (map == null || map.status() != MapStatus.ACTIVE
+                || !roles.hasRole(map.id(), sender.getUniqueId(), MapRole.ADMIN)) return List.of();
+        if (args.length == 2) return suggestions(args[1], List.of("add", "remove"));
+        MapRole role = MapRole.valueOf(command.toUpperCase(Locale.ROOT));
+        if (args[1].equalsIgnoreCase("add"))
+            return suggestions(args[2], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+        if (!args[1].equalsIgnoreCase("remove")) return List.of();
+        return suggestions(args[2], roles.assignedMembers(map.id(), role).stream()
+                .map(id -> {
+                    String name = Bukkit.getOfflinePlayer(id).getName();
+                    return name == null ? id.toString() : name;
+                }).toList());
+    }
+
+    private static List<String> suggestions(String prefix, Collection<String> choices) {
+        String lower = prefix.toLowerCase(Locale.ROOT);
+        return choices.stream().filter(choice -> choice.toLowerCase(Locale.ROOT).startsWith(lower))
+                .distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
     private void create(CommandSender sender, NotificationTarget target, String[] args) {
@@ -291,7 +427,7 @@ public final class MapWorldCommand extends Command {
         MapInstance selectedMap = manageableCurrentMap(actor, target, operation);
         if (selectedMap == null) return;
         UUID actorId = actor.getUniqueId();
-        players.resolveId(args[2]).whenComplete((memberId, error) -> {
+        resolveMemberId(args[2]).whenComplete((memberId, error) -> {
             if (!plugin.isEnabled()) return;
             Bukkit.getScheduler().runTask(plugin, () -> {
                 Player currentActor = Bukkit.getPlayer(actorId);
@@ -319,6 +455,14 @@ public final class MapWorldCommand extends Command {
                 }
             });
         });
+    }
+
+    private CompletableFuture<UUID> resolveMemberId(String input) {
+        try {
+            return CompletableFuture.completedFuture(UUID.fromString(input));
+        } catch (IllegalArgumentException exception) {
+            return players.resolveId(input);
+        }
     }
 
     private MapInstance manageableCurrentMap(Player actor, NotificationTarget target, OperationName operation) {
