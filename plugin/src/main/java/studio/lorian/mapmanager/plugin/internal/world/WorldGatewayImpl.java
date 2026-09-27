@@ -2,6 +2,7 @@ package studio.lorian.mapmanager.plugin.internal.world;
 
 import studio.lorian.mapmanager.api.service.WorldGateway;
 import org.bukkit.Bukkit;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,7 +39,7 @@ public final class WorldGatewayImpl implements WorldGateway {
         if (levelName == null || levelName.isBlank() || levelName.equals(".") || levelName.equals("..")
                 || levelName.contains("/") || levelName.contains("\\")) {
             var worlds = Bukkit.getWorlds();
-            if (worlds.isEmpty()) throw new IllegalStateException("无法确定主地图：服务器尚未加载世界");
+            if (worlds.isEmpty()) throw new IllegalStateException(Messages.text("errors.no_primary_world"));
             levelName = worlds.get(0).getName();
         }
         Path dimensions = serverDirectory.resolve(levelName).resolve("dimensions/minecraft");
@@ -48,7 +49,7 @@ public final class WorldGatewayImpl implements WorldGateway {
     @Override
     public Path worldDirectory(String worldName) {
         if (worldName == null || !worldName.matches("[A-Za-z0-9_-]{1,100}")) {
-            throw new IllegalArgumentException("世界名无效");
+            throw new IllegalArgumentException(Messages.text("errors.invalid_world_name"));
         }
         return worldParentDirectory().resolve(worldName);
     }

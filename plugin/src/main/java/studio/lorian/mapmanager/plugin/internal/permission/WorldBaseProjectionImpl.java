@@ -4,6 +4,7 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.group.GroupManager;
 import net.luckperms.api.node.types.InheritanceNode;
 import net.luckperms.api.context.DefaultContextKeys;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.util.Objects;
 import java.util.Set;
@@ -37,7 +38,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
     @Override
     public CompletableFuture<Boolean> ensureGroupInheritance(String groupId, Set<String> worldNames) {
         if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE))
-            throw new IllegalArgumentException("地图组不能使用 LuckPerms 基础组名称");
+            throw new IllegalArgumentException(Messages.text("errors.reserved_group"));
         GroupManager manager = luckPerms.getGroupManager();
         return ensureWorldBase().thenCompose(ignored -> manager.loadGroup(groupId)).thenCompose(existing -> existing
                 .map(CompletableFuture::completedFuture)
@@ -55,7 +56,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
     @Override
     public boolean setBuilderAccess(String groupId, UUID playerId, boolean enabled) {
         if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE))
-            throw new IllegalArgumentException("地图组不能使用 LuckPerms 基础组名称");
+            throw new IllegalArgumentException(Messages.text("errors.reserved_group"));
         var manager = luckPerms.getUserManager();
         var user = manager.loadUser(playerId).join();
         var node = InheritanceNode.builder(groupId).build();

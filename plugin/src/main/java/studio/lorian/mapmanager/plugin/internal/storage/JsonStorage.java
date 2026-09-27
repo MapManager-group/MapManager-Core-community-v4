@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import studio.lorian.mapmanager.api.model.MapGroup;
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -57,27 +58,27 @@ public final class JsonStorage implements MapRepository, RoleRepository, Operati
                 Document document = gson.fromJson(reader, Document.class);
                 if (document == null || document.version() != FORMAT || document.maps() == null
                         || document.groups() == null || document.grants() == null || document.operations() == null) {
-                    throw new IOException("不支持或不完整的 JSON 存储格式");
+                    throw new IOException(Messages.text("errors.json_format"));
                 }
                 State loaded = new State();
                 loaded.groups.addAll(document.groups());
                 for (MapInstance map : document.maps()) {
                     StorageValidation.map(map);
-                    if (loaded.maps.putIfAbsent(map.id(), map) != null) throw new IOException("地图 ID 重复");
+                    if (loaded.maps.putIfAbsent(map.id(), map) != null) throw new IOException(Messages.text("errors.duplicate_map_id"));
                 }
                 for (Grant grant : document.grants()) {
                     if (grant == null || grant.role() == null || grant.scopeId() == null || grant.playerId() == null)
-                        throw new IOException("角色记录无效");
+                        throw new IOException(Messages.text("errors.invalid_role_record"));
                     loaded.grants.add(grant);
                 }
                 for (OperationRecord operation : document.operations()) {
-                    if (operation == null || operation.id() == null) throw new IOException("操作记录无效");
+                    if (operation == null || operation.id() == null) throw new IOException(Messages.text("errors.invalid_operation_record"));
                     loaded.operations.put(operation.id(), operation);
                 }
                 validate(loaded);
                 state = loaded;
             } catch (RuntimeException ex) {
-                throw new IOException("JSON 存储读取失败", ex);
+                throw new IOException(Messages.text("errors.json_read_failed"), ex);
             }
         } else {
             state = new State();
@@ -89,13 +90,13 @@ public final class JsonStorage implements MapRepository, RoleRepository, Operati
         Set<String> names = new java.util.HashSet<>();
         for (MapInstance map : value.maps.values()) {
             if (!value.groups.contains(map.groupId()) || !names.add(StorageValidation.key(map.worldName())))
-                throw new IllegalArgumentException("地图组不存在或世界名重复: " + map.worldName());
+                throw new IllegalArgumentException(Messages.text("errors.group_or_world_conflict", "world", map.worldName()));
         }
         for (Grant grant : value.grants) {
             boolean valid = grant.role() == MapRole.VISITOR
                     ? value.maps.containsKey(UUID.fromString(grant.scopeId()))
                     : value.groups.contains(grant.scopeId());
-            if (!valid) throw new IllegalArgumentException("角色作用范围不存在: " + grant.scopeId());
+            if (!valid) throw new IllegalArgumentException(Messages.text("errors.role_scope_missing", "scope", grant.scopeId()));
         }
     }
 
@@ -117,7 +118,7 @@ public final class JsonStorage implements MapRepository, RoleRepository, Operati
         State next = state.copy();
         T result = mutation.apply(next);
         validate(next);
-        try { write(next); } catch (IOException ex) { throw new StorageException("JSON 写入失败", ex); }
+        try { write(next); } catch (IOException ex) { throw new StorageException(Messages.text("errors.json_write_failed"), ex); }
         state = next;
         return result;
     }

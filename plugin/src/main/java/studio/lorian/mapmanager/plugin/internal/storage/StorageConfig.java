@@ -1,6 +1,7 @@
 package studio.lorian.mapmanager.plugin.internal.storage;
 
 import org.bukkit.configuration.file.FileConfiguration;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 /** 插件内部的持久化配置。 */
 public record StorageConfig(Type type, String host, int port, String database,
@@ -12,7 +13,7 @@ public record StorageConfig(Type type, String host, int port, String database,
         Type type = switch (rawType.toLowerCase(java.util.Locale.ROOT)) {
             case "json" -> Type.JSON;
             case "mysql" -> Type.MYSQL;
-            default -> throw new IllegalArgumentException("storage.type 只能是 json 或 mysql");
+            default -> throw new IllegalArgumentException(Messages.text("errors.storage_type"));
         };
         String base = "storage.mysql.";
         String host = config.getString(base + "host", "").trim();
@@ -22,7 +23,7 @@ public record StorageConfig(Type type, String host, int port, String database,
         String password = config.getString(base + "password", "");
         if (type == Type.MYSQL && (host.isBlank() || database.isBlank() || username.isBlank()
                 || port < 1 || port > 65535 || !database.matches("[A-Za-z0-9_]+"))) {
-            throw new IllegalArgumentException("MySQL 配置无效：检查 host、port、database 和 username");
+            throw new IllegalArgumentException(Messages.text("errors.mysql_config"));
         }
         return new StorageConfig(type, host, port, database, username, password,
                 config.getBoolean(base + "use-ssl", true));

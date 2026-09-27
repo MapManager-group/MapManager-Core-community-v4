@@ -7,6 +7,7 @@ import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
 import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
 import studio.lorian.mapmanager.plugin.internal.migration.V3Migration;
 import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifierImpl;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 import studio.lorian.mapmanager.plugin.internal.player.PlayerGatewayImpl;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjectionImpl;
 import studio.lorian.mapmanager.plugin.internal.storage.JsonStorage;
@@ -26,6 +27,7 @@ public final class MapManagerPlugin extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
         try {
+            Messages.load(this);
             StorageConfig config = StorageConfig.load(getConfig());
             Pattern deletionPattern = Pattern.compile(getConfig().getString(
                     "deletion.allowed-world-name-regex", ".*_bak$"));
@@ -37,19 +39,19 @@ public final class MapManagerPlugin extends JavaPlugin {
             String selected = config.type() == StorageConfig.Type.JSON ? "JSON"
                     : "MYSQL:" + config.host() + ":" + config.port() + "/" + config.database();
             if (Files.exists(marker) && !Files.readString(marker, StandardCharsets.UTF_8).trim().equals(selected)) {
-                throw new IllegalStateException("存储后端已变更；请先显式迁移数据，再更改 storage.type");
+                throw new IllegalStateException(Messages.text("startup.backend_changed"));
             }
             var repository = config.type() == StorageConfig.Type.JSON
                     ? new JsonStorage(directory.resolve("maps.json")) : new MySqlStorage(config);
             if (!Files.exists(marker)) Files.writeString(marker, selected + "\n", StandardCharsets.UTF_8);
             LuckPerms luckPerms = getServer().getServicesManager().load(LuckPerms.class);
-            if (luckPerms == null) throw new IllegalStateException("LuckPerms API 服务不可用");
+            if (luckPerms == null) throw new IllegalStateException(Messages.text("startup.luckperms_unavailable"));
             var projection = new WorldBaseProjectionImpl(luckPerms);
             var players = new PlayerGatewayImpl(this);
             var notifier = new OperationNotifierImpl();
             api = new MapManagerImpl(repository, repository, repository, projection, players,
                     deletionPattern, blockedCreationPattern, getLogger());
-            getLogger().info("地图存储已加载: " + selected);
+            getLogger().info(Messages.text("startup.storage_loaded", "backend", selected));
             Path oldDirectory = getDataFolder().getParentFile().toPath().resolve("MapManager-Core");
             new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms)
                     .migrate().whenComplete((message, error) -> {
@@ -57,7 +59,7 @@ public final class MapManagerPlugin extends JavaPlugin {
                         getServer().getScheduler().runTask(this, () -> {
                             if (!isEnabled()) return;
                             if (error != null) {
-                                getLogger().severe("v3 数据迁移失败: " + error.getMessage());
+                                getLogger().severe(Messages.text("startup.migration_failed", "error", error.getMessage()));
                                 getServer().getPluginManager().disablePlugin(this);
                                 return;
                             }
@@ -72,19 +74,18 @@ public final class MapManagerPlugin extends JavaPlugin {
                     });
             projection.ensureWorldBase().whenComplete((created, error) -> {
                 if (error != null) {
-                    getLogger().severe("初始化 LuckPerms worldbase 权限组失败: " + error.getMessage());
+                    getLogger().severe(Messages.text("startup.worldbase_failed", "error", error.getMessage()));
                     if (isEnabled()) {
                         getServer().getScheduler().runTask(this,
                                 () -> getServer().getPluginManager().disablePlugin(this));
                     }
                 } else {
-                    getLogger().info(created ? "已创建并初始化 LuckPerms worldbase 权限组"
-                            : "LuckPerms worldbase 权限组已存在");
+                    getLogger().info(Messages.text(created ? "startup.worldbase_created" : "startup.worldbase_exists"));
                 }
             });
-            getLogger().warning("其他地图生命周期和准入监听仍未实现，尚未发布完整 API 服务。");
+            getLogger().warning(Messages.text("startup.incomplete"));
         } catch (Exception ex) {
-            getLogger().severe("MapManager 启动初始化失败: " + ex.getMessage());
+            getLogger().severe(Messages.text("startup.failed", "error", ex.getMessage()));
             getServer().getPluginManager().disablePlugin(this);
         }
     }

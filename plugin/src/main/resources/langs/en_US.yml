@@ -1,0 +1,137 @@
+result:
+  success: '<green><operation> succeeded. Operation ID: <operationId>'
+  failure: '<red><operation> failed: <reason>. Operation ID: <operationId>'
+  partial: '<yellow><operation> partially completed: <reason>. Pending operation ID: <operationId>'
+operations:
+  CREATE: Create map
+  IMPORT: Import map
+  INITIALIZE: Initialize map
+  DELETE: Delete map
+  LOAD: Load map
+  ADD_MEMBER: Add member
+  REMOVE_MEMBER: Remove member
+  LIST_MEMBERS: List members
+  SET_PUBLIC: Change public access
+  SET_ALIAS: Change map alias
+  SET_PHYSICAL: Change physics
+  SET_EXPLOSION: Change explosions
+  SET_SPAWN: Change spawn
+  TELEPORT: Teleport to map
+  KICK: Remove player from map
+reasons:
+  MAP_NOT_FOUND: Map not found
+  WORLD_NOT_FOUND: World not found
+  ALREADY_EXISTS: Map or world already exists
+  INVALID_INPUT: Invalid input
+  PLAYER_NOT_FOUND: Player not found or could not be resolved
+  PLAYER_NOT_IN_MAP: Player is not in this map
+  NO_PERMISSION: You do not have permission
+  ACCESS_DENIED: Access to this map was denied
+  WORLD_BACKEND_FAILED: World operation failed
+  STORAGE_FAILED: Storage operation failed
+  PERMISSION_SYNC_FAILED: Permission sync failed
+  OPERATION_IN_PROGRESS: An operation is already in progress
+  INTERNAL_ERROR: Internal error
+roles:
+  ADMIN: admin
+  BUILDER: builder
+  VISITOR: visitor
+command:
+  usage_wtp: 'Usage: /wtp <map>'
+  usage_world: 'Usage: /world <create|import|init|delete|tp|kick|admins|builders|visitors|admin|builder|visitor> ...'
+  delete_usage: 'Usage: /world delete <map>, then run /world delete <confirmation code> within 10 seconds'
+  delete_expired: '<red>The deletion code expired. Select the map again.'
+  delete_wrong_code: '<red>Incorrect confirmation code. Use the six-character code from the previous step.'
+  delete_name_denied: '<red>The map name does not match deletion.allowed-world-name-regex, or the code is invalid.'
+  delete_confirm: '<yellow>Confirm deletion of <world>: run /world delete <code> within 10 seconds'
+  kicked: '<gray><operator> removed you from map <world>.'
+  public_map: '<green>This map is public; everyone may visit.'
+  members_header: '<aqua><role>s directly assigned to <world> (<count>):'
+  members_empty: '<gray>No members are directly assigned.'
+  members_entry: '<dark_aqua>> <aqua><player>'
+  member_added: '<green>Added <role> role for <player>.'
+  member_removed: '<green>Removed <role> role from <player>.'
+startup:
+  backend_changed: Storage backend changed; migrate data explicitly before changing storage.type
+  luckperms_unavailable: LuckPerms API service is unavailable
+  storage_loaded: 'Map storage loaded: <backend>'
+  migration_failed: 'v3 data migration failed: <error>'
+  worldbase_failed: 'Failed to initialize LuckPerms worldbase group: <error>'
+  worldbase_created: Created and initialized LuckPerms worldbase group
+  worldbase_exists: LuckPerms worldbase group already exists
+  incomplete: Other map lifecycle features and access listeners are still incomplete; the full API is not published.
+  failed: 'MapManager startup failed: <error>'
+player:
+  mojang_failed: 'Mojang UUID lookup failed: <error>'
+  paper_config_failed: 'Could not read paper-global.yml; trying server.properties: <error>'
+  server_config_failed: 'Could not read server.properties; using the running server configuration: <error>'
+world:
+  create_failed: 'World creation failed for <world>: <reason>'
+  import_failed: 'World import failed for <world>: <reason>'
+  initialize_failed: 'World initialization failed for <world>: <error>'
+  operation_save_failed: 'Could not save failed world operation record: <error>'
+  failed_state_read_failed: 'Could not read failed map state: <error>'
+  storage_failed: '<operation> storage failed for <world>: <error>'
+  operation_failed: '<operation> world operation failed for <world>: <error>'
+  pending_read_failed: 'Could not read pending map <world>: <error>'
+  init_record_failed: 'Could not save initialization record for <world>: <error>'
+  delete_failed: 'World deletion failed for <world>: <reason>'
+  projection_cleanup_failed: 'Could not clean permission projection for <world>: <error>'
+  delete_storage_failed: 'Could not delete map data for <world>: <error>'
+  delete_operation_failed: 'Could not delete map <world>: <error>'
+  delete_record_failed: 'Could not save failed deletion record: <error>'
+migration:
+  done_before: v3 data was migrated previously
+  no_data: No v3 data found
+  done: 'v3 migration complete: <maps> maps, <groups> groups, <roles> role records'
+  files_missing: Both v3 worlds.json and groups.json must exist
+  default_group_missing: Cannot read the LP default group to determine v3 public access
+  uuid_missing: 'Could not resolve v3 player UUID: <player>'
+  marker_failed: Could not write migration completion marker
+  group_conflict: 'v4 group contains other maps: <group>'
+  map_conflict: 'v4 map conflicts with v3 data: <world>'
+  id_conflict: 'v4 map ID conflict: <world>'
+  source_changed: 'v3 source file changed before migration retry: <file>'
+  backup_failed: Could not back up v3 source files
+  read_failed: 'Could not read v3 data: <file>'
+  duplicate_world: 'Invalid v3 data: duplicate world name <world>'
+  missing_group: 'Invalid v3 data: world <world> references missing group <group>'
+  worlds_mismatch: 'Invalid v3 data: group world list differs from worlds.json: <group>'
+  not_object: 'Invalid v3 data: <label> is not a JSON object'
+  invalid_field: 'Invalid v3 data: missing or invalid field <field>'
+  invalid_boolean: 'Invalid v3 data: invalid boolean field <field>'
+  invalid_list: 'Invalid v3 data: invalid member list <field>'
+  invalid_member: 'Invalid v3 data: invalid member in <field>'
+  invalid_player: 'Invalid v3 data: invalid player name <player>'
+  duplicate_entry: 'Invalid v3 data: duplicate entry <entry>'
+  invalid_world: 'Invalid v3 data: invalid world name <value>'
+  invalid_group: 'Invalid v3 data: invalid group ID <value>'
+errors:
+  reserved_group: Map groups cannot use LuckPerms base group names
+  no_primary_world: Cannot determine the primary world because no world is loaded
+  invalid_world_name: Invalid world name
+  invalid_group_id: Invalid group ID
+  invalid_display_name: Invalid display name
+  invalid_spawn: Invalid spawn point
+  storage_type: storage.type must be json or mysql
+  mysql_config: 'Invalid MySQL settings: check host, port, database and username'
+  mv_world_missing: 'Multiverse world does not exist: <world>'
+  json_format: Unsupported or incomplete JSON storage format
+  duplicate_map_id: Duplicate map ID
+  invalid_role_record: Invalid role record
+  invalid_operation_record: Invalid operation record
+  json_read_failed: Could not read JSON storage
+  group_or_world_conflict: 'Group missing or world name duplicated: <world>'
+  role_scope_missing: 'Role scope does not exist: <scope>'
+  json_write_failed: Could not write JSON storage
+  mysql_driver_missing: MySQL driver is unavailable
+  mysql_failed: MySQL operation failed
+  mysql_map_corrupt: MySQL map record is corrupt
+  structures_boolean: structures must be true or false
+  flat_only: flat.height is only supported for FLAT worlds
+  flat_generator_conflict: flat.height and generator-settings cannot be set together
+  flat_height_range: flat.height must be between 1 and 320
+  voidgen_required: VOID worlds require VoidGen
+  mv_alias_failed: 'Multiverse alias sync failed: <world>'
+  bukkit_world_unloaded: 'Bukkit world is not loaded: <world>'
+  gamerule_failed: 'Could not set gamerule: <rule>'

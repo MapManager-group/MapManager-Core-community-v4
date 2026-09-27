@@ -9,6 +9,7 @@ import studio.lorian.mapmanager.api.model.MapStatus;
 import studio.lorian.mapmanager.api.model.SpawnPoint;
 import studio.lorian.mapmanager.api.result.FailureReason;
 import studio.lorian.mapmanager.api.result.OperationName;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -32,7 +33,7 @@ public final class MySqlStorage implements MapRepository, RoleRepository, Operat
         this.url = "jdbc:mysql://" + config.host() + ":" + config.port() + "/" + config.database()
                 + "?useSSL=" + config.useSsl() + "&allowPublicKeyRetrieval=false&characterEncoding=utf8";
         try { Class.forName("com.mysql.cj.jdbc.Driver"); }
-        catch (ClassNotFoundException ex) { throw new StorageException("MySQL 驱动不存在", ex); }
+        catch (ClassNotFoundException ex) { throw new StorageException(Messages.text("errors.mysql_driver_missing"), ex); }
         inConnection(connection -> {
             String[] ddl = {
                     "CREATE TABLE IF NOT EXISTS mm_groups (id VARCHAR(100) COLLATE utf8mb4_bin PRIMARY KEY) ENGINE=InnoDB",
@@ -52,7 +53,7 @@ public final class MySqlStorage implements MapRepository, RoleRepository, Operat
     private <T> T inConnection(SqlTask<T> task) {
         try (Connection connection = DriverManager.getConnection(url, config.username(), config.password())) {
             return task.run(connection);
-        } catch (SQLException ex) { throw new StorageException("MySQL 操作失败", ex); }
+        } catch (SQLException ex) { throw new StorageException(Messages.text("errors.mysql_failed"), ex); }
     }
     private MapInstance readMap(ResultSet rows) throws SQLException {
         try {
@@ -63,7 +64,7 @@ public final class MySqlStorage implements MapRepository, RoleRepository, Operat
                     gson.fromJson(rows.getString("spawn_json"), SpawnPoint.class));
             StorageValidation.map(map);
             return map;
-        } catch (RuntimeException ex) { throw new StorageException("MySQL 地图记录损坏", ex); }
+        } catch (RuntimeException ex) { throw new StorageException(Messages.text("errors.mysql_map_corrupt"), ex); }
     }
     private MapInstance one(String sql, String argument) {
         return inConnection(connection -> {

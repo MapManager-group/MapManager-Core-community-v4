@@ -1,3 +1,5 @@
+language: zh_CN # langs/<语言代码>.yml；缺失条目回退到内置 zh_CN
+
 storage:
   type: json # json | mysql；切换后端不会自动迁移数据
   mysql:

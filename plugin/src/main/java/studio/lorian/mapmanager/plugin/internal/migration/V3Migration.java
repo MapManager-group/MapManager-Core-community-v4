@@ -11,6 +11,7 @@ import studio.lorian.mapmanager.api.model.SpawnPoint;
 import studio.lorian.mapmanager.api.service.PlayerGateway;
 import studio.lorian.mapmanager.plugin.internal.storage.MapRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -44,12 +45,12 @@ public final class V3Migration {
     /** 无源文件或已有完成标记时立即结束；错误会使 future 失败。 */
     public CompletableFuture<String> migrate() {
         Path marker = destination.resolve("v3-migration.done");
-        if (Files.exists(marker)) return CompletableFuture.completedFuture("v3 数据此前已迁移");
+        if (Files.exists(marker)) return CompletableFuture.completedFuture(Messages.text("migration.done_before"));
         boolean worlds = Files.isRegularFile(source.resolve("worlds.json"));
         boolean groups = Files.isRegularFile(source.resolve("groups.json"));
-        if (!worlds && !groups) return CompletableFuture.completedFuture("未发现 v3 数据");
+        if (!worlds && !groups) return CompletableFuture.completedFuture(Messages.text("migration.no_data"));
         if (!worlds || !groups) return CompletableFuture.failedFuture(
-                new IllegalStateException("v3 worlds.json 与 groups.json 必须同时存在"));
+                new IllegalStateException(Messages.text("migration.files_missing")));
 
         LegacySnapshot snapshot;
         try { snapshot = new V3MigrationSourceImpl(source).read(); }
@@ -57,7 +58,7 @@ public final class V3Migration {
 
         var defaultGroup = luckPerms.getGroupManager().getGroup("default");
         if (defaultGroup == null && !snapshot.maps().isEmpty()) return CompletableFuture.failedFuture(
-                new IllegalStateException("无法读取 LP default 组，不能判断 v3 地图公开状态"));
+                new IllegalStateException(Messages.text("migration.default_group_missing")));
         List<MapInstance> imported = snapshot.maps().stream().map(map -> {
             String node = "multiverse.access." + map.worldName().toLowerCase(Locale.ROOT);
             boolean isPublic = defaultGroup.getNodes().stream().anyMatch(value -> value.getKey().equals(node) && value.getValue());
@@ -79,7 +80,7 @@ public final class V3Migration {
         return CompletableFuture.allOf(identities.values().toArray(CompletableFuture[]::new))
                 .thenApplyAsync(ignored -> {
                     for (var entry : identities.entrySet()) if (entry.getValue().join() == null)
-                        throw new IllegalStateException("无法解析 v3 玩家 UUID: " + entry.getKey());
+                        throw new IllegalStateException(Messages.text("migration.uuid_missing", "player", entry.getKey()));
                     preflight(imported, snapshot);
                     backup();
                     for (String group : snapshot.groups()) maps.saveGroup(new MapGroup(group, java.util.Set.of()));
@@ -91,9 +92,9 @@ public final class V3Migration {
                         roles.add(scope, grant.role(), identities.get(grant.playerName().toLowerCase(Locale.ROOT)).join());
                     }
                     try { Files.writeString(marker, "v3 migration completed\n"); }
-                    catch (IOException ex) { throw new IllegalStateException("迁移完成标记写入失败", ex); }
-                    return "v3 迁移完成: " + imported.size() + " 张地图, " + snapshot.groups().size()
-                            + " 个组, " + snapshot.roles().size() + " 条角色记录";
+                    catch (IOException ex) { throw new IllegalStateException(Messages.text("migration.marker_failed"), ex); }
+                    return Messages.text("migration.done", "maps", imported.size(), "groups", snapshot.groups().size(),
+                            "roles", snapshot.roles().size());
                 });
     }
 
@@ -102,15 +103,15 @@ public final class V3Migration {
             MapGroup existingGroup = maps.findGroup(group);
             if (existingGroup != null && existingGroup.worldNames().stream().anyMatch(world -> imported.stream()
                     .noneMatch(map -> map.worldName().equals(world) && map.groupId().equals(group))))
-                throw new IllegalStateException("v4 地图组已包含其他地图: " + group);
+                throw new IllegalStateException(Messages.text("migration.group_conflict", "group", group));
         }
         for (MapInstance map : imported) {
             MapInstance existing = maps.findByWorldName(map.worldName());
             if (existing != null && !existing.equals(map))
-                throw new IllegalStateException("v4 地图已存在且与 v3 数据冲突: " + map.worldName());
+                throw new IllegalStateException(Messages.text("migration.map_conflict", "world", map.worldName()));
             existing = maps.findById(map.id());
             if (existing != null && !existing.equals(map))
-                throw new IllegalStateException("v4 地图 ID 冲突: " + map.worldName());
+                throw new IllegalStateException(Messages.text("migration.id_conflict", "world", map.worldName()));
         }
     }
 
@@ -123,8 +124,8 @@ public final class V3Migration {
                 Path copy = backup.resolve(name);
                 if (!Files.exists(copy)) Files.copy(original, copy);
                 else if (Files.mismatch(original, copy) != -1)
-                    throw new IllegalStateException("v3 源文件在迁移重试前发生变化: " + name);
+                    throw new IllegalStateException(Messages.text("migration.source_changed", "file", name));
             }
-        } catch (IOException ex) { throw new IllegalStateException("备份 v3 源文件失败", ex); }
+        } catch (IOException ex) { throw new IllegalStateException(Messages.text("migration.backup_failed"), ex); }
     }
 }

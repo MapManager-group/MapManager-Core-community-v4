@@ -9,6 +9,7 @@ import studio.lorian.mapmanager.api.result.OperationResult;
 import studio.lorian.mapmanager.api.service.MapAliasService;
 import studio.lorian.mapmanager.plugin.internal.storage.MapRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageException;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.util.UUID;
 import java.util.Objects;
@@ -36,7 +37,7 @@ public final class MapAliasServiceImpl implements MapAliasService {
     /** 读取 Multiverse 中已有的别名，去掉最前面的颜色代码。 */
     String currentAlias(MapInstance map) {
         var world = MultiverseCoreApi.get().getWorldManager().getWorld(map.worldName()).getOrNull();
-        if (world == null) throw new IllegalStateException("Multiverse 世界不存在: " + map.worldName());
+        if (world == null) throw new IllegalStateException(Messages.text("errors.mv_world_missing", "world", map.worldName()));
         String alias = world.getAlias();
         String text = alias == null ? "" : stripColor(alias);
         return text.isBlank() ? map.displayName() : text;

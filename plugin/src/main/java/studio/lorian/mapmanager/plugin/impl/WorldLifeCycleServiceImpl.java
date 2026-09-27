@@ -30,6 +30,7 @@ import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
 import studio.lorian.mapmanager.api.service.WorldGateway;
 import studio.lorian.mapmanager.api.service.MapAliasService;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjection;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 import studio.lorian.mapmanager.plugin.internal.storage.MapRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.OperationRecord;
 import studio.lorian.mapmanager.plugin.internal.storage.OperationRepository;
@@ -99,7 +100,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 request.displayName(), request.ownerId(), () -> {
                     var result = MultiverseCoreApi.get().getWorldManager().createWorld(options);
                     if (result.isFailure())
-                        logger.warning("创建世界失败 " + request.worldName() + ": " + result.getFailureReason());
+                        logger.warning(Messages.text("world.create_failed", "world", request.worldName(),
+                                "reason", result.getFailureReason()));
                     return result.getOrNull();
                 });
     }
@@ -111,13 +113,13 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         try {
             operations.save(new OperationRecord(id, operation, name, OperationStage.FAILED, reason));
         } catch (Exception exception) {
-            logger.severe("保存世界操作失败记录失败: " + exception.getMessage());
+            logger.severe(Messages.text("world.operation_save_failed", "error", exception.getMessage()));
         }
         MapInstance map;
         try {
             map = maps.findByWorldName(name);
         } catch (Exception exception) {
-            logger.severe("读取失败地图状态失败: " + exception.getMessage());
+            logger.severe(Messages.text("world.failed_state_read_failed", "error", exception.getMessage()));
             map = null;
         }
         return map == null ? new OperationResult.Failure<>(operation, id, reason)
@@ -171,11 +173,11 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         CreateWorldOptions options = CreateWorldOptions.worldName(request.worldName()).doFolderCheck(true)
                 .generateStructures(Boolean.parseBoolean(params.getOrDefault("structures", "false")));
         if (params.containsKey("structures") && !Set.of("true", "false").contains(params.get("structures")))
-            throw new IllegalArgumentException("structures 必须是 true 或 false");
+            throw new IllegalArgumentException(Messages.text("errors.structures_boolean"));
         if (params.containsKey("flat.height") && type != WorldType.FLAT)
-            throw new IllegalArgumentException("flat.height 仅支持 FLAT 世界");
+            throw new IllegalArgumentException(Messages.text("errors.flat_only"));
         if (params.containsKey("flat.height") && params.containsKey("generator-settings"))
-            throw new IllegalArgumentException("flat.height 与 generator-settings 不能同时设置");
+            throw new IllegalArgumentException(Messages.text("errors.flat_generator_conflict"));
         if (params.containsKey("seed")) options.seed(Long.parseLong(params.get("seed")));
         if (params.containsKey("biome")) options.biome(params.get("biome"));
         if (params.containsKey("generator")) options.generator(params.get("generator"));
@@ -190,7 +192,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 options.worldType(org.bukkit.WorldType.FLAT).environment(World.Environment.NORMAL);
                 if (params.containsKey("flat.height")) {
                     int height = Integer.parseInt(params.get("flat.height"));
-                    if (height < 1 || height > 320) throw new IllegalArgumentException("flat.height 超出 1-320");
+                    if (height < 1 || height > 320) throw new IllegalArgumentException(Messages.text("errors.flat_height_range"));
                     JsonObject settings = new JsonObject();
                     JsonArray layers = new JsonArray();
                     JsonObject layer = new JsonObject();
@@ -205,7 +207,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             case NORMAL -> options.worldType(org.bukkit.WorldType.NORMAL).environment(World.Environment.NORMAL);
             case VOID -> {
                 if (!Bukkit.getPluginManager().isPluginEnabled("VoidGen"))
-                    throw new IllegalArgumentException("VOID 世界需要 VoidGen");
+                    throw new IllegalArgumentException(Messages.text("errors.voidgen_required"));
                 options.worldType(org.bukkit.WorldType.FLAT).environment(World.Environment.NORMAL)
                         .generator(params.getOrDefault("generator", "VoidGen:{}"));
             }
@@ -242,7 +244,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         return registerWorld(OperationName.IMPORT, operationId, name, request.groupId(), request.displayName(),
                 request.ownerId(), () -> {
                     var result = MultiverseCoreApi.get().getWorldManager().importWorld(options);
-                    if (result.isFailure()) logger.warning("导入世界失败 " + name + ": " + result.getFailureReason());
+                    if (result.isFailure()) logger.warning(Messages.text("world.import_failed", "world", name,
+                            "reason", result.getFailureReason()));
                     return result.getOrNull();
                 });
     }
@@ -277,7 +280,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             try {
                 initializeWorld(world, pending.id(), requestedAlias);
             } catch (RuntimeException exception) {
-                logger.warning("初始化世界失败 " + name + ": " + exception.getMessage());
+                logger.warning(Messages.text("world.initialize_failed", "world", name, "error", exception.getMessage()));
                 return failed(operationId, name, FailureReason.WORLD_BACKEND_FAILED, operation);
             }
 
@@ -301,10 +304,12 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             operations.save(new OperationRecord(operationId, operation, name, OperationStage.COMPLETED, null));
             return new OperationResult.Success<>(operation, operationId, active);
         } catch (StorageException exception) {
-            logger.severe(operation + " 地图存储失败 " + name + ": " + exception.getMessage());
+            logger.severe(Messages.text("world.storage_failed", "operation", Messages.text("operations." + operation),
+                    "world", name, "error", exception.getMessage()));
             return failed(operationId, name, FailureReason.STORAGE_FAILED, operation);
         } catch (Exception exception) {
-            logger.severe(operation + " 地图操作失败 " + name + ": " + exception.getMessage());
+            logger.severe(Messages.text("world.operation_failed", "operation", Messages.text("operations." + operation),
+                    "world", name, "error", exception.getMessage()));
             return failed(operationId, name, FailureReason.INTERNAL_ERROR, operation);
         }
     }
@@ -317,7 +322,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         OperationResult<Void> aliasResult = blank(requestedAlias)
                 ? aliases.setAlias(mapId) : aliases.setAlias(mapId, requestedAlias);
         if (!(aliasResult instanceof OperationResult.Success<?>))
-            throw new IllegalStateException("Multiverse 别名同步失败: " + world.getName());
+            throw new IllegalStateException(Messages.text("errors.mv_alias_failed", "world", world.getName()));
         world.setDifficulty(Difficulty.PEACEFUL).get();
         world.setAutoLoad(true).get();
         world.setKeepSpawnInMemory(false).get();
@@ -332,7 +337,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         world.getEntitySpawnConfig().getSpawnCategoryConfig(SpawnCategory.MISC).setSpawn(true).get();
 
         World bukkitWorld = world.getBukkitWorld().getOrNull();
-        if (bukkitWorld == null) throw new IllegalStateException("Bukkit 世界未加载: " + world.getName());
+        if (bukkitWorld == null) throw new IllegalStateException(Messages.text("errors.bukkit_world_unloaded", "world", world.getName()));
         setRule(bukkitWorld, GameRule.RANDOM_TICK_SPEED, 0);
         setRule(bukkitWorld, GameRule.DO_FIRE_TICK, false);
         setRule(bukkitWorld, GameRule.DO_WEATHER_CYCLE, false);
@@ -348,7 +353,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
      */
     private static <T> void setRule(World world, GameRule<T> rule, T value) {
         if (!world.setGameRule(rule, value))
-            throw new IllegalStateException("无法设置 gamerule: " + rule.getName());
+            throw new IllegalStateException(Messages.text("errors.gamerule_failed", "rule", rule.getName()));
     }
 
     @Override
@@ -360,7 +365,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         try {
             map = maps.findByWorldName(worldName);
         } catch (StorageException exception) {
-            logger.severe("读取待初始化地图失败 " + worldName + ": " + exception.getMessage());
+            logger.severe(Messages.text("world.pending_read_failed", "world", worldName, "error", exception.getMessage()));
             return new OperationResult.Failure<>(OperationName.INITIALIZE, operationId, FailureReason.STORAGE_FAILED);
         }
         if (map == null)
@@ -375,10 +380,10 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             operations.save(new OperationRecord(operationId, OperationName.INITIALIZE, worldName, OperationStage.COMPLETED, null));
             return new OperationResult.Success<>(OperationName.INITIALIZE, operationId, map);
         } catch (StorageException exception) {
-            logger.severe("保存初始化记录失败 " + worldName + ": " + exception.getMessage());
+            logger.severe(Messages.text("world.init_record_failed", "world", worldName, "error", exception.getMessage()));
             return failed(operationId, worldName, FailureReason.STORAGE_FAILED, OperationName.INITIALIZE);
         } catch (RuntimeException exception) {
-            logger.warning("初始化世界失败 " + worldName + ": " + exception.getMessage());
+            logger.warning(Messages.text("world.initialize_failed", "world", worldName, "error", exception.getMessage()));
             return failed(operationId, worldName, FailureReason.WORLD_BACKEND_FAILED, OperationName.INITIALIZE);
         }
     }
@@ -427,7 +432,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 if (world == null) return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
                 var result = manager.deleteWorld(DeleteWorldOptions.world(world));
                 if (result.isFailure()) {
-                    logger.warning("删除世界失败 " + map.worldName() + ": " + result.getFailureReason());
+                    logger.warning(Messages.text("world.delete_failed", "world", map.worldName(),
+                            "reason", result.getFailureReason()));
                     return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
                 }
             }
@@ -451,7 +457,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     return deleteFailed(id, FailureReason.PERMISSION_SYNC_FAILED);
                 }
             } catch (RuntimeException exception) {
-                logger.warning("清理地图权限投影失败 " + map.worldName() + ": " + exception.getMessage());
+                logger.warning(Messages.text("world.projection_cleanup_failed", "world", map.worldName(),
+                        "error", exception.getMessage()));
                 return deleteFailed(id, FailureReason.PERMISSION_SYNC_FAILED);
             }
 
@@ -464,10 +471,10 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             operations.save(new OperationRecord(id, OperationName.DELETE, map.worldName(), OperationStage.COMPLETED, null));
             return new OperationResult.Success<>(OperationName.DELETE, id, null);
         } catch (StorageException exception) {
-            logger.severe("删除地图存储失败 " + worldName + ": " + exception.getMessage());
+            logger.severe(Messages.text("world.delete_storage_failed", "world", worldName, "error", exception.getMessage()));
             return deleteFailed(id, FailureReason.STORAGE_FAILED);
         } catch (RuntimeException exception) {
-            logger.warning("删除地图失败 " + worldName + ": " + exception.getMessage());
+            logger.warning(Messages.text("world.delete_operation_failed", "world", worldName, "error", exception.getMessage()));
             return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
         }
     }
@@ -478,7 +485,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             if (record != null) operations.save(new OperationRecord(id, OperationName.DELETE,
                     record.worldName(), OperationStage.FAILED, reason));
         } catch (RuntimeException exception) {
-            logger.severe("保存删除失败记录失败: " + exception.getMessage());
+            logger.severe(Messages.text("world.delete_record_failed", "error", exception.getMessage()));
         }
         return new OperationResult.Failure<>(OperationName.DELETE, id, reason);
     }

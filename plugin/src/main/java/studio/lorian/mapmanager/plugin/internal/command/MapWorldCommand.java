@@ -24,6 +24,7 @@ import studio.lorian.mapmanager.api.service.PlayerGateway;
 import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
 import studio.lorian.mapmanager.plugin.internal.notification.NotificationTarget;
 import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifier;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageException;
 
 import java.io.IOException;
@@ -104,8 +105,7 @@ public final class MapWorldCommand extends Command {
                 Map.entry("visitor", new Subcommand(false, OperationName.ADD_MEMBER,
                         (sender, target, args) -> changeMember(sender, target, args, MapRole.VISITOR)))
         );
-        setUsage(name.equals("wtp") ? "/wtp <地图名>"
-                : "/world <create|import|init|delete|tp|kick|admins|builders|visitors|admin|builder|visitor> ...");
+        setUsage(Messages.text(name.equals("wtp") ? "command.usage_wtp" : "command.usage_world"));
     }
 
     @Override
@@ -393,7 +393,7 @@ public final class MapWorldCommand extends Command {
     private void delete(CommandSender sender, NotificationTarget target, String[] args) {
         if (args.length != 2) {
             fail(target, OperationName.DELETE, FailureReason.INVALID_INPUT);
-            notifier.notify(target, "用法: /world delete <地图名>，然后在 10 秒内执行 /world delete <确认码>");
+            notifier.notifyKey(target, "command.delete_usage");
             return;
         }
         String input = args[1];
@@ -402,7 +402,7 @@ public final class MapWorldCommand extends Command {
             pendingDeletion = null;
             if (System.nanoTime() - pending.issuedAtNanos() >= DELETE_CONFIRM_NANOS) {
                 fail(target, OperationName.DELETE, FailureReason.INVALID_INPUT);
-                notifier.notify(target, "删除确认码已过期，请重新指定地图。");
+                notifier.notifyKey(target, "command.delete_expired");
                 return;
             }
             try {
@@ -421,14 +421,14 @@ public final class MapWorldCommand extends Command {
         if (pending != null) {
             if (System.nanoTime() - pending.issuedAtNanos() < DELETE_CONFIRM_NANOS) {
                 fail(target, OperationName.DELETE, FailureReason.INVALID_INPUT);
-                notifier.notify(target, "确认码不正确；请使用上一步提供的 6 位字符串。");
+                notifier.notifyKey(target, "command.delete_wrong_code");
                 return;
             }
             pendingDeletion = null;
         }
         if (!deletionPattern.matcher(input).matches()) {
             fail(target, OperationName.DELETE, FailureReason.ACCESS_DENIED);
-            notifier.notify(target, "地图名不符合 deletion.allowed-world-name-regex，或确认码无效。");
+            notifier.notifyKey(target, "command.delete_name_denied");
             return;
         }
         try {
@@ -446,7 +446,7 @@ public final class MapWorldCommand extends Command {
                 chars[i] = CONFIRM_CHARACTERS.charAt(RANDOM.nextInt(CONFIRM_CHARACTERS.length()));
             String code = new String(chars);
             pendingDeletion = new PendingDeletion(map.id(), map.worldName(), code, System.nanoTime());
-            notifier.notify(target, "确认删除地图 " + map.worldName() + "：请在 10 秒内执行 /world delete " + code);
+            notifier.notifyKey(target, "command.delete_confirm", "world", map.worldName(), "code", code);
         } catch (StorageException exception) {
             fail(target, OperationName.DELETE, FailureReason.STORAGE_FAILED);
         }
@@ -490,8 +490,8 @@ public final class MapWorldCommand extends Command {
         OperationResult<Void> result = travel.kickFromMap(operator.getUniqueId(), member.getUniqueId());
         notifier.notify(target, result);
         if (result instanceof OperationResult.Success<?>)
-            notifier.notify(NotificationTarget.player(member.getName()),
-                    "§7你已被 " + operator.getName() + " 移出地图 " + worldName + "。");
+            notifier.notifyKey(NotificationTarget.player(member.getName()), "command.kicked",
+                    "operator", operator.getName(), "world", worldName);
     }
 
     /**
@@ -514,16 +514,17 @@ public final class MapWorldCommand extends Command {
                 return;
             }
             if (role == MapRole.VISITOR && map.settings().isPublic())
-                sender.sendMessage("§a当前地图公开，所有玩家均可参观。");
+                notifier.notifyKey(target, "command.public_map");
             List<String> names = roles.assignedMembers(map.id(), role).stream()
                     .map(id -> {
                         String name = Bukkit.getOfflinePlayer(id).getName();
                         return name == null ? id.toString() : name;
                     })
                     .sorted(String.CASE_INSENSITIVE_ORDER).toList();
-            sender.sendMessage("§b" + map.worldName() + " 的" + roleName(role) + "（" + names.size() + " 人）：");
-            if (names.isEmpty()) sender.sendMessage("§7暂无直接授予的成员。");
-            else names.forEach(name -> sender.sendMessage("§3> §b" + name));
+            notifier.notifyKey(target, "command.members_header", "world", map.worldName(),
+                    "role", roleName(role), "count", names.size());
+            if (names.isEmpty()) notifier.notifyKey(target, "command.members_empty");
+            else names.forEach(name -> notifier.notifyKey(target, "command.members_entry", "player", name));
         } catch (StorageException exception) {
             fail(target, OperationName.LIST_MEMBERS, FailureReason.STORAGE_FAILED);
         }
@@ -564,8 +565,9 @@ public final class MapWorldCommand extends Command {
                             : roles.removeMember(map.id(), memberId, role);
                     notifier.notify(target, result);
                     if (result instanceof OperationResult.Success<?>)
-                        notifier.notify(target, "§a已" + (operation == OperationName.ADD_MEMBER ? "添加" : "移除")
-                                + " " + args[2] + " 的" + roleName(role) + "角色。");
+                        notifier.notifyKey(target, operation == OperationName.ADD_MEMBER
+                                ? "command.member_added" : "command.member_removed",
+                                "player", args[2], "role", roleName(role));
                 } catch (StorageException exception) {
                     fail(target, operation, FailureReason.STORAGE_FAILED);
                 }
@@ -599,13 +601,7 @@ public final class MapWorldCommand extends Command {
         }
     }
 
-    private static String roleName(MapRole role) {
-        return switch (role) {
-            case ADMIN -> "管理员";
-            case BUILDER -> "建筑者";
-            case VISITOR -> "访客";
-        };
-    }
+    private static String roleName(MapRole role) { return Messages.text("roles." + role); }
 
     private void fail(NotificationTarget target, OperationName operation, FailureReason reason) {
         notifier.notify(target, new OperationResult.Failure<>(operation, UUID.randomUUID(), reason));

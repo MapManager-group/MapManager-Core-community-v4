@@ -9,6 +9,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.api.model.SpawnPoint;
 import studio.lorian.mapmanager.api.service.PlayerGateway;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,7 +67,7 @@ public final class PlayerGatewayImpl implements PlayerGateway {
             try {
                 return profile.complete(false, true) ? profile.getId() : null;
             } catch (RuntimeException ex) {
-                plugin.getLogger().warning("查询 Mojang UUID 失败: " + ex.getMessage());
+                plugin.getLogger().warning(Messages.text("player.mojang_failed", "error", ex.getMessage()));
                 return null;
             }
         });
@@ -87,7 +88,7 @@ public final class PlayerGatewayImpl implements PlayerGateway {
                     return config.getBoolean("proxies.bungee-cord.online-mode");
                 }
             } catch (Exception ex) {
-                plugin.getLogger().warning("读取 paper-global.yml 失败，改用 server.properties: " + ex.getMessage());
+                plugin.getLogger().warning(Messages.text("player.paper_config_failed", "error", ex.getMessage()));
             }
         }
         Path propertiesFile = serverDirectory.resolve("server.properties");
@@ -99,7 +100,7 @@ public final class PlayerGatewayImpl implements PlayerGateway {
                 if ("true".equalsIgnoreCase(value)) return true;
                 if ("false".equalsIgnoreCase(value)) return false;
             } catch (IOException ex) {
-                plugin.getLogger().warning("读取 server.properties 失败，改用服务器运行配置: " + ex.getMessage());
+                plugin.getLogger().warning(Messages.text("player.server_config_failed", "error", ex.getMessage()));
             }
         }
         return plugin.getServer().getOnlineMode();

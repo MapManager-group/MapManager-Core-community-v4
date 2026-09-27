@@ -1,0 +1,137 @@
+result:
+  success: '<green><operation>成功。操作 ID：<operationId>'
+  failure: '<red><operation>失败：<reason>。操作 ID：<operationId>'
+  partial: '<yellow><operation>部分完成：<reason>。待处理操作 ID：<operationId>'
+operations:
+  CREATE: 创建地图
+  IMPORT: 导入地图
+  INITIALIZE: 初始化地图
+  DELETE: 删除地图
+  LOAD: 加载地图
+  ADD_MEMBER: 添加成员
+  REMOVE_MEMBER: 移除成员
+  LIST_MEMBERS: 查询成员
+  SET_PUBLIC: 修改公开状态
+  SET_ALIAS: 修改地图别名
+  SET_PHYSICAL: 修改物理设置
+  SET_EXPLOSION: 修改爆炸设置
+  SET_SPAWN: 修改出生点
+  TELEPORT: 传送地图
+  KICK: 移出地图
+reasons:
+  MAP_NOT_FOUND: 地图不存在
+  WORLD_NOT_FOUND: 世界不存在
+  ALREADY_EXISTS: 地图或世界已存在
+  INVALID_INPUT: 参数无效
+  PLAYER_NOT_FOUND: 玩家不存在或无法解析
+  PLAYER_NOT_IN_MAP: 玩家不在该地图
+  NO_PERMISSION: 没有操作权限
+  ACCESS_DENIED: 无权进入该地图
+  WORLD_BACKEND_FAILED: 世界操作失败
+  STORAGE_FAILED: 数据存储失败
+  PERMISSION_SYNC_FAILED: 权限同步失败
+  OPERATION_IN_PROGRESS: 操作正在进行
+  INTERNAL_ERROR: 内部错误
+roles:
+  ADMIN: 管理员
+  BUILDER: 建筑者
+  VISITOR: 访客
+command:
+  usage_wtp: '用法：/wtp <地图名>'
+  usage_world: '用法：/world <create|import|init|delete|tp|kick|admins|builders|visitors|admin|builder|visitor> ...'
+  delete_usage: '用法：/world delete <地图名>，然后在 10 秒内执行 /world delete <确认码>'
+  delete_expired: '<red>删除确认码已过期，请重新指定地图。'
+  delete_wrong_code: '<red>确认码不正确；请使用上一步提供的 6 位字符串。'
+  delete_name_denied: '<red>地图名不符合 deletion.allowed-world-name-regex，或确认码无效。'
+  delete_confirm: '<yellow>确认删除地图 <world>：请在 10 秒内执行 /world delete <code>'
+  kicked: '<gray>你已被 <operator> 移出地图 <world>。'
+  public_map: '<green>当前地图公开，所有玩家均可参观。'
+  members_header: '<aqua><world> 的<role>（<count> 人）：'
+  members_empty: '<gray>暂无直接授予的成员。'
+  members_entry: '<dark_aqua>> <aqua><player>'
+  member_added: '<green>已添加 <player> 的<role>角色。'
+  member_removed: '<green>已移除 <player> 的<role>角色。'
+startup:
+  backend_changed: 存储后端已变更；请先显式迁移数据，再更改 storage.type
+  luckperms_unavailable: LuckPerms API 服务不可用
+  storage_loaded: '地图存储已加载：<backend>'
+  migration_failed: 'v3 数据迁移失败：<error>'
+  worldbase_failed: '初始化 LuckPerms worldbase 权限组失败：<error>'
+  worldbase_created: 已创建并初始化 LuckPerms worldbase 权限组
+  worldbase_exists: LuckPerms worldbase 权限组已存在
+  incomplete: 其他地图生命周期和准入监听仍未实现，尚未发布完整 API 服务。
+  failed: 'MapManager 启动初始化失败：<error>'
+player:
+  mojang_failed: '查询 Mojang UUID 失败：<error>'
+  paper_config_failed: '读取 paper-global.yml 失败，改用 server.properties：<error>'
+  server_config_failed: '读取 server.properties 失败，改用服务器运行配置：<error>'
+world:
+  create_failed: '创建世界失败 <world>：<reason>'
+  import_failed: '导入世界失败 <world>：<reason>'
+  initialize_failed: '初始化世界失败 <world>：<error>'
+  operation_save_failed: '保存世界操作失败记录失败：<error>'
+  failed_state_read_failed: '读取失败地图状态失败：<error>'
+  storage_failed: '<operation> 地图存储失败 <world>：<error>'
+  operation_failed: '<operation> 地图操作失败 <world>：<error>'
+  pending_read_failed: '读取待初始化地图失败 <world>：<error>'
+  init_record_failed: '保存初始化记录失败 <world>：<error>'
+  delete_failed: '删除世界失败 <world>：<reason>'
+  projection_cleanup_failed: '清理地图权限投影失败 <world>：<error>'
+  delete_storage_failed: '删除地图存储失败 <world>：<error>'
+  delete_operation_failed: '删除地图失败 <world>：<error>'
+  delete_record_failed: '保存删除失败记录失败：<error>'
+migration:
+  done_before: v3 数据此前已迁移
+  no_data: 未发现 v3 数据
+  done: 'v3 迁移完成：<maps> 张地图，<groups> 个组，<roles> 条角色记录'
+  files_missing: v3 worlds.json 与 groups.json 必须同时存在
+  default_group_missing: 无法读取 LP default 组，不能判断 v3 地图公开状态
+  uuid_missing: '无法解析 v3 玩家 UUID：<player>'
+  marker_failed: 迁移完成标记写入失败
+  group_conflict: 'v4 地图组已包含其他地图：<group>'
+  map_conflict: 'v4 地图已存在且与 v3 数据冲突：<world>'
+  id_conflict: 'v4 地图 ID 冲突：<world>'
+  source_changed: 'v3 源文件在迁移重试前发生变化：<file>'
+  backup_failed: 备份 v3 源文件失败
+  read_failed: '读取 v3 数据失败：<file>'
+  duplicate_world: 'v3 数据无效：重复世界名 <world>'
+  missing_group: 'v3 数据无效：世界 <world> 引用缺失地图组 <group>'
+  worlds_mismatch: 'v3 数据无效：地图组世界列表与 worlds.json 不一致：<group>'
+  not_object: 'v3 数据无效：<label> 不是 JSON 对象'
+  invalid_field: 'v3 数据无效：缺失或无效字段 <field>'
+  invalid_boolean: 'v3 数据无效：无效布尔字段 <field>'
+  invalid_list: 'v3 数据无效：无效成员列表 <field>'
+  invalid_member: 'v3 数据无效：无效成员 <field>'
+  invalid_player: 'v3 数据无效：无效玩家名 <player>'
+  duplicate_entry: 'v3 数据无效：重复条目 <entry>'
+  invalid_world: 'v3 数据无效：无效世界名 <value>'
+  invalid_group: 'v3 数据无效：无效地图组 ID <value>'
+errors:
+  reserved_group: 地图组不能使用 LuckPerms 基础组名称
+  no_primary_world: 无法确定主地图：服务器尚未加载世界
+  invalid_world_name: 世界名无效
+  invalid_group_id: 地图组 ID 无效
+  invalid_display_name: 显示名无效
+  invalid_spawn: 出生点无效
+  storage_type: storage.type 只能是 json 或 mysql
+  mysql_config: MySQL 配置无效：检查 host、port、database 和 username
+  mv_world_missing: 'Multiverse 世界不存在：<world>'
+  json_format: 不支持或不完整的 JSON 存储格式
+  duplicate_map_id: 地图 ID 重复
+  invalid_role_record: 角色记录无效
+  invalid_operation_record: 操作记录无效
+  json_read_failed: JSON 存储读取失败
+  group_or_world_conflict: '地图组不存在或世界名重复：<world>'
+  role_scope_missing: '角色作用范围不存在：<scope>'
+  json_write_failed: JSON 写入失败
+  mysql_driver_missing: MySQL 驱动不存在
+  mysql_failed: MySQL 操作失败
+  mysql_map_corrupt: MySQL 地图记录损坏
+  structures_boolean: structures 必须是 true 或 false
+  flat_only: flat.height 仅支持 FLAT 世界
+  flat_generator_conflict: flat.height 与 generator-settings 不能同时设置
+  flat_height_range: flat.height 超出 1-320
+  voidgen_required: VOID 世界需要 VoidGen
+  mv_alias_failed: 'Multiverse 别名同步失败：<world>'
+  bukkit_world_unloaded: 'Bukkit 世界未加载：<world>'
+  gamerule_failed: '无法设置 gamerule：<rule>'
