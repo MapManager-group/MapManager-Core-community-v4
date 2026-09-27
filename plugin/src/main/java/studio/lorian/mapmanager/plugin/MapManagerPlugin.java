@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
 import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
+import studio.lorian.mapmanager.plugin.internal.migration.V3Migration;
 import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifierImpl;
 import studio.lorian.mapmanager.plugin.internal.player.PlayerGatewayImpl;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjectionImpl;
@@ -48,13 +49,27 @@ public final class MapManagerPlugin extends JavaPlugin {
             var notifier = new OperationNotifierImpl();
             api = new MapManagerImpl(repository, repository, repository, projection, players,
                     deletionPattern, blockedCreationPattern, getLogger());
-            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
-                    notifier, deletionPattern));
-            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
-                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
-                    notifier, deletionPattern));
             getLogger().info("地图存储已加载: " + selected);
+            Path oldDirectory = getDataFolder().getParentFile().toPath().resolve("MapManager-Core");
+            new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms)
+                    .migrate().whenComplete((message, error) -> {
+                        if (!isEnabled()) return;
+                        getServer().getScheduler().runTask(this, () -> {
+                            if (!isEnabled()) return;
+                            if (error != null) {
+                                getLogger().severe("v3 数据迁移失败: " + error.getMessage());
+                                getServer().getPluginManager().disablePlugin(this);
+                                return;
+                            }
+                            getLogger().info(message);
+                            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
+                                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
+                                    notifier, deletionPattern));
+                            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
+                                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
+                                    notifier, deletionPattern));
+                        });
+                    });
             projection.ensureWorldBase().whenComplete((created, error) -> {
                 if (error != null) {
                     getLogger().severe("初始化 LuckPerms worldbase 权限组失败: " + error.getMessage());

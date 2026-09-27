@@ -37,7 +37,8 @@ MapManager-v4/
 
 | 入口或方法 | 直接依赖 | 结果或副作用 |
 |---|---|---|
-| `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl` | 装配服务、注册命令、异步确保 `worldbase` 存在 |
+| `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；`V3Migration`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl` | 装配服务、检测旧文件并完成迁移后注册命令、异步确保 `worldbase` 存在 |
+| `V3Migration.migrate` | `V3MigrationSourceImpl`、LP 默认组只读节点、MV 别名/出生点只读元数据、`PlayerGateway.resolveId`、`MapRepository`、`RoleRepository` | 校验并备份 v3 JSON；UUID 全部解析成功后写入 MMC 存储，成功写完成标记；不写 LP 或 MV |
 | `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家与服务端世界目录 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标 |
 | `MapManagerImpl` | `MapRepository`、`RoleRepository`、`OperationRepository`、`WorldBaseProjection`、`PlayerGateway` | 组装地图、角色、准入、别名、设置、传送和生命周期服务 |
 | `MapAccessServiceImpl.decide` | `MapRepository.findById` → `MapRoleService.hasRole` | 按 MMC 地图状态、角色和公开状态决定准入；不读取 LP |
