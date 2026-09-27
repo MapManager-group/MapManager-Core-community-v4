@@ -17,7 +17,7 @@ public interface WorldLifeCycleService {
     OperationResult<MapInstance> create(CreateMapRequest request);
 
     /**
-     * 导入已有世界并将其注册为 MMC 地图。
+     * 导入服务端根目录下包含 {@code level.dat} 的已有世界，并将其注册为 MMC 地图。
      *
      * @param request 导入参数和初始所有者
      * @return 导入后的地图，或操作失败结果
@@ -25,7 +25,7 @@ public interface WorldLifeCycleService {
     OperationResult<MapInstance> importWorld(ImportMapRequest request);
 
     /**
-     * 为已加载的现有世界应用 MMC 默认设置。
+     * 为已加载的 MMC 地图重放 Multiverse 属性、按公开状态设置别名、生物生成限制及 gamerule 默认设置。
      *
      * @param worldName 服务器世界名称
      * @return 初始化后的地图，或操作失败结果

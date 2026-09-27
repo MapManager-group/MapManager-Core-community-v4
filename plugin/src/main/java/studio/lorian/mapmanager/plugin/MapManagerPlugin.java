@@ -3,6 +3,9 @@ package studio.lorian.mapmanager.plugin;
 import net.luckperms.api.LuckPerms;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
+import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
+import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifierImpl;
+import studio.lorian.mapmanager.plugin.internal.player.PlayerGatewayImpl;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjectionImpl;
 import studio.lorian.mapmanager.plugin.internal.storage.JsonStorage;
 import studio.lorian.mapmanager.plugin.internal.storage.MySqlStorage;
@@ -32,11 +35,20 @@ public final class MapManagerPlugin extends JavaPlugin {
             var repository = config.type() == StorageConfig.Type.JSON
                     ? new JsonStorage(directory.resolve("maps.json")) : new MySqlStorage(config);
             if (!Files.exists(marker)) Files.writeString(marker, selected + "\n", StandardCharsets.UTF_8);
-            api = new MapManagerImpl(repository, repository);
-            getLogger().info("地图存储已加载: " + selected);
             LuckPerms luckPerms = getServer().getServicesManager().load(LuckPerms.class);
             if (luckPerms == null) throw new IllegalStateException("LuckPerms API 服务不可用");
-            new WorldBaseProjectionImpl(luckPerms).ensureWorldBase().whenComplete((created, error) -> {
+            var projection = new WorldBaseProjectionImpl(luckPerms);
+            api = new MapManagerImpl(repository, repository, repository, projection, getLogger());
+            var players = new PlayerGatewayImpl(this);
+            var notifier = new OperationNotifierImpl();
+            getServer().getCommandMap().register("mapmanager", new MapWorldCommand(this,
+                    api.worldLifeCycle(), players, notifier));
+            getServer().getCommandMap().register("mapmanager", new MapWorldCommand("create", this,
+                    api.worldLifeCycle(), players, notifier));
+            getServer().getCommandMap().register("mapmanager", new MapWorldCommand("import", this,
+                    api.worldLifeCycle(), players, notifier));
+            getLogger().info("地图存储已加载: " + selected);
+            projection.ensureWorldBase().whenComplete((created, error) -> {
                 if (error != null) {
                     getLogger().severe("初始化 LuckPerms worldbase 权限组失败: " + error.getMessage());
                     if (isEnabled()) {
@@ -48,7 +60,7 @@ public final class MapManagerPlugin extends JavaPlugin {
                             : "LuckPerms worldbase 权限组已存在");
                 }
             });
-            getLogger().warning("地图生命周期、准入、命令和权限同步仍未实现，尚未发布完整 API 服务。");
+            getLogger().warning("其他地图生命周期、准入和角色权限同步仍未实现，尚未发布完整 API 服务。");
         } catch (Exception ex) {
             getLogger().severe("MapManager 启动初始化失败: " + ex.getMessage());
             getServer().getPluginManager().disablePlugin(this);

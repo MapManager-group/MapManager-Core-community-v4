@@ -11,6 +11,10 @@
     <artifactId>mapmanager-plugin</artifactId>
     <repositories>
         <repository>
+            <id>multiverse</id>
+            <url>https://repo.onarandombox.com/content/groups/public/</url>
+        </repository>
+        <repository>
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
@@ -31,6 +35,12 @@
             <groupId>net.luckperms</groupId>
             <artifactId>api</artifactId>
             <version>5.4</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mvplugins.multiverse.core</groupId>
+            <artifactId>multiverse-core</artifactId>
+            <version>5.7.2</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

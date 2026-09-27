@@ -1,5 +1,6 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import org.bukkit.Bukkit;
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapSettings;
 import studio.lorian.mapmanager.api.model.SpawnPoint;
@@ -16,7 +17,11 @@ import java.util.function.Function;
 /** 修改 MMC 持久化的单地图设置。 */
 public final class MapSettingsServiceImpl implements MapSettingsService {
     private final MapRepository maps;
-    public MapSettingsServiceImpl(MapRepository maps) { this.maps = maps; }
+    private final MapAliasServiceImpl aliases;
+    public MapSettingsServiceImpl(MapRepository maps, MapAliasServiceImpl aliases) {
+        this.maps = maps;
+        this.aliases = aliases;
+    }
 
     private synchronized OperationResult<Void> change(UUID id, OperationName operation,
                                                        Function<MapInstance, MapInstance> edit) {
@@ -36,12 +41,31 @@ public final class MapSettingsServiceImpl implements MapSettingsService {
     private MapInstance with(MapInstance old, String name, MapSettings settings, SpawnPoint spawn) {
         return new MapInstance(old.id(), old.worldName(), old.groupId(), name, settings, old.status(), spawn);
     }
-    @Override public OperationResult<Void> setPublic(UUID id, boolean value) {
-        return change(id, OperationName.SET_PUBLIC, old -> with(old, old.displayName(),
-                new MapSettings(old.settings().physical(), old.settings().explosion(), value), old.spawn()));
+    @Override public synchronized OperationResult<Void> setPublic(UUID id, boolean value) {
+        UUID operationId = UUID.randomUUID();
+        if (id == null || !Bukkit.isPrimaryThread())
+            return new OperationResult.Failure<>(OperationName.SET_PUBLIC, operationId, FailureReason.INVALID_INPUT);
+        try {
+            MapInstance old = maps.findById(id);
+            if (old == null) return new OperationResult.Failure<>(OperationName.SET_PUBLIC, operationId, FailureReason.MAP_NOT_FOUND);
+            // 先读取原有 MV 别名并去掉旧颜色，避免公开状态切换时把别名重置为地图名。
+            String alias = aliases.currentAlias(old);
+            maps.save(with(old, old.displayName(), new MapSettings(old.settings().physical(),
+                    old.settings().explosion(), value), old.spawn()));
+            OperationResult<Void> synced = aliases.setAlias(id, alias);
+            if (synced instanceof OperationResult.Failure<Void> failure)
+                return new OperationResult.Partial<>(OperationName.SET_PUBLIC, operationId, null, failure.reason());
+            if (synced instanceof OperationResult.Partial<Void> partial)
+                return new OperationResult.Partial<>(OperationName.SET_PUBLIC, operationId, null, partial.reason());
+            return new OperationResult.Success<>(OperationName.SET_PUBLIC, operationId, null);
+        } catch (StorageException exception) {
+            return new OperationResult.Failure<>(OperationName.SET_PUBLIC, operationId, FailureReason.STORAGE_FAILED);
+        } catch (RuntimeException exception) {
+            return new OperationResult.Failure<>(OperationName.SET_PUBLIC, operationId, FailureReason.WORLD_BACKEND_FAILED);
+        }
     }
     @Override public OperationResult<Void> setDisplayName(UUID id, String name) {
-        return change(id, OperationName.SET_ALIAS, old -> with(old, name, old.settings(), old.spawn()));
+        return aliases.setAlias(id, name);
     }
     @Override public OperationResult<Void> setPhysical(UUID id, boolean value) {
         return change(id, OperationName.SET_PHYSICAL, old -> with(old, old.displayName(),

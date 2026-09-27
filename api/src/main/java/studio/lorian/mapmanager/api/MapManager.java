@@ -1,6 +1,7 @@
 package studio.lorian.mapmanager.api;
 
 import studio.lorian.mapmanager.api.service.MapAccessService;
+import studio.lorian.mapmanager.api.service.MapAliasService;
 import studio.lorian.mapmanager.api.service.MapRoleService;
 import studio.lorian.mapmanager.api.service.MapService;
 import studio.lorian.mapmanager.api.service.MapSettingsService;
@@ -40,6 +41,13 @@ public interface MapManager {
      * @return 地图设置服务
      */
     MapSettingsService settings();
+
+    /**
+     * 返回按地图公开状态同步 Multiverse 别名的服务。
+     *
+     * @return 地图别名服务
+     */
+    MapAliasService aliases();
 
     /**
      * 返回地图传送及玩家移出服务。

@@ -2,7 +2,7 @@ package studio.lorian.mapmanager.api.model;
 
 import java.util.UUID;
 
-/** 将已有世界目录注册为 MMC 地图的请求。
+/** 将服务端根目录下已有的世界目录注册为 MMC 地图的请求；该目录必须包含 {@code level.dat}。
  *
  * @param worldName 要导入的现有服务器世界名称
  * @param displayName 面向玩家显示的地图名称

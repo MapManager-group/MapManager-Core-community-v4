@@ -8,7 +8,7 @@ import java.util.UUID;
 /** 修改单张地图的公开状态、显示名称、方块物理、爆炸和出生点。 */
 public interface MapSettingsService {
     /**
-     * 设置是否允许任意玩家以访客身份进入地图。
+     * 设置是否允许任意玩家以访客身份进入地图，并刷新 Multiverse 别名颜色。
      *
      * @param mapId 要修改的地图标识
      * @param isPublic {@code true} 表示允许公开访客进入
@@ -17,7 +17,7 @@ public interface MapSettingsService {
     OperationResult<Void> setPublic(UUID mapId, boolean isPublic);
 
     /**
-     * 修改面向玩家显示的地图名称。
+     * 修改面向玩家显示的地图名称，并刷新 Multiverse 别名。
      *
      * @param mapId 要修改的地图标识
      * @param displayName 新的显示名称
