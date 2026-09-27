@@ -5,8 +5,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.permissions.Permission;
-import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.api.model.CreateMapRequest;
 import studio.lorian.mapmanager.api.model.ImportMapRequest;
@@ -19,6 +17,7 @@ import studio.lorian.mapmanager.api.result.OperationName;
 import studio.lorian.mapmanager.api.result.OperationResult;
 import studio.lorian.mapmanager.api.service.MapService;
 import studio.lorian.mapmanager.api.service.MapAccessService;
+import studio.lorian.mapmanager.api.service.AccessDecision;
 import studio.lorian.mapmanager.api.service.MapRoleService;
 import studio.lorian.mapmanager.api.service.MapTravelService;
 import studio.lorian.mapmanager.api.service.PlayerGateway;
@@ -35,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 /**
- * 注册并分派 /world 子命令；每个子命令在注册时声明执行方和权限。
+ * 注册并分派 /world 子命令；玩家操作由 MMC 地图角色与准入规则授权。
  */
 public final class MapWorldCommand extends Command {
     private final JavaPlugin plugin;
@@ -73,27 +72,26 @@ public final class MapWorldCommand extends Command {
         this.players = players;
         this.notifier = notifier;
         this.subcommands = Map.ofEntries(
-                Map.entry("create", new Subcommand(true, null, OperationName.CREATE, this::create)),
-                Map.entry("import", new Subcommand(true, null, OperationName.IMPORT, this::importWorld)),
-                Map.entry("init", new Subcommand(true, null, OperationName.INITIALIZE, this::initialize)),
-                Map.entry("tp", new Subcommand(false, "mapmanager.world", OperationName.TELEPORT, this::teleport)),
-                Map.entry("kick", new Subcommand(false, "mapmanager.world", OperationName.KICK, this::kick)),
-                Map.entry("admins", new Subcommand(false, "mapmanager.world", OperationName.LIST_MEMBERS,
+                Map.entry("create", new Subcommand(true, OperationName.CREATE, this::create)),
+                Map.entry("import", new Subcommand(true, OperationName.IMPORT, this::importWorld)),
+                Map.entry("init", new Subcommand(true, OperationName.INITIALIZE, this::initialize)),
+                Map.entry("tp", new Subcommand(false, OperationName.TELEPORT, this::teleport)),
+                Map.entry("kick", new Subcommand(false, OperationName.KICK, this::kick)),
+                Map.entry("admins", new Subcommand(false, OperationName.LIST_MEMBERS,
                         (sender, target, args) -> listMembers(sender, target, args, MapRole.ADMIN))),
-                Map.entry("builders", new Subcommand(false, "mapmanager.world", OperationName.LIST_MEMBERS,
+                Map.entry("builders", new Subcommand(false, OperationName.LIST_MEMBERS,
                         (sender, target, args) -> listMembers(sender, target, args, MapRole.BUILDER))),
-                Map.entry("visitors", new Subcommand(false, "mapmanager.world", OperationName.LIST_MEMBERS,
+                Map.entry("visitors", new Subcommand(false, OperationName.LIST_MEMBERS,
                         (sender, target, args) -> listMembers(sender, target, args, MapRole.VISITOR))),
-                Map.entry("admin", new Subcommand(false, "mapmanager.world", OperationName.ADD_MEMBER,
+                Map.entry("admin", new Subcommand(false, OperationName.ADD_MEMBER,
                         (sender, target, args) -> changeMember(sender, target, args, MapRole.ADMIN))),
-                Map.entry("builder", new Subcommand(false, "mapmanager.world", OperationName.ADD_MEMBER,
+                Map.entry("builder", new Subcommand(false, OperationName.ADD_MEMBER,
                         (sender, target, args) -> changeMember(sender, target, args, MapRole.BUILDER))),
-                Map.entry("visitor", new Subcommand(false, "mapmanager.world", OperationName.ADD_MEMBER,
+                Map.entry("visitor", new Subcommand(false, OperationName.ADD_MEMBER,
                         (sender, target, args) -> changeMember(sender, target, args, MapRole.VISITOR)))
         );
         setUsage(name.equals("wtp") ? "/wtp <地图名>"
                 : "/world <create|import|init|tp|kick|admins|builders|visitors|admin|builder|visitor> ...");
-        registerPlayerPermissions();
     }
 
     @Override
@@ -128,10 +126,6 @@ public final class MapWorldCommand extends Command {
             fail(target, operation, FailureReason.INVALID_INPUT);
             return true;
         }
-        if (subcommand.permission != null && !sender.hasPermission(subcommand.permission)) {
-            fail(target, operation, FailureReason.NO_PERMISSION);
-            return true;
-        }
         subcommand.handler.execute(sender, target, args);
         return true;
     }
@@ -141,24 +135,26 @@ public final class MapWorldCommand extends Command {
         if (args.length == 0) return List.of();
         try {
             if (getName().equals("wtp"))
-                return args.length == 1 && playerCommandAllowed(sender)
+                return args.length == 1 && sender instanceof Player
                         ? suggestions(args[0], accessibleWorldNames((Player) sender)) : List.of();
             if (args.length == 1) {
-                MapInstance current = sender instanceof Player player && playerCommandAllowed(sender)
+                MapInstance current = sender instanceof Player player
                         ? maps.findByWorldName(player.getWorld().getName()) : null;
-                boolean admin = current != null && current.status() == MapStatus.ACTIVE
-                        && roles.hasRole(current.id(), ((Player) sender).getUniqueId(), MapRole.ADMIN);
+                AccessDecision decision = current == null ? null
+                        : access.decide(((Player) sender).getUniqueId(), current.id());
+                boolean canEnter = decision != null && decision.allowed();
+                boolean admin = canEnter && decision.effectiveRole() == MapRole.ADMIN;
                 return suggestions(args[0], subcommands.entrySet().stream()
                         .filter(entry -> entry.getValue().consoleOnly ? sender instanceof ConsoleCommandSender
-                                : playerCommandAllowed(sender))
+                                : sender instanceof Player)
                         .filter(entry -> !Set.of("admin", "builder", "visitor", "kick").contains(entry.getKey()) || admin)
-                        .filter(entry -> !Set.of("admins", "builders", "visitors").contains(entry.getKey()) || current != null)
+                        .filter(entry -> !Set.of("admins", "builders", "visitors").contains(entry.getKey()) || canEnter)
                         .map(Map.Entry::getKey).toList());
             }
             String command = args[0].toLowerCase(Locale.ROOT);
             Subcommand subcommand = subcommands.get(command);
             if (subcommand == null || (subcommand.consoleOnly && !(sender instanceof ConsoleCommandSender))
-                    || (!subcommand.consoleOnly && !playerCommandAllowed(sender))) return List.of();
+                    || (!subcommand.consoleOnly && !(sender instanceof Player))) return List.of();
             String currentArg = args[args.length - 1];
             return switch (command) {
                 case "tp" -> args.length == 2
@@ -167,7 +163,7 @@ public final class MapWorldCommand extends Command {
                         ? kickSuggestions((Player) sender, currentArg) : List.of();
                 case "init" -> args.length == 2
                         ? suggestions(currentArg, maps.listMaps().stream()
-                                .filter(map -> map.status() != MapStatus.DELETED).map(MapInstance::worldName).toList())
+                        .filter(map -> map.status() != MapStatus.DELETED).map(MapInstance::worldName).toList())
                         : List.of();
                 case "import" -> args.length == 2 ? suggestions(currentArg, importableWorldNames())
                         : creationSuggestions(command, args);
@@ -180,18 +176,14 @@ public final class MapWorldCommand extends Command {
         }
     }
 
-    private boolean playerCommandAllowed(CommandSender sender) {
-        return sender instanceof Player && sender.hasPermission("mapmanager.world");
-    }
-
     private List<String> accessibleWorldNames(Player player) {
         return access.accessibleMaps(player.getUniqueId()).stream().map(MapInstance::worldName).toList();
     }
 
     private List<String> kickSuggestions(Player sender, String prefix) {
         MapInstance map = maps.findByWorldName(sender.getWorld().getName());
-        if (map == null || map.status() != MapStatus.ACTIVE
-                || !roles.hasRole(map.id(), sender.getUniqueId(), MapRole.ADMIN)) return List.of();
+        if (map == null || access.decide(sender.getUniqueId(), map.id()).effectiveRole() != MapRole.ADMIN)
+            return List.of();
         return suggestions(prefix, sender.getWorld().getPlayers().stream().map(Player::getName).toList());
     }
 
@@ -250,8 +242,8 @@ public final class MapWorldCommand extends Command {
     private List<String> roleSuggestions(Player sender, String command, String[] args) {
         if (args.length > 3) return List.of();
         MapInstance map = maps.findByWorldName(sender.getWorld().getName());
-        if (map == null || map.status() != MapStatus.ACTIVE
-                || !roles.hasRole(map.id(), sender.getUniqueId(), MapRole.ADMIN)) return List.of();
+        if (map == null || access.decide(sender.getUniqueId(), map.id()).effectiveRole() != MapRole.ADMIN)
+            return List.of();
         if (args.length == 2) return suggestions(args[1], List.of("add", "remove"));
         MapRole role = MapRole.valueOf(command.toUpperCase(Locale.ROOT));
         if (args[1].equalsIgnoreCase("add"))
@@ -397,7 +389,9 @@ public final class MapWorldCommand extends Command {
         notifier.notify(target, travel.teleport(player.getUniqueId(), map.id()));
     }
 
-    /** 将当前 MMC 地图中的在线玩家送至 Multiverse 默认世界出生点。 */
+    /**
+     * 将当前 MMC 地图中的在线玩家送至 Multiverse 默认世界出生点。
+     */
     private void kick(CommandSender sender, NotificationTarget target, String[] args) {
         if (args.length != 2) {
             fail(target, OperationName.KICK, FailureReason.INVALID_INPUT);
@@ -417,7 +411,9 @@ public final class MapWorldCommand extends Command {
                     "§7你已被 " + operator.getName() + " 移出地图 " + worldName + "。");
     }
 
-    /** 当前地图决定角色作用范围；名单只显示直接授予的成员。 */
+    /**
+     * 当前地图决定角色作用范围；名单只显示直接授予的成员。
+     */
     private void listMembers(CommandSender sender, NotificationTarget target, String[] args, MapRole role) {
         if (args.length != 1) {
             fail(target, OperationName.LIST_MEMBERS, FailureReason.INVALID_INPUT);
@@ -427,6 +423,11 @@ public final class MapWorldCommand extends Command {
             MapInstance map = maps.findByWorldName(((Player) sender).getWorld().getName());
             if (map == null) {
                 fail(target, OperationName.LIST_MEMBERS, FailureReason.MAP_NOT_FOUND);
+                return;
+            }
+            AccessDecision decision = access.decide(((Player) sender).getUniqueId(), map.id());
+            if (!decision.allowed()) {
+                fail(target, OperationName.LIST_MEMBERS, decision.denialReason());
                 return;
             }
             if (role == MapRole.VISITOR && map.settings().isPublic())
@@ -445,7 +446,9 @@ public final class MapWorldCommand extends Command {
         }
     }
 
-    /** 先验证当前地图管理员，再异步解析用户名，最后在主线程重新验证并修改角色。 */
+    /**
+     * 先验证当前地图管理员，再异步解析用户名，最后在主线程重新验证并修改角色。
+     */
     private void changeMember(CommandSender sender, NotificationTarget target, String[] args, MapRole role) {
         OperationName operation = args.length > 1 && args[1].equalsIgnoreCase("remove")
                 ? OperationName.REMOVE_MEMBER : OperationName.ADD_MEMBER;
@@ -502,7 +505,7 @@ public final class MapWorldCommand extends Command {
                 fail(target, operation, FailureReason.MAP_NOT_FOUND);
                 return null;
             }
-            if (!roles.hasRole(map.id(), actor.getUniqueId(), MapRole.ADMIN)) {
+            if (access.decide(actor.getUniqueId(), map.id()).effectiveRole() != MapRole.ADMIN) {
                 fail(target, operation, FailureReason.NO_PERMISSION);
                 return null;
             }
@@ -525,27 +528,11 @@ public final class MapWorldCommand extends Command {
         notifier.notify(target, new OperationResult.Failure<>(operation, UUID.randomUUID(), reason));
     }
 
-    private void registerPlayerPermissions() {
-        subcommands.values().stream().map(Subcommand::permission).filter(Objects::nonNull)
-                .distinct().forEach(permission -> {
-                    if (plugin.getServer().getPluginManager().getPermission(permission) == null) {
-                        plugin.getServer().getPluginManager().addPermission(
-                                new Permission(permission, PermissionDefault.FALSE));
-                    }
-                });
-    }
-
     @FunctionalInterface
     private interface Handler {
         void execute(CommandSender sender, NotificationTarget target, String[] args);
     }
 
-    private record Subcommand(boolean consoleOnly, String permission, OperationName operation, Handler handler) {
-        private Subcommand {
-            if (!consoleOnly && (permission == null || permission.isBlank()))
-                throw new IllegalArgumentException("玩家子命令必须声明权限节点");
-            if (consoleOnly && permission != null)
-                throw new IllegalArgumentException("仅控制台子命令不能配置玩家权限节点");
-        }
+    private record Subcommand(boolean consoleOnly, OperationName operation, Handler handler) {
     }
 }

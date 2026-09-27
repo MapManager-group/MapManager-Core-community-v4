@@ -18,6 +18,6 @@ MySQL 自动创建五张 InnoDB 表：
 
 `settings_json` 和 `spawn_json` 在 `mm_maps` 中各占一个 JSON 字段，出生点可为 `NULL`。删除地图时访客授权级联删除；仍有地图引用的组不能删除。JSON 后端以相同的逻辑关系写入单文件，每次写入使用临时文件和原子替换。
 
-地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admins|builders|visitors` 查询当前地图的直接授予成员，`/world admin|builder|visitor add|remove <用户名>` 由 MMC 当前地图组管理员执行。玩家命令需要默认关闭的 `mapmanager.world` 权限。组角色会同步 LP 地图组成员，若 MMC 写入成功而 LP 同步失败则返回 `Partial`；重复命令可以重新投影。自动重试、全路径准入监听和 v3 迁移仍未实现，当前版本不会发布完整 `MapManager` API。
+地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admins|builders|visitors` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名>` 和 `/world kick` 仅由 MMC 当前地图组管理员执行；所有玩家可执行 `/world tp`，但入图仍由 MMC 准入判断。玩家命令不检查 Bukkit 权限节点。组角色会同步 LP 地图组成员，若 MMC 写入成功而 LP 同步失败则返回 `Partial`；重复命令可以重新投影。自动重试、全路径准入监听和 v3 迁移仍未实现，当前版本不会发布完整 `MapManager` API。
 
 `PlayerGateway.resolveId` 优先在线玩家和服务端缓存。未命中时先读取 `config/paper-global.yml` 中已启用的 Velocity/Bungee 代理的 `online-mode`，否则读取 `server.properties`；正版模式异步向 Mojang 补全 UUID，离线模式按 `OfflinePlayer:<用户名>` 计算 UUID。`WorldGateway` 只提供目录查询：先读取 `server.properties` 的 `level-name`，读取不到时使用 `Bukkit.getWorlds().get(0).getName()`；存在 `<level-name>/dimensions/minecraft` 时以此作为地图父目录，否则使用服务端工作目录。路径查询不会创建目录。创建和导入等操作统一由 `WorldLifeCycleService` 定义。

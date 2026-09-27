@@ -54,7 +54,7 @@ MapManager-v4/
   → RoleRepository.members（组 ADMIN/BUILDER；地图 VISITOR）
 
 /world admin|builder|visitor add|remove <用户名>
-  → MapWorldCommand（mapmanager.world + 当前地图 ADMIN 身份）
+  → MapWorldCommand（当前地图 MMC ADMIN 身份）
   → PlayerGateway.resolveId（在线 → 缓存 → Mojang/离线 UUID）
   → 主线程复核当前地图及 ADMIN 身份
   → MapRoleService.addMember/removeMember
