@@ -2,7 +2,9 @@ package studio.lorian.mapmanager.plugin;
 
 import net.luckperms.api.LuckPerms;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
+import studio.lorian.mapmanager.api.MapManager;
 import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
 import studio.lorian.mapmanager.plugin.impl.WorldVersionServiceImpl;
 import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
@@ -20,6 +22,7 @@ import studio.lorian.mapmanager.plugin.internal.storage.StorageConfig;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 
 /** Paper 插件入口；加载配置和选定的持久化后端。 */
@@ -61,27 +64,19 @@ public final class MapManagerPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new MapSettingsListener(repository), this);
             getLogger().info(Messages.text("startup.storage_loaded", "backend", selected));
             Path oldDirectory = getDataFolder().getParentFile().toPath().resolve("MapManager-Core");
-            new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms)
-                    .migrate().whenComplete((message, error) -> {
+            CompletableFuture<String> migration = new V3Migration(
+                    oldDirectory, directory, repository, repository, players, luckPerms).migrate();
+            CompletableFuture<Boolean> worldBase = projection.ensureWorldBase();
+            migration.whenComplete((message, error) -> {
+                if (error != null && isEnabled()) {
+                    getServer().getScheduler().runTask(this, () -> {
                         if (!isEnabled()) return;
-                        getServer().getScheduler().runTask(this, () -> {
-                            if (!isEnabled()) return;
-                            if (error != null) {
-                                getLogger().severe(Messages.text("startup.migration_failed", "error", error.getMessage()));
-                                getServer().getPluginManager().disablePlugin(this);
-                                return;
-                            }
-                            getLogger().info(message);
-                            accessListener.checkOnlinePlayers();
-                            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                                    api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
-                                    notifier, deletionPattern, accessListener));
-                            Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
-                                    api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
-                                    notifier, deletionPattern, accessListener));
-                        });
+                        getLogger().severe(Messages.text("startup.migration_failed", "error", error.getMessage()));
+                        getServer().getPluginManager().disablePlugin(this);
                     });
-            projection.ensureWorldBase().whenComplete((created, error) -> {
+                }
+            });
+            worldBase.whenComplete((created, error) -> {
                 if (error != null) {
                     getLogger().severe(Messages.text("startup.worldbase_failed", "error", error.getMessage()));
                     if (isEnabled()) {
@@ -92,6 +87,21 @@ public final class MapManagerPlugin extends JavaPlugin {
                     getLogger().info(Messages.text(created ? "startup.worldbase_created" : "startup.worldbase_exists"));
                 }
             });
+            CompletableFuture.allOf(migration, worldBase).whenComplete((ignored, error) -> {
+                if (error != null || !isEnabled()) return;
+                getServer().getScheduler().runTask(this, () -> {
+                    if (!isEnabled()) return;
+                    getLogger().info(migration.join());
+                    accessListener.checkOnlinePlayers();
+                    Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
+                            api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
+                            notifier, deletionPattern, accessListener));
+                    Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
+                            api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
+                            notifier, deletionPattern, accessListener));
+                    Bukkit.getServicesManager().register(MapManager.class, api, this, ServicePriority.Normal);
+                });
+            });
             getLogger().warning(Messages.text("startup.incomplete"));
         } catch (Exception ex) {
             getLogger().severe(Messages.text("startup.failed", "error", ex.getMessage()));
@@ -101,6 +111,7 @@ public final class MapManagerPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (api != null) Bukkit.getServicesManager().unregister(MapManager.class, api);
         api = null;
     }
 }

@@ -50,7 +50,7 @@ plugin/src/main/java/studio/lorian/mapmanager/plugin/
   notification/统一通知路由与消息格式
 ```
 
-`api` 是调用方编译依赖，`plugin` 已有 Paper 入口和实际业务实现。主类装配服务并注册 `/world`、`/wtp` 命令及 `MapAccessListener`，但尚未通过 Bukkit ServicesManager 注册 `MapManager`。`PlayerGateway`、`WorldGateway` 和 `WorldVersionService` 接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，地图版本服务公开版本读取和兼容性判断，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
+`api` 是调用方编译依赖，`plugin` 有 Paper 入口和实际业务实现。存储迁移与 LP `worldbase` 初始化均成功后，主类在主线程通过 Bukkit ServicesManager 发布 `MapManager`，并注册 `/world`、`/wtp` 命令及 `MapAccessListener`。外部插件依赖和服务获取方式见 [API_GUIDE.md](API_GUIDE.md)。`PlayerGateway`、`WorldGateway` 和 `WorldVersionService` 接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，地图版本服务公开版本读取和兼容性判断，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
 
 ## 3. API 核心类型
 
@@ -178,4 +178,4 @@ ACTIVE → ARCHIVED / DELETING → DELETED
 
 1. 完成创建、导入和删除失败恢复；让 LP 投影异步执行并支持自动重试；实现玩家断线 API。
 2. 为 v3 自动迁移增加 dry-run、目标备份及详细差异报告；实现 JSON/MySQL 显式后端迁移。
-3. 将 `MapManager` 注册到 Bukkit ServicesManager，随后完成构建和 Paper、Multiverse-Core、LuckPerms 集成验证。
+3. 完成 Maven 打包和 Paper、Multiverse-Core、LuckPerms 集成验证，并验证外部插件通过 Bukkit ServicesManager 获取 `MapManager`。

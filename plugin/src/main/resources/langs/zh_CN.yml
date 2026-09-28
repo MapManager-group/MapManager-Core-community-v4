@@ -74,7 +74,7 @@ startup:
   worldbase_failed: '初始化 LuckPerms worldbase 权限组失败：<error>'
   worldbase_created: 已创建并初始化 LuckPerms worldbase 权限组
   worldbase_exists: LuckPerms worldbase 权限组已存在
-  incomplete: 部分地图生命周期功能仍未完成，完整 API 服务尚未发布。
+  incomplete: 部分地图生命周期功能仍未完成。
   failed: 'MapManager 启动初始化失败：<error>'
 player:
   mojang_failed: '查询 Mojang UUID 失败：<error>'

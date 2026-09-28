@@ -51,7 +51,7 @@
 | LuckPerms `apply` 共享权限组 | 未迁移 | v3 地图组继承 `apply`（无世界上下文）；v4 地图组仅维护 `default` 和带世界上下文的 `worldbase`。v4 将 MMC 作为准入来源，旧 `public` LP 组也不再代表公开状态 |
 | `/mapadmin save`、`reload`、`sync` 与 `/write` | 无直接命令等价物 | v4 对业务数据自动持久化；没有手动导出/重载命令、LuckPerms 全量重同步命令或操作记录查看/恢复命令。LP 同步失败后可重复角色修改重试，但没有自动重试队列 |
 | 全局 physics/explosion 管理命令 | 未保留 | v3 有 `/mapadmin physics|explosion true|false|clear` 和配置字段，v4 明确只保留单地图设置。另经检查，v3 当前监听器调用的 `isPhysical/isExploded` 只读取地图节点，未读取这些全局值，因此不能把旧全局配置描述为当前有效的事件覆盖 |
-| 对外 `MapManager` API 使用 | 未接通 | v4 定义并组装了 `MapManager` 服务对象，但主类尚未注册到 Bukkit ServicesManager；其他插件无法通过标准服务注册获取该实例 |
+| 对外 `MapManager` API 使用 | 已实现 | 存储迁移和 LP `worldbase` 初始化成功后，主类通过 Bukkit ServicesManager 以 `ServicePriority.Normal` 注册服务，停用时撤销注册；Paper 外部插件需声明依赖并允许共享 provider classpath，调用方式见 [API_GUIDE.md](API_GUIDE.md) |
 
 ## 命令和策略变化（不是缺失实现）
 

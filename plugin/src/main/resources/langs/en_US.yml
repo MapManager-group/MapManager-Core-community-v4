@@ -74,7 +74,7 @@ startup:
   worldbase_failed: 'Failed to initialize LuckPerms worldbase group: <error>'
   worldbase_created: Created and initialized LuckPerms worldbase group
   worldbase_exists: LuckPerms worldbase group already exists
-  incomplete: Some map lifecycle features remain incomplete; the full API is not published.
+  incomplete: Some map lifecycle features remain incomplete.
   failed: 'MapManager startup failed: <error>'
 player:
   mojang_failed: 'Mojang UUID lookup failed: <error>'

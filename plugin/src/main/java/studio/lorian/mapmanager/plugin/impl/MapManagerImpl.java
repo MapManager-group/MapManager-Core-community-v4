@@ -18,7 +18,7 @@ import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjection;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
-/** API 入口的占位实现；完成业务实现后再由主类注册。 */
+/** API 入口实现；启动准备完成后由主类注册到服务器服务管理器。 */
 public final class MapManagerImpl implements MapManager {
     private final MapService maps;
     private final MapRoleService roles;

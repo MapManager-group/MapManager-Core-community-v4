@@ -28,6 +28,18 @@
 | BOOT-12 | MySQL 主机不可达、凭据错误或数据库不存在        | 启动报告存储连接错误；原数据不被空数据覆盖                                        |
 | BOOT-13 | 删除 `access-control.strict-map-entry` 或显式设为 `true` | 严格地图准入监听默认开启                                                    |
 
+## 对外 API 服务注册与调用
+
+| ID     | 前置条件与操作                                                                                      | 预期结果                                                                                       |
+|--------|-----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| API-01 | 正常启动 MapManager-Core，等待存储、迁移及 `worldbase` 初始化完成后调用 `ServicesManager.load(MapManager.class)` | 返回非 null 的 `MapManager` provider；注册优先级为 `Normal`                                    |
+| API-02 | 外部 Paper 插件声明 `MapManager-Core` 依赖和 `join-classpath: true`，在 `onEnable` 查询并监听服务事件 | 初次查询可为 null；收到 `ServiceRegisterEvent` 后可通过同一个 `MapManager.class` 查询到服务       |
+| API-03 | 分别令 v3 迁移或 LuckPerms `worldbase` 初始化失败后启动                                              | MapManager-Core 禁用；没有发布 `MapManager` 服务                                                |
+| API-04 | 正常启动后禁用 MapManager-Core，且服务器没有其他 `MapManager` provider                               | 发布 `ServiceUnregisterEvent`；事件后 `ServicesManager.load(MapManager.class)` 返回 null           |
+| API-05 | 服务注册后读取 `maps/roles/access/settings/aliases/travel/worldLifeCycle/worldVersions` getter        | 所有 getter 返回非 null 服务实例；地图查询与版本查询返回值符合各自接口契约                       |
+| API-06 | 外部插件未打包另一份 `mapmanager-api`，通过 joined classpath 查询服务                                | 服务键与调用方的 `MapManager.class` 类型一致，不出现服务查询返回 null或类转换错误                |
+| API-07 | 外部插件调用角色或地图设置写方法前后检查自己的操作者授权                                             | MapManager 只执行业务变更，不代替调用方授权；未授权请求由外部插件拦截且 MMC 数据不变              |
+
 ## 地图创建、导入与初始化
 
 | ID      | 前置条件与操作                                                             | 预期结果                                                                                                                 |
@@ -218,7 +230,7 @@
 
 ## 目前不列为通过项的能力
 
-以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：`MapManager` Bukkit 服务注册、按需加载未加载世界、`PlayerGateway.disconnect`、公开状态/别名/出生点命令、PVP/全局物理或全局爆炸覆盖、JSON 与 MySQL 自动迁移、迁移 dry-run 与自动恢复、未实现的 API 授权入口。地图准入监听用例列在 ACCESS-01 至 ACCESS-07；本文件仅描述预期用例，不代表这些场景已经执行。
+以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：按需加载未加载世界、`PlayerGateway.disconnect`、PVP/全局物理或全局爆炸覆盖、JSON 与 MySQL 自动迁移、迁移 dry-run 与自动恢复、未实现的 API 授权入口。地图准入监听用例列在 ACCESS-01 至 ACCESS-07；本文件仅描述预期用例，不代表这些场景已经执行。
 
 ## 执行记录
 
