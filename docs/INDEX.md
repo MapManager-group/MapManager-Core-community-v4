@@ -28,7 +28,7 @@
 - [`STORAGE.md`](STORAGE.md)：存储配置、文件/表结构、后端约束。
 - [`MESSAGES.md`](MESSAGES.md)：语言选择、资源位置、MiniMessage 和翻译维护。
 - [`PROJECT_NOTES.md`](PROJECT_NOTES.md)：长期项目约定和阶段记录；可能随源码演进，执行前核对源码。
-- [`TEST_CASES.md`](TEST_CASES.md)：按当前实现整理的启动、命令、API、存储、迁移和适配器验收用例；不代表已经执行。
+- [`TEST_CASES.md`](TEST_CASES.md)：自动化单元测试映射，以及需 Paper/依赖服务的启动、命令、API、存储和迁移验收用例。
 
 ## 文档维护约定
 

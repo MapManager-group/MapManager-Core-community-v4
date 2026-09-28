@@ -1,32 +1,60 @@
 # MapManager v4 已实现功能测试用例
 
-本清单依据当前源码整理，用于 Paper 服务器验收和 API/适配器测试。状态以 [`CLASS_STATUS.md`](CLASS_STATUS.md) 为准；标记“部分实现”的流程仍测试已存在的分支，同时记录未实现的行为，不将设计目标算作通过。这里是测试用例，不代表这些场景已经执行。
+本清单依据当前源码整理，区分可在本地自动运行的单元测试和需要 Paper/依赖服务的集成验收。状态以 [`CLASS_STATUS.md`](CLASS_STATUS.md) 为准；标记“部分实现”的流程仍测试已存在的分支，同时记录未实现的行为，不将设计目标算作通过。自动测试使用 JUnit Jupiter，由 Maven Surefire 在 `test` 阶段运行；`mvn package` 会先运行测试，任一测试失败都会阻止进入打包阶段。
 
 ## 测试环境与数据
 
-- 基础环境：Java 21、兼容版本的 Paper、Multiverse-Core、LuckPerms；按场景准备 VoidGen、可用 Mojang 查询网络和 MySQL。
+- 自动测试环境：Maven 和 JDK 21，`JAVA_HOME` 指向 JDK 21。
+- 集成验收环境：兼容版本的 Paper、Multiverse-Core、LuckPerms；按场景准备 VoidGen、可用 Mojang 查询网络和 MySQL。
 - 准备默认世界 `world`，并准备无玩家在线、可以删除的测试世界目录；删除测试建议用 `alpha_bak`、`beta_bak`。
 - 准备地图 `arena`（私有、ACTIVE、组 `team`）、同组地图 `arena2`、另一组地图 `other`、管理员 `AdminA`、建筑者 `BuilderB`、访客 `VisitorC`、无角色玩家 `GuestD`。
 - 准备两个存储配置：JSON；独立测试 MySQL。需要故障分支时使用错误凭据、不可写目录、无效配置或可控的适配器替身。
 - 每个写入类用例结束后，分别查询服务/API、命令返回和持久存储，确认三者一致。结果对象检查 `operation`、`operationId`、`Success/Failure/Partial` 与失败原因。
 
+## 自动化自测与打包门禁
+
+从仓库根目录执行：
+
+```shell
+mvn clean test
+mvn clean package
+```
+
+第二条命令按 Maven 生命周期先执行 `test`，再执行 `package`。不要在发布构建中传入 `-DskipTests` 或 `-Dmaven.test.skip=true`。Surefire XML 和文本报告分别写入模块的 `target/surefire-reports/`。
+
+当前自动测试不启动 Paper，也不连接 LuckPerms、Multiverse、Mojang 或 MySQL；这些依赖的运行时行为仍按后续章节在集成环境验收。
+
+| 自动用例                         | 测试类                                                                                               | 覆盖点                                                                                                        |
+|----------------------------------|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| UNIT-API-01 至 UNIT-API-03       | `api/src/test/java/studio/lorian/mapmanager/api/model/ApiModelContractTest.java`                     | 创建/导入请求默认类型、创建参数防御性复制、地图组世界集合不可变                                               |
+| UNIT-STO-01 至 UNIT-STO-05       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/JsonStorageTest.java`         | JSON 重启恢复、大小写不敏感查询、角色和操作持久化、非法状态不提交、地图删除访客清理、重复授权及损坏文件拒绝   |
+| UNIT-SVC-01 至 UNIT-SVC-07       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServicesTest.java`                     | 角色组/单图范围、有效角色继承、公开和 ACTIVE 准入、LP 部分失败、物理/爆炸字段隔离、`MapManager` 服务图 getter |
+| UNIT-WORLD-01 至 UNIT-WORLD-04   | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/WorldGatewayImplTest.java`      | `server.properties` 地图根目录定位、维度目录选择和世界名路径穿越防护                                          |
+| UNIT-NBT-01 至 UNIT-NBT-03       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/LevelDatVersionReaderTest.java` | 压缩 NBT 读取数据版本；文件损坏、字段缺失或类型无效时返回空值                                                 |
+| UNIT-ALIAS-01                    | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapAliasServiceImplTest.java`             | legacy、section 与 RGB 颜色代码清理                                                                           |
+| UNIT-MIG-01 至 UNIT-MIG-02       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationSourceTest.java` | v3 地图、组、角色范围和物理/爆炸设置解析；组地图清单不一致时拒绝                                              |
+| UNIT-MSG-01 至 UNIT-MSG-03       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文资源与安全占位符、缺项中文回退、占位参数校验                                                              |
+| UNIT-CONFIG-01 至 UNIT-CONFIG-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageConfigTest.java`       | JSON 默认值、MySQL 配置读取与空白裁剪、未知类型及必填项/端口/数据库名校验                                     |
+
+当前共 33 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。服务注册事件/插件类路径、Bukkit 事件、Multiverse/LuckPerms 实际写入、MySQL 建表及完整启动迁移仍需真实集成环境，不纳入这批单元测试。
+
 ## 启动、配置与本地化
 
-| ID      | 前置条件与操作                                  | 预期结果                                                                          |
-|---------|-------------------------------------------------|-----------------------------------------------------------------------------------|
-| BOOT-01 | 首次用默认配置启动                              | 创建插件数据目录、默认配置及内置语言文件；选择 JSON；插件不因配置初始化失败而禁用 |
-| BOOT-02 | 指定 `language: en_US` 启动                     | 英文资源被选中；启动和命令文案使用英文                                            |
-| BOOT-03 | 选择语言文件中缺少一个键                        | 缺失键回退到内置中文；其他英文键仍正常                                            |
-| BOOT-04 | 选择的语言代码对应文件不存在                    | 启动失败并输出可定位的语言文件错误                                                |
-| BOOT-05 | 语言 YAML 语法无效                              | 启动失败并记录语言文件错误                                                        |
-| BOOT-06 | 配置无效的创建名称正则或删除名称正则            | 插件启动失败，日志指出初始化错误                                                  |
-| BOOT-07 | LuckPerms API 服务不可用                        | 插件禁用并输出依赖不可用原因                                                      |
-| BOOT-08 | `worldbase` 不存在时启动                        | 创建 `worldbase`，使其继承 `default` 并保存                                       |
-| BOOT-09 | `worldbase` 已存在且包含自定义节点时启动        | 不重置或覆盖已存在组及其节点                                                      |
-| BOOT-10 | 使用 JSON 启动后改成 MySQL，或改 MySQL 连接目标 | 检测到 `storage-backend.txt` 不匹配，拒绝静默换库并禁用启动                       |
-| BOOT-11 | 使用有效 MySQL 配置首次启动                     | 连接成功并创建所需五张 InnoDB 表及索引/外键                                       |
-| BOOT-12 | MySQL 主机不可达、凭据错误或数据库不存在        | 启动报告存储连接错误；原数据不被空数据覆盖                                        |
-| BOOT-13 | 删除 `access-control.strict-map-entry` 或显式设为 `true` | 严格地图准入监听默认开启                                                    |
+| ID      | 前置条件与操作                                           | 预期结果                                                                          |
+|---------|----------------------------------------------------------|-----------------------------------------------------------------------------------|
+| BOOT-01 | 首次用默认配置启动                                       | 创建插件数据目录、默认配置及内置语言文件；选择 JSON；插件不因配置初始化失败而禁用 |
+| BOOT-02 | 指定 `language: en_US` 启动                              | 英文资源被选中；启动和命令文案使用英文                                            |
+| BOOT-03 | 选择语言文件中缺少一个键                                 | 缺失键回退到内置中文；其他英文键仍正常                                            |
+| BOOT-04 | 选择的语言代码对应文件不存在                             | 启动失败并输出可定位的语言文件错误                                                |
+| BOOT-05 | 语言 YAML 语法无效                                       | 启动失败并记录语言文件错误                                                        |
+| BOOT-06 | 配置无效的创建名称正则或删除名称正则                     | 插件启动失败，日志指出初始化错误                                                  |
+| BOOT-07 | LuckPerms API 服务不可用                                 | 插件禁用并输出依赖不可用原因                                                      |
+| BOOT-08 | `worldbase` 不存在时启动                                 | 创建 `worldbase`，使其继承 `default` 并保存                                       |
+| BOOT-09 | `worldbase` 已存在且包含自定义节点时启动                 | 不重置或覆盖已存在组及其节点                                                      |
+| BOOT-10 | 使用 JSON 启动后改成 MySQL，或改 MySQL 连接目标          | 检测到 `storage-backend.txt` 不匹配，拒绝静默换库并禁用启动                       |
+| BOOT-11 | 使用有效 MySQL 配置首次启动                              | 连接成功并创建所需五张 InnoDB 表及索引/外键                                       |
+| BOOT-12 | MySQL 主机不可达、凭据错误或数据库不存在                 | 启动报告存储连接错误；原数据不被空数据覆盖                                        |
+| BOOT-13 | 删除 `access-control.strict-map-entry` 或显式设为 `true` | 严格地图准入监听默认开启                                                          |
 
 ## 对外 API 服务注册与调用
 
@@ -111,7 +139,7 @@
 | ROLE-08 | 对 PENDING/DELETING 等非 ACTIVE 地图修改成员                        | 返回 ACCESS_DENIED；授权不变                                                      |
 | ROLE-09 | 成员修改使用 null map/player/role 或无效地图 ID                     | 返回 INVALID_INPUT 或 MAP_NOT_FOUND；存储不变                                     |
 | ROLE-10 | MMC 角色存储失败；MMC 成功但 LP 写入失败                            | 前者返回 STORAGE_FAILED；后者返回 Partial，并保留 MMC 权威角色记录                |
-| ROLE-11 | `/world admins                                                      | builders                                                                          |visitors` 由可进入当前地图玩家执行 | 输出直接授予该角色的玩家，不把继承角色错误列为直接授予 |
+| ROLE-11 | `/world admins\|builders\|visitors` 由可进入当前地图玩家执行       | 输出直接授予该角色的玩家，不把继承角色错误列为直接授予                               |
 | ROLE-12 | 无准入权限玩家执行名单命令                                          | 返回 ACCESS_DENIED；不泄露成员名单                                                |
 | ROLE-13 | 管理员执行 admin/builder/visitor add/remove，目标用用户名及 UUID    | 名称解析到正确 UUID；UUID 可直接使用；添加/撤销结果与查询一致                     |
 | ROLE-14 | 非管理员执行成员变更；玩家在未登记地图执行                          | 返回 NO_PERMISSION/MAP_NOT_FOUND，授权不变                                        |
@@ -230,8 +258,8 @@
 
 ## 目前不列为通过项的能力
 
-以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：按需加载未加载世界、`PlayerGateway.disconnect`、PVP/全局物理或全局爆炸覆盖、JSON 与 MySQL 自动迁移、迁移 dry-run 与自动恢复、未实现的 API 授权入口。地图准入监听用例列在 ACCESS-01 至 ACCESS-07；本文件仅描述预期用例，不代表这些场景已经执行。
+以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：按需加载未加载世界、`PlayerGateway.disconnect`、PVP/全局物理或全局爆炸覆盖、JSON 与 MySQL 自动迁移、迁移 dry-run 与自动恢复、未实现的 API 授权入口。实际 Paper 服务注册、插件类路径及服务事件仍需执行 API-01 至 API-07 的集成用例；地图准入监听用例列在 ACCESS-01 至 ACCESS-07。
 
 ## 执行记录
 
-本文件仅生成测试用例，没有执行测试。逐项执行时可复制对应章节并增加“结果、证据、版本、执行人、日期”；Paper/MV/LP 集成用例应记录服务器版本和插件版本，MySQL 用例记录 MySQL 版本及 schema 初始化结果。
+JUnit 单元用例由 Maven 构建自动执行，具体结果见各模块 `target/surefire-reports/`。逐项执行 Paper/MV/LP 集成用例时记录服务器和插件版本；MySQL 用例记录数据库版本及 schema 初始化结果。本文列出的人工验收场景仍须逐项记录结果、证据、版本、执行人和日期。

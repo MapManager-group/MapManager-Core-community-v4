@@ -7,7 +7,7 @@
 - `api` 放对外模型及接口，`plugin` 放实现。`PlayerGateway`、`WorldGateway` 接口在 `api.service`；存储接口 `MapRepository`、`RoleRepository`、`OperationRepository` 仍只在 `plugin` 内部。
 - MMC 是地图准入和角色的权威来源；LuckPerms 只投影 `worldbase` 建造权限；Multiverse-Core 负责世界操作。`WorldGateway` **只查存储目录**，创建、导入、删除等由 `WorldLifeCycleService` 定义。
 - 状态：**契约/数据**＝类型已定义；**已实现**＝列出的功能有实际代码；**部分实现**＝有真实逻辑但仍缺关键环节；**占位**＝方法仍返回 `null`/`false`/空值或空方法体。
-- 当前插件初始化 JSON/MySQL 存储并异步确保 LP `worldbase` 组存在；启动时检测并迁移 v3 JSON，注册地图命令、地图设置监听和可配置的全路径准入监听；存储迁移与 `worldbase` 初始化均成功后，通过 Bukkit ServicesManager 注册 `MapManager`。当前目录和方法依赖见 [STRUCTURE.md](STRUCTURE.md)。
+- 当前插件初始化 JSON/MySQL 存储并异步确保 LP `worldbase` 组存在；启动时检测并迁移 v3 JSON，注册地图命令、地图设置监听和可配置的全路径准入监听；存储迁移与 `worldbase` 初始化均成功后，通过 Bukkit ServicesManager 注册 `MapManager`。`api` 与 `plugin` 单元测试由 Maven Surefire 在 `test` 阶段执行。当前目录和方法依赖见 [STRUCTURE.md](STRUCTURE.md)。
 
 ## api 模块：入口、模型与结果
 

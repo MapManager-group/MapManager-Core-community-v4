@@ -9,4 +9,12 @@
         <version>4.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>mapmanager-api</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>
