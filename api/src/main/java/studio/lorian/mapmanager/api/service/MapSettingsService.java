@@ -52,7 +52,7 @@ public interface MapSettingsService {
     SpawnPoint getSpawn(UUID mapId);
 
     /**
-     * 设置地图出生点。
+     * 设置地图出生点，并同步 Bukkit 与 Multiverse 世界出生点。
      *
      * @param mapId 要修改的地图标识
      * @param spawn 新出生点

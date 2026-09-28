@@ -10,7 +10,7 @@ Paper 入口会读取 `config.yml` 并初始化 JSON 或 MySQL 存储。默认�
 
 创建和导入地图均拒绝固定保留名：`cache`、`config`、`world`、`log`、`test`、`overworld`、`default`、`worldbase`、`apply`、`public`、`private`，以及以 `plugin`、`version`、`admin`、`mapmanager`、`builder`、`visitor`、`lib`、`mmc` 开头的名称。`creation.blocked-world-name-regex` 可额外配置 Java 正则，匹配完整地图名；默认 `.*_bak$`，会拒绝 `_bak` 结尾的名称。例如 `(?:lobby|temp.*|.*_bak)` 可同时禁止 `lobby`、`temp` 前缀和 `_bak` 后缀。正则无效会阻止启动；内置限制始终生效。
 
-地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。当前 `/world` 命令尚未提供公开状态、别名或出生点的子命令。当前地图管理员可用 `/world physics [true|false|info]` 和 `/world explosion [true|false|info]` 查看或修改单地图设置；修改立即持久化。关闭物理会取消方块物理事件并阻止落沙实体生成；关闭爆炸会取消方块与实体爆炸事件。未登记世界不受影响。不提供 v3 全局覆盖。
+地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。当前地图管理员可用 `/world public [true|false|info]` 修改或查询公开状态，公开地图允许所有玩家进入；`/world setname <名称>` 修改地图显示名和 Multiverse 别名；`/world setspawn` 将当前位置设置为 MMC、Bukkit 和 Multiverse 出生点。物理和爆炸设置可用 `/world physics [true|false|info]` 与 `/world explosion [true|false|info]` 查看或修改；修改立即持久化。关闭物理会取消方块物理事件并阻止落沙实体生成；关闭爆炸会取消方块与实体爆炸事件。未登记世界不受影响。不提供 v3 全局覆盖。
 
 MySQL 自动创建五张 InnoDB 表：
 
@@ -24,7 +24,7 @@ MySQL 自动创建五张 InnoDB 表：
 
 `settings_json` 和 `spawn_json` 在 `mm_maps` 中各占一个 JSON 字段，出生点可为 `NULL`。删除地图时访客授权级联删除；仍有地图引用的组不能删除。JSON 后端以相同的逻辑关系写入单文件，每次写入使用临时文件和原子替换。
 
-地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admins|builders|visitors` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名或 UUID>` 和 `/world kick` 仅由 MMC 当前地图组管理员执行；所有玩家可执行 `/world tp`，但只能进入已加载的地图且仍由 MMC 准入判断。玩家命令不检查 Bukkit 权限节点。组角色会同步 LP 地图组成员，若 MMC 写入成功而 LP 同步失败则返回 `Partial`；重复命令可以重新投影。启动时会检查相邻插件目录 `MapManager-Core`；其中同时存在 `worlds.json` 和 `groups.json` 时，插件备份旧文件并迁移地图、组和角色数据到所选仓储。严格准入监听已实现并默认开启；LP 自动重试、完整 `MapManager` API 注册仍未实现。
+地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admins|builders|visitors` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名或 UUID>`、`/world kick`、`/world public`、`/world setname` 和 `/world setspawn` 仅由 MMC 当前地图组管理员执行；`/world tp` 与 `/wtp` 可进入玩家有地图角色或公开的已加载地图，补全使用相同准入结果。玩家命令不检查 Bukkit 权限节点。组角色会同步 LP 地图组成员，若 MMC 写入成功而 LP 同步失败则返回 `Partial`；重复命令可以重新投影。启动时会检查相邻插件目录 `MapManager-Core`；其中同时存在 `worlds.json` 和 `groups.json` 时，插件备份旧文件并迁移地图、组和角色数据到所选仓储。严格准入监听已实现并默认开启；LP 自动重试、完整 `MapManager` API 注册仍未实现。
 
 控制台先执行 `/world delete <地图名>`，然后在 10 秒内执行 `/world delete <6 位随机字符串>`；玩家不能执行。`config.yml` 的 `deletion.allowed-world-name-regex` 使用 Java 正则匹配整个地图名，默认 `.*_bak$`，只允许删除 `_bak` 结尾的地图；命令和生命周期 API 均执行该限制。删除前检查世界目录、Multiverse 默认世界及在线玩家；删除中保留 `DELETING` 状态，失败后可重新走两步确认。删除世界成功后清理 LP 世界继承及 MMC 地图、角色和空组记录。
 

@@ -17,7 +17,7 @@ operations:
   REMOVE_MEMBER: Remove member
   LIST_MEMBERS: List members
   SET_PUBLIC: Change public access
-  SET_ALIAS: Change map alias
+  SET_ALIAS: Change map name
   SET_PHYSICAL: Change physics
   SET_EXPLOSION: Change explosions
   SET_SPAWN: Change spawn
@@ -49,9 +49,11 @@ access:
   recovery_failed: '<red>You could not be moved safely to the default world, so your connection was closed.'
 command:
   usage_wtp: 'Usage: /wtp <map>'
-  usage_world: 'Usage: /world <create|import|init|delete|tp|kick|physics|explosion|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: 'Usage: /world <create|import|init|delete|tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
   setting_usage: '<red>Usage: /world <setting> [true|false|info]'
   setting_info: '<aqua>Current map <setting>: <value>'
+  setname_usage: '<red>Usage: /world setname <name>'
+  setspawn_usage: '<red>Usage: /world setspawn'
   delete_usage: 'Usage: /world delete <map>, then run /world delete <confirmation code> within 10 seconds'
   delete_expired: '<red>The deletion code expired. Select the map again.'
   delete_wrong_code: '<red>Incorrect confirmation code. Use the six-character code from the previous step.'

@@ -31,6 +31,10 @@ All players can run `/world tp <name>` or its shorthand `/wtp <name>`. MMC check
 
 `access-control.strict-map-entry` in `config.yml` defaults to `true`. When enabled, MMC checks and blocks unauthorized player teleports, then verifies the actual world after teleport and world-change events. It also checks a player's world on login and respawn. After `/world admin|builder|visitor remove`, a player who no longer has any effective access to their current map is returned to the Multiverse default world's spawn. If the default world is unavailable, the player cannot enter it, or the return teleport fails, MMC disconnects the player. Setting `strict-map-entry: false` under `access-control` disables this listener's entry and revocation checks. `/world tp` and `/wtp` continue to use their MMC access decision.
 
+## Map settings
+
+The current map's MMC administrator can run `/world public [true|false|info]` to change or view public access. Players with an effective map role and everyone on public maps may enter. `/world setname <name>` changes the display name and Multiverse alias. `/world setspawn` saves the player's current location as the MMC, Bukkit, and Multiverse world spawn.
+
 An MMC administrator of the current map can run `/world kick <online-player>` while in a managed map. The target must be in the same map. MMC moves them to Multiverse-Core's default world spawn and reports a structured `KICK` result. Tab completion lists only online players in the current map.
 
 The console can request deletion with `/world delete <name>`. MMC prints a random six-character code bound to the selected map; enter `/world delete <code>` within 10 seconds to confirm. Players cannot use this command. `deletion.allowed-world-name-regex` in `config.yml` limits eligible names and defaults to `.*_bak$`. MMC refuses the Multiverse default world, the server's first loaded world, and worlds containing players. It checks the expected world directory, records `DELETING`, asks Multiverse to delete the world files, and then removes MMC roles and LuckPerms projection. A failed deletion retains `DELETING`; repeat the two-step command after fixing the cause.

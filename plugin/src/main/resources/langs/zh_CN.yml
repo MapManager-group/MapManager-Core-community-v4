@@ -17,7 +17,7 @@ operations:
   REMOVE_MEMBER: 移除成员
   LIST_MEMBERS: 查询成员
   SET_PUBLIC: 修改公开状态
-  SET_ALIAS: 修改地图别名
+  SET_ALIAS: 修改地图名称
   SET_PHYSICAL: 修改物理设置
   SET_EXPLOSION: 修改爆炸设置
   SET_SPAWN: 修改出生点
@@ -49,9 +49,11 @@ access:
   recovery_failed: '<red>无法安全返回默认世界，连接已断开。'
 command:
   usage_wtp: '用法：/wtp <地图名>'
-  usage_world: '用法：/world <create|import|init|delete|tp|kick|physics|explosion|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: '用法：/world <create|import|init|delete|tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
   setting_usage: '<red>用法：/world <setting> [true|false|info]'
   setting_info: '<aqua>当前地图 <setting>：<value>'
+  setname_usage: '<red>用法：/world setname <名称>'
+  setspawn_usage: '<red>用法：/world setspawn'
   delete_usage: '用法：/world delete <地图名>，然后在 10 秒内执行 /world delete <确认码>'
   delete_expired: '<red>删除确认码已过期，请重新指定地图。'
   delete_wrong_code: '<red>确认码不正确；请使用上一步提供的 6 位字符串。'

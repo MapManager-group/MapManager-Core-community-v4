@@ -49,11 +49,13 @@ MapManager-v4/
 | `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；`V3Migration`；`Messages`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl`；`access-control.strict-map-entry` | 装配服务并注册地图设置/准入监听；检测旧文件并完成迁移后复核已在线玩家、注册命令，异步确保 `worldbase` 存在 |
 | `Messages` | `config.yml` 的 `language`、插件数据目录 `langs/<语言代码>.yml`、内置中文资源 | 生成 MiniMessage Component；缺项回退中文，日志与异常使用纯文本 |
 | `V3Migration.migrate` | `V3MigrationSourceImpl`、LP 默认组只读节点、MV 别名/出生点只读元数据、`PlayerGateway.resolveId`、`MapRepository`、`RoleRepository` | 校验并备份 v3 JSON；UUID 全部解析成功后写入 MMC 存储，成功写完成标记；不写 LP 或 MV |
-| `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家与服务端世界目录 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标 |
+| `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家与服务端世界目录 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标；`/wtp` 包含公开地图 |
 | `MapManagerImpl` | `MapRepository`、`RoleRepository`、`OperationRepository`、`WorldBaseProjection`、`PlayerGateway` | 组装地图、角色、准入、别名、设置、传送和生命周期服务 |
 | `WorldVersionServiceImpl` / `LevelDatVersionReader` | Bukkit dataVersion、Querz NBT | 读取 `level.dat` 的 `Data.DataVersion`，判断地图版本是否不高于当前服务器；导入前执行校验 |
 | `MapAccessServiceImpl.decide` | `MapRepository.findById` → `MapRoleService.hasRole` | 按 MMC 地图状态、角色和公开状态决定准入；不读取 LP |
 | `MapAccessListener` | `PlayerTeleportEvent`、`PlayerChangedWorldEvent`、`PlayerJoinEvent`、`PlayerRespawnEvent`；`MapService`；`MapAccessService`；MV 默认世界 | 严格校验开启时预先拦截并在事件后复核地图进入；加入和重生时检查；撤权后复核当前地图；无法安全送回默认世界时断开连接 |
+| `MapWorldCommand.public/setname/setspawn` | 当前 MMC 地图、`MapAccessService`、`MapSettingsService` | 只允许当前地图管理员修改公开状态、显示名和出生点；出生点取玩家当前位置并同步 MMC、Bukkit 与 Multiverse |
+| `MapSettingsServiceImpl.setSpawn` | `MapRepository`、Bukkit `World`、Multiverse `MultiverseWorld` | 先持久化 MMC 出生点，再更新 Bukkit 和 Multiverse 出生点并保存 Multiverse 配置；外部同步失败返回 `Partial` |
 | `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 导入前校验 `level.dat` 版本；创建或导入地图后写入首位管理员、初始化地图并转换状态 |
 | `MapWorldCommand.delete` → `WorldLifeCycleServiceImpl.delete` | 控制台一次性确认码、删除名称正则、`WorldGateway`、Bukkit、Multiverse、操作记录、`WorldBaseProjection`、地图与角色存储 | 首次输入地图名取得 10 秒有效的 6 位确认码；二次输入确认码后检查 MV 默认世界、服务器首个加载世界、在线玩家和目录；删除世界后清理 LP 投影与 MMC 数据；失败保留 `DELETING` 供重试 |
 | `MapTravelServiceImpl.teleport` | `MapAccessService`、`MapRepository`、`PlayerGateway` | 准入通过后传送到已加载世界；按需加载尚未实现 |

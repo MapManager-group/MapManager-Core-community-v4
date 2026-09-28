@@ -37,9 +37,9 @@
 |---|---|---|
 | 地图创建、导入、初始化、删除 | 已实现 | 由 `WorldLifeCycleService` 编排并持久化操作阶段；失败自动恢复仍未实现 |
 | 地图组管理员/建筑者、单图访客 | 已实现 | MMC 角色为权威数据，组管理员/建筑者投影至 LuckPerms；投影自动重试未实现 |
-| 公开/私有地图 | 部分实现 | `MapSettingsService.setPublic` 和准入决策已实现，但没有 `/world public` 管理命令 |
-| 地图显示名/Multiverse 别名 | 部分实现 | `MapAliasService` 和 `MapSettingsService.setDisplayName` 可供内部服务使用，创建/导入和初始化会同步；没有 `/world setname` 命令，完整 `MapManager` API 也未注册到 Bukkit 服务 |
-| 地图出生点 | 部分实现 | `MapSettingsService.getSpawn/setSpawn` 只读写 MMC 出生点；没有 `/world setspawn`，手动设置不会同步 Bukkit/Multiverse 出生点 |
+| 公开/私有地图 | 已实现 | 地图管理员可用 `/world public [true|false|info]` 查看或设置；准入服务、事件监听、`/world tp` 和 `/wtp` 均允许有效角色或公开地图进入，补全只列出有权限或公开的地图 |
+| 地图显示名/Multiverse 别名 | 已实现 | 地图管理员可用 `/world setname <名称>` 修改 MMC 显示名及带可见状态颜色的 Multiverse 别名；创建/导入和初始化也会同步 |
+| 地图出生点 | 已实现 | 地图管理员可用 `/world setspawn` 保存当前位置，并同步 MMC、Bukkit 和 Multiverse 出生点 |
 | 地图物理和爆炸 | 已实现 | 单地图开关、状态查询和物理/落沙/两类爆炸事件均已接通；不提供全局覆盖 |
 | PVP 设置 | 未实现 | v3 `/world pvp` 读写并保存 Multiverse PVP；v4 `MapSettings`、设置服务和命令均无对应能力 |
 | 地图传送 `/world tp`、`/wtp` | 部分实现 | MMC 准入与已加载地图传送已实现；未加载地图不会按需加载；v3 的 `/worldtp` 名称未作为 v4 命令注册 |

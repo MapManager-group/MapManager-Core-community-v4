@@ -1,6 +1,9 @@
 package studio.lorian.mapmanager.plugin.impl;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.mvplugins.multiverse.core.MultiverseCoreApi;
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapSettings;
 import studio.lorian.mapmanager.api.model.SpawnPoint;
@@ -80,6 +83,35 @@ public final class MapSettingsServiceImpl implements MapSettingsService {
         return map == null ? null : map.spawn();
     }
     @Override public OperationResult<Void> setSpawn(UUID id, SpawnPoint spawn) {
-        return change(id, OperationName.SET_SPAWN, old -> with(old, old.displayName(), old.settings(), spawn));
+        UUID operationId = UUID.randomUUID();
+        if (id == null || spawn == null || !Bukkit.isPrimaryThread()
+                || !Double.isFinite(spawn.x()) || !Double.isFinite(spawn.y()) || !Double.isFinite(spawn.z())
+                || !Float.isFinite(spawn.yaw()) || !Float.isFinite(spawn.pitch()))
+            return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.INVALID_INPUT);
+        try {
+            MapInstance old = maps.findById(id);
+            if (old == null)
+                return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.MAP_NOT_FOUND);
+            if (!old.worldName().equalsIgnoreCase(spawn.worldName()))
+                return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.INVALID_INPUT);
+            World bukkitWorld = Bukkit.getWorld(old.worldName());
+            var multiverseWorld = MultiverseCoreApi.get().getWorldManager().getWorld(old.worldName()).getOrNull();
+            if (bukkitWorld == null || multiverseWorld == null)
+                return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.WORLD_NOT_FOUND);
+
+            maps.save(with(old, old.displayName(), old.settings(), spawn));
+            Location location = new Location(bukkitWorld, spawn.x(), spawn.y(), spawn.z(), spawn.yaw(), spawn.pitch());
+            if (!bukkitWorld.setSpawnLocation(location))
+                return new OperationResult.Partial<>(OperationName.SET_SPAWN, operationId, null,
+                        FailureReason.WORLD_BACKEND_FAILED);
+            multiverseWorld.setSpawnLocation(location).get();
+            MultiverseCoreApi.get().getWorldManager().saveWorldsConfig().get();
+            return new OperationResult.Success<>(OperationName.SET_SPAWN, operationId, null);
+        } catch (StorageException exception) {
+            return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.STORAGE_FAILED);
+        } catch (RuntimeException exception) {
+            return new OperationResult.Partial<>(OperationName.SET_SPAWN, operationId, null,
+                    FailureReason.WORLD_BACKEND_FAILED);
+        }
     }
 }

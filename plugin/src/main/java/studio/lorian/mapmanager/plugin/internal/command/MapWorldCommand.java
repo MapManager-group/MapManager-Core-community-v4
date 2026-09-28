@@ -11,6 +11,7 @@ import studio.lorian.mapmanager.api.model.ImportMapRequest;
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
 import studio.lorian.mapmanager.api.model.MapStatus;
+import studio.lorian.mapmanager.api.model.SpawnPoint;
 import studio.lorian.mapmanager.api.model.WorldType;
 import studio.lorian.mapmanager.api.result.FailureReason;
 import studio.lorian.mapmanager.api.result.OperationName;
@@ -104,6 +105,9 @@ public final class MapWorldCommand extends Command {
                         (sender, target, args) -> changeSetting((Player) sender, target, args, true))),
                 Map.entry("explosion", new Subcommand(false, OperationName.SET_EXPLOSION,
                         (sender, target, args) -> changeSetting((Player) sender, target, args, false))),
+                Map.entry("public", new Subcommand(false, OperationName.SET_PUBLIC, this::changePublic)),
+                Map.entry("setname", new Subcommand(false, OperationName.SET_ALIAS, this::setName)),
+                Map.entry("setspawn", new Subcommand(false, OperationName.SET_SPAWN, this::setSpawn)),
                 Map.entry("admins", new Subcommand(false, OperationName.LIST_MEMBERS,
                         (sender, target, args) -> listMembers(sender, target, args, MapRole.ADMIN))),
                 Map.entry("builders", new Subcommand(false, OperationName.LIST_MEMBERS,
@@ -173,7 +177,8 @@ public final class MapWorldCommand extends Command {
                 return suggestions(args[0], subcommands.entrySet().stream()
                         .filter(entry -> entry.getValue().consoleOnly ? sender instanceof ConsoleCommandSender
                                 : sender instanceof Player)
-                        .filter(entry -> !Set.of("admin", "builder", "visitor", "kick", "physics", "explosion").contains(entry.getKey()) || admin)
+                        .filter(entry -> !Set.of("admin", "builder", "visitor", "kick", "physics", "explosion",
+                                "public", "setname", "setspawn").contains(entry.getKey()) || admin)
                         .filter(entry -> !Set.of("admins", "builders", "visitors").contains(entry.getKey()) || canEnter)
                         .map(Map.Entry::getKey).toList());
             }
@@ -203,6 +208,8 @@ public final class MapWorldCommand extends Command {
                 case "admin", "builder", "visitor" -> roleSuggestions((Player) sender, command, args);
                 case "physics", "explosion" -> args.length == 2
                         && manageableSettingMap((Player) sender) ? suggestions(currentArg, List.of("true", "false", "info")) : List.of();
+                case "public" -> args.length == 2 && manageableSettingMap((Player) sender)
+                        ? suggestions(currentArg, List.of("true", "false", "info")) : List.of();
                 default -> List.of();
             };
         } catch (StorageException exception) {
@@ -211,7 +218,9 @@ public final class MapWorldCommand extends Command {
     }
 
     private List<String> accessibleWorldNames(Player player) {
-        return access.accessibleMaps(player.getUniqueId()).stream().map(MapInstance::worldName).toList();
+        return access.accessibleMaps(player.getUniqueId()).stream()
+                .filter(map -> Bukkit.getWorld(map.worldName()) != null)
+                .map(MapInstance::worldName).toList();
     }
 
     private List<String> kickSuggestions(Player sender, String prefix) {
@@ -619,6 +628,54 @@ public final class MapWorldCommand extends Command {
         }
         boolean enabled = Boolean.parseBoolean(args[1]);
         notifier.notify(target, physics ? settings.setPhysical(map.id(), enabled) : settings.setExplosion(map.id(), enabled));
+    }
+
+    private void changePublic(CommandSender sender, NotificationTarget target, String[] args) {
+        if (args.length > 2 || (args.length == 2
+                && !Set.of("true", "false", "on", "enable", "yes", "off", "disable", "no", "info", "status")
+                .contains(args[1].toLowerCase(Locale.ROOT)))) {
+            fail(target, OperationName.SET_PUBLIC, FailureReason.INVALID_INPUT);
+            notifier.notifyKey(target, "command.setting_usage", "setting", "public");
+            return;
+        }
+        Player actor = (Player) sender;
+        MapInstance map = manageableCurrentMap(actor, target, OperationName.SET_PUBLIC);
+        if (map == null) return;
+        if (args.length == 1 || args[1].equalsIgnoreCase("info") || args[1].equalsIgnoreCase("status")) {
+            notifier.notifyKey(target, "command.setting_info", "setting", "public",
+                    "value", map.settings().isPublic());
+            return;
+        }
+        boolean enabled = Set.of("true", "on", "enable", "yes").contains(args[1].toLowerCase(Locale.ROOT));
+        notifier.notify(target, settings.setPublic(map.id(), enabled));
+    }
+
+    private void setName(CommandSender sender, NotificationTarget target, String[] args) {
+        if (args.length < 2) {
+            fail(target, OperationName.SET_ALIAS, FailureReason.INVALID_INPUT);
+            notifier.notifyKey(target, "command.setname_usage");
+            return;
+        }
+        Player actor = (Player) sender;
+        MapInstance map = manageableCurrentMap(actor, target, OperationName.SET_ALIAS);
+        if (map == null) return;
+        String displayName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+        notifier.notify(target, settings.setDisplayName(map.id(), displayName));
+    }
+
+    private void setSpawn(CommandSender sender, NotificationTarget target, String[] args) {
+        if (args.length != 1) {
+            fail(target, OperationName.SET_SPAWN, FailureReason.INVALID_INPUT);
+            notifier.notifyKey(target, "command.setspawn_usage");
+            return;
+        }
+        Player actor = (Player) sender;
+        MapInstance map = manageableCurrentMap(actor, target, OperationName.SET_SPAWN);
+        if (map == null) return;
+        var location = actor.getLocation();
+        SpawnPoint spawn = new SpawnPoint(map.worldName(), location.getX(), location.getY(), location.getZ(),
+                location.getYaw(), location.getPitch());
+        notifier.notify(target, settings.setSpawn(map.id(), spawn));
     }
 
     private MapInstance manageableCurrentMap(Player actor, NotificationTarget target, OperationName operation) {
