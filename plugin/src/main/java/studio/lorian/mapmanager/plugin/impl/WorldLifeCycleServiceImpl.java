@@ -27,6 +27,7 @@ import studio.lorian.mapmanager.api.result.FailureReason;
 import studio.lorian.mapmanager.api.result.OperationName;
 import studio.lorian.mapmanager.api.result.OperationResult;
 import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
+import studio.lorian.mapmanager.api.service.WorldVersionService;
 import studio.lorian.mapmanager.api.service.WorldGateway;
 import studio.lorian.mapmanager.api.service.MapAliasService;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjection;
@@ -62,6 +63,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     private final OperationRepository operations;
     private final WorldBaseProjection permissions;
     private final MapAliasService aliases;
+    private final WorldVersionService worldVersions;
     private final WorldGateway worldGateway;
     private final Pattern deletionPattern;
     private final Pattern blockedCreationPattern;
@@ -69,12 +71,14 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
 
     public WorldLifeCycleServiceImpl(MapRepository maps, RoleRepository roles, OperationRepository operations,
                                      WorldBaseProjection permissions, MapAliasService aliases,
-                                     Pattern deletionPattern, Pattern blockedCreationPattern, Logger logger) {
+                                     WorldVersionService worldVersions, Pattern deletionPattern,
+                                     Pattern blockedCreationPattern, Logger logger) {
         this.maps = maps;
         this.roles = roles;
         this.operations = operations;
         this.permissions = permissions;
         this.aliases = aliases;
+        this.worldVersions = worldVersions;
         this.worldGateway = new WorldGatewayImpl();
         this.deletionPattern = deletionPattern;
         this.blockedCreationPattern = blockedCreationPattern;
@@ -231,6 +235,9 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.WORLD_NOT_FOUND);
         if (!Files.isRegularFile(folder.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS))
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.INVALID_INPUT);
+        if (!worldVersions.isCompatible(folder))
+            return new OperationResult.Failure<>(OperationName.IMPORT, operationId,
+                    FailureReason.WORLD_VERSION_INCOMPATIBLE);
         // 环境和虚空生成器只属于导入流程；其余注册步骤与创建共用。
         if (request.worldType() == WorldType.VOID && !Bukkit.getPluginManager().isPluginEnabled("VoidGen"))
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.WORLD_BACKEND_FAILED);

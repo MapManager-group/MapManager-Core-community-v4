@@ -26,6 +26,7 @@ operations:
 reasons:
   MAP_NOT_FOUND: 地图不存在
   WORLD_NOT_FOUND: 世界不存在
+  WORLD_VERSION_INCOMPATIBLE: 地图版本高于服务器版本或版本信息无效
   ALREADY_EXISTS: 地图或世界已存在
   INVALID_INPUT: 参数无效
   PLAYER_NOT_FOUND: 玩家不存在或无法解析

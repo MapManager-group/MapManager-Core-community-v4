@@ -6,6 +6,8 @@ public enum FailureReason {
     MAP_NOT_FOUND,
     /** 世界后端中不存在请求的世界。 */
     WORLD_NOT_FOUND,
+    /** 地图 level.dat 数据版本高于服务器，或版本信息无效。 */
+    WORLD_VERSION_INCOMPATIBLE,
     /** 已存在同名地图或世界。 */
     ALREADY_EXISTS,
     /** 请求中有一个或多个参数无效。 */

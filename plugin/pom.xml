@@ -11,6 +11,10 @@
     <artifactId>mapmanager-plugin</artifactId>
     <repositories>
         <repository>
+            <id>jitpack</id>
+            <url>https://jitpack.io</url>
+        </repository>
+        <repository>
             <id>multiverse</id>
             <url>https://repo.onarandombox.com/content/groups/public/</url>
         </repository>
@@ -49,6 +53,11 @@
             <version>2.13.2</version>
         </dependency>
         <dependency>
+            <groupId>com.github.Querz</groupId>
+            <artifactId>NBT</artifactId>
+            <version>6.1</version>
+        </dependency>
+        <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <version>9.4.0</version>
@@ -81,9 +90,14 @@
                                     <include>com.google.code.gson:gson</include>
                                     <include>com.mysql:mysql-connector-j</include>
                                     <include>com.google.protobuf:protobuf-java</include>
+                                    <include>com.github.Querz:NBT</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
+                                <relocation>
+                                    <pattern>net.querz</pattern>
+                                    <shadedPattern>studio.lorian.mapmanager.plugin.lib.querz</shadedPattern>
+                                </relocation>
                                 <relocation>
                                     <pattern>com.google.gson</pattern>
                                     <shadedPattern>studio.lorian.mapmanager.plugin.lib.gson</shadedPattern>

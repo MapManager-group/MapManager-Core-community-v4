@@ -51,9 +51,10 @@ MapManager-v4/
 | `V3Migration.migrate` | `V3MigrationSourceImpl`、LP 默认组只读节点、MV 别名/出生点只读元数据、`PlayerGateway.resolveId`、`MapRepository`、`RoleRepository` | 校验并备份 v3 JSON；UUID 全部解析成功后写入 MMC 存储，成功写完成标记；不写 LP 或 MV |
 | `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家与服务端世界目录 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标 |
 | `MapManagerImpl` | `MapRepository`、`RoleRepository`、`OperationRepository`、`WorldBaseProjection`、`PlayerGateway` | 组装地图、角色、准入、别名、设置、传送和生命周期服务 |
+| `WorldVersionServiceImpl` / `LevelDatVersionReader` | Bukkit dataVersion、Querz NBT | 读取 `level.dat` 的 `Data.DataVersion`，判断地图版本是否不高于当前服务器；导入前执行校验 |
 | `MapAccessServiceImpl.decide` | `MapRepository.findById` → `MapRoleService.hasRole` | 按 MMC 地图状态、角色和公开状态决定准入；不读取 LP |
 | `MapAccessListener` | `PlayerTeleportEvent`、`PlayerChangedWorldEvent`、`PlayerJoinEvent`、`PlayerRespawnEvent`；`MapService`；`MapAccessService`；MV 默认世界 | 严格校验开启时预先拦截并在事件后复核地图进入；加入和重生时检查；撤权后复核当前地图；无法安全送回默认世界时断开连接 |
-| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`WorldBaseProjection`、`MapAliasService` | 校验名称后创建或导入地图、写入首位管理员、初始化地图并转换状态 |
+| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 导入前校验 `level.dat` 版本；创建或导入地图后写入首位管理员、初始化地图并转换状态 |
 | `MapWorldCommand.delete` → `WorldLifeCycleServiceImpl.delete` | 控制台一次性确认码、删除名称正则、`WorldGateway`、Bukkit、Multiverse、操作记录、`WorldBaseProjection`、地图与角色存储 | 首次输入地图名取得 10 秒有效的 6 位确认码；二次输入确认码后检查 MV 默认世界、服务器首个加载世界、在线玩家和目录；删除世界后清理 LP 投影与 MMC 数据；失败保留 `DELETING` 供重试 |
 | `MapTravelServiceImpl.teleport` | `MapAccessService`、`MapRepository`、`PlayerGateway` | 准入通过后传送到已加载世界；按需加载尚未实现 |
 | `MapWorldCommand.kick` → `MapTravelServiceImpl.kickFromMap` | Bukkit 在线玩家、内部地图存储、`MapAccessService.decide`、Multiverse 默认世界 | 服务按操作者当前世界定位地图，确认管理员及目标在同图，再使用 MV 默认世界出生点传送 |

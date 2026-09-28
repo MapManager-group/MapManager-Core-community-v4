@@ -17,4 +17,8 @@ public record ImportMapRequest(
         UUID ownerId,
         WorldType worldType
 ) {
+    /** 按平坦世界环境导入现有地图。 */
+    public ImportMapRequest(String worldName, String displayName, String groupId, UUID ownerId) {
+        this(worldName, displayName, groupId, ownerId, WorldType.FLAT);
+    }
 }

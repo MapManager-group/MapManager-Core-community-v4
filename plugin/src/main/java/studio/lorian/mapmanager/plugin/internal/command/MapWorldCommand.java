@@ -236,7 +236,7 @@ public final class MapWorldCommand extends Command {
     private List<String> creationSuggestions(String command, String[] args) {
         boolean creating = command.equals("create");
         String current = args[args.length - 1];
-        if (args.length == 3 && (creating || !current.contains("="))) {
+        if (args.length == 3 && !current.contains("=")) {
             List<String> types = Arrays.stream(WorldType.values())
                     .map(type -> type.name().toLowerCase(Locale.ROOT)).toList();
             if (creating) return suggestions(current, types);
@@ -306,13 +306,13 @@ public final class MapWorldCommand extends Command {
 
     private void createOrImport(CommandSender sender, NotificationTarget target, String[] args, boolean importing) {
         OperationName operation = importing ? OperationName.IMPORT : OperationName.CREATE;
-        if (args.length < (importing ? 2 : 3) || (!importing && args[2].contains("="))) {
+        if (args.length < 2) {
             fail(target, operation, FailureReason.INVALID_INPUT);
             return;
         }
 
         int optionsStart = 2;
-        WorldType type = WorldType.NORMAL;
+        WorldType type = WorldType.FLAT;
         if (args.length > 2 && !args[2].contains("=")) {
             try {
                 type = WorldType.valueOf(args[2].toUpperCase(Locale.ROOT));

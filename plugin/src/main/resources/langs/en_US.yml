@@ -26,6 +26,7 @@ operations:
 reasons:
   MAP_NOT_FOUND: Map not found
   WORLD_NOT_FOUND: World not found
+  WORLD_VERSION_INCOMPATIBLE: World data version is newer than the server or invalid
   ALREADY_EXISTS: Map or world already exists
   INVALID_INPUT: Invalid input
   PLAYER_NOT_FOUND: Player not found or could not be resolved

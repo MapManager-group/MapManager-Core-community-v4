@@ -7,6 +7,7 @@ import studio.lorian.mapmanager.api.service.MapService;
 import studio.lorian.mapmanager.api.service.MapSettingsService;
 import studio.lorian.mapmanager.api.service.MapTravelService;
 import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
+import studio.lorian.mapmanager.api.service.WorldVersionService;
 
 /**
  * MapManager 对外公开 API 的统一入口。
@@ -62,4 +63,11 @@ public interface MapManager {
      * @return 世界生命周期服务
      */
     WorldLifeCycleService worldLifeCycle();
+
+    /**
+     * 返回地图文件版本查询服务。
+     *
+     * @return 地图版本服务
+     */
+    WorldVersionService worldVersions();
 }

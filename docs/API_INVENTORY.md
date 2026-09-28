@@ -4,7 +4,7 @@
 
 | v3 来源 | v3 能力 | v4 归属 |
 |---|---|---|
-| `MapManager` | 获取 `DynamicWorld`、`MapAgent`、`MainYaml`、`VersionCheck`、LP | `api/MapManager` 只暴露分类服务；LP、配置文件与版本检查实例由 plugin 管理 |
+| `MapManager` | 获取 `DynamicWorld`、`MapAgent`、`MainYaml`、`VersionCheck`、LP | `api/MapManager` 暴露分类服务和 `WorldVersionService`；LP 与配置文件仍由 plugin 管理 |
 | `MapAgent.newWorld/deleteWorld` | 地图记录创建与删除 | `WorldLifeCycleService` 统一编排世界和 MMC 数据 |
 | `MapAgent.addPlayer/removePlayer/getPlayers/isAdmin` | admin、builder、visitor 成员管理 | `MapRoleService`；UUID 为玩家主键 |
 | `MapAgent.publicizeWorld/privatizeWorld/isPublic` | 地图公开状态 | `MapSettingsService.setPublic`、`MapSettings.isPublic` |
@@ -28,7 +28,7 @@
 | `DynamicWorld.getMVWorldManager/getLoadedWorld/getCorrectWorld/getMVWorld` | MV 原生对象 | 留在 plugin 的 Multiverse 实现内部，不泄漏到 API |
 | `DynamicWorld.hasPermission` | LP/Multiverse 访问节点查询 | 移除旧准入方式，由 `MapAccessService.decide` 替代 |
 | `MainYaml`、`MainConfig` | YAML 全局设置读写 | 仅迁移地图自身设置；全局覆盖不进入 v4 API |
-| `VersionCheck` | 世界文件版本检查 | plugin 内部 `WorldVersionValidator`，不进入公开 API |
+| `VersionCheck` | 世界文件版本检查 | `api.service.WorldVersionService` 提供服务器版本、地图版本读取和兼容性判断；NBT 解析留在 plugin |
 | `WorldNode`、`WorldGroup`、`MapGroup`、`MMWorldType` | 地图数据、组、角色、世界类型 | `MapInstance`、`MapGroup`、`MapRole`、`WorldType`；不返回可变持久实体 |
 
 ## v3 用户功能迁移差异
@@ -46,7 +46,7 @@
 | 踢出当前地图玩家 | 已实现 | 管理员只能踢出同图在线玩家，目标传送到 Multiverse 默认世界出生点 |
 | 传送准入监听 | 已实现 | `MapAccessListener` 默认启用 `access-control.strict-map-entry`，用 MMC 检查传送目标、传送后实际世界、登录、重生和角色撤销后的当前地图；关闭配置会停用整套检查。v3 的 LP `multiverse.access.*` 不是 v4 的准入来源 |
 | 未加载地图按需加载及延迟卸载 | 未实现 | v3 有加载、取消卸载与延迟卸载实现；v4 传送要求目标世界已加载，也没有对应状态和任务 |
-| 导入世界版本兼容检查 | 未实现 | v3 导入会解析 `level.dat` 并拒绝高于服务器版本的地图；v4 导入只检查目录和 `level.dat` 是否存在，`WorldVersionValidatorImpl` 仍是未接线的固定 `false` 占位 |
+| 导入世界版本兼容检查 | 已实现 | plugin 使用 Querz NBT 读取 `Data.DataVersion`，并与 Bukkit 服务器 dataVersion 比较；导入会拒绝版本更高或版本字段无效的地图，公开服务可查询地图版本和兼容性 |
 | 龙蛋传送保护 | 未实现 | v3 `BlockListener` 取消玩家右键龙蛋事件；v4 设置监听器中没有对应事件处理 |
 | LuckPerms `apply` 共享权限组 | 未迁移 | v3 地图组继承 `apply`（无世界上下文）；v4 地图组仅维护 `default` 和带世界上下文的 `worldbase`。v4 将 MMC 作为准入来源，旧 `public` LP 组也不再代表公开状态 |
 | `/mapadmin save`、`reload`、`sync` 与 `/write` | 无直接命令等价物 | v4 对业务数据自动持久化；没有手动导出/重载命令、LuckPerms 全量重同步命令或操作记录查看/恢复命令。LP 同步失败后可重复角色修改重试，但没有自动重试队列 |
@@ -57,7 +57,7 @@
 
 - v3 使用独立 `/create`、`/import`、`/delete`、`/init` 及 `n:`/`e:` 参数；v4 收敛为 `/world create|import|delete|init` 和 `key=value` 参数。
 - v3 多数玩家操作依赖 Bukkit/LuckPerms 权限节点；v4 玩家地图操作以 MMC 角色及地图准入判断为准，创建/导入/初始化/删除改为控制台专用。
-- v3 创建/导入默认世界类型为 FLAT；v4 当前 `/world create` 和 `/world import` 默认 NORMAL。需要兼容旧服命令行为时，这是一个需要产品决策的默认值变化。
+- v3 和 v4 `/world create`、`/world import` 未指定类型时均默认 FLAT。
 - v3 创建/导入未提供 owner 时使用命令发送者；v4 控制台命令未提供 `admin=<玩家>` 时不会添加首位管理员，地图仍可创建但没有默认管理员。
 - v3 `/world tp` 根据 LuckPerms `multiverse.access.<world>` 授权；v4 根据 MMC ACTIVE 状态、角色和 `isPublic` 授权。这是准入权威的替换，而不是待迁移的 LP 访问节点检查。
 

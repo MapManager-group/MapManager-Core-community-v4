@@ -9,6 +9,7 @@ import studio.lorian.mapmanager.api.service.MapSettingsService;
 import studio.lorian.mapmanager.api.service.MapTravelService;
 import studio.lorian.mapmanager.api.service.PlayerGateway;
 import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
+import studio.lorian.mapmanager.api.service.WorldVersionService;
 import studio.lorian.mapmanager.plugin.internal.storage.MapRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.OperationRepository;
@@ -26,17 +27,19 @@ public final class MapManagerImpl implements MapManager {
     private final MapSettingsService settings;
     private final MapTravelService travel;
     private final WorldLifeCycleService worldLifeCycle;
+    private final WorldVersionService worldVersions;
 
     public MapManagerImpl(MapRepository repository, RoleRepository roleRepository, OperationRepository operations,
                           WorldBaseProjection permissions, PlayerGateway players, Pattern deletionPattern,
-                          Pattern blockedCreationPattern, Logger logger) {
+                          Pattern blockedCreationPattern, Logger logger, WorldVersionService worldVersions) {
         this.maps = new MapServiceImpl(repository);
         this.aliases = new MapAliasServiceImpl(repository);
         this.settings = new MapSettingsServiceImpl(repository, aliases);
         this.roles = new MapRoleServiceImpl(repository, roleRepository, permissions);
         this.access = new MapAccessServiceImpl(repository, roles);
+        this.worldVersions = worldVersions;
         this.worldLifeCycle = new WorldLifeCycleServiceImpl(repository, roleRepository, operations,
-                permissions, aliases, deletionPattern, blockedCreationPattern, logger);
+                permissions, aliases, worldVersions, deletionPattern, blockedCreationPattern, logger);
         this.travel = new MapTravelServiceImpl(repository, access, players, worldLifeCycle);
     }
 
@@ -73,5 +76,10 @@ public final class MapManagerImpl implements MapManager {
     @Override
     public WorldLifeCycleService worldLifeCycle() {
         return worldLifeCycle;
+    }
+
+    @Override
+    public WorldVersionService worldVersions() {
+        return worldVersions;
     }
 }

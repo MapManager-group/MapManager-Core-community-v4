@@ -33,7 +33,7 @@ plugin (mapmanager-plugin)
 api/src/main/java/studio/lorian/mapmanager/api/
   model/       MapInstance, MapRole, MapSettings
   service/     MapService, MapRoleService, MapSettingsService, MapAccessService,
-               MapTravelService, WorldLifeCycleService
+               MapTravelService, WorldLifeCycleService, WorldVersionService
   result/      OperationResult, FailureReason
   event/       面向扩展插件的公开事件
 
@@ -50,7 +50,7 @@ plugin/src/main/java/studio/lorian/mapmanager/plugin/
   notification/统一通知路由与消息格式
 ```
 
-`api` 是调用方编译依赖，`plugin` 已有 Paper 入口和实际业务实现。主类装配服务并注册 `/world`、`/wtp` 命令及 `MapAccessListener`，但尚未通过 Bukkit ServicesManager 注册 `MapManager`。`PlayerGateway` 和 `WorldGateway` 的接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
+`api` 是调用方编译依赖，`plugin` 已有 Paper 入口和实际业务实现。主类装配服务并注册 `/world`、`/wtp` 命令及 `MapAccessListener`，但尚未通过 Bukkit ServicesManager 注册 `MapManager`。`PlayerGateway`、`WorldGateway` 和 `WorldVersionService` 接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，地图版本服务公开版本读取和兼容性判断，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
 
 ## 3. API 核心类型
 
@@ -84,9 +84,16 @@ public interface WorldLifeCycleService {
     OperationResult<MapInstance> initialize(String worldName);
     OperationResult<Void> delete(String worldName);
 }
+
+public interface WorldVersionService {
+    int serverDataVersion();
+    OptionalInt mapDataVersion(Path worldFolder);
+    boolean isCompatible(Path worldFolder);
+    boolean isCompatible(String worldName);
+}
 ```
 
-以上为当前接口。API 尚未暴露按需加载方法；当前 `MapTravelServiceImpl` 也要求目标世界已加载。API 中只出现 MMC 自己的类型和 JDK 类型；不把 Bukkit、LuckPerms 或 Multiverse 的实现对象泄漏给调用方。世界目录查询的 `Path` 由 `WorldGateway` 提供。
+以上为当前接口。`WorldVersionService` 使用 Querz NBT 读取 `level.dat` 的 `Data.DataVersion`，并与 Bukkit 当前服务器 dataVersion 比较；NBT 实现留在 plugin。API 尚未暴露按需加载方法；当前 `MapTravelServiceImpl` 也要求目标世界已加载。API 中只出现 MMC 自己的类型和 JDK 类型；不把 Bukkit、LuckPerms 或 Multiverse 的实现对象泄漏给调用方。
 
 ## 4. 准入和 LuckPerms
 

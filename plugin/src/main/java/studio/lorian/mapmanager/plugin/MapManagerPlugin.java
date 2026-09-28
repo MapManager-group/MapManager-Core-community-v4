@@ -4,6 +4,7 @@ import net.luckperms.api.LuckPerms;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
+import studio.lorian.mapmanager.plugin.impl.WorldVersionServiceImpl;
 import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
 import studio.lorian.mapmanager.plugin.internal.listener.MapAccessListener;
 import studio.lorian.mapmanager.plugin.internal.listener.MapSettingsListener;
@@ -51,8 +52,9 @@ public final class MapManagerPlugin extends JavaPlugin {
             var projection = new WorldBaseProjectionImpl(luckPerms);
             var players = new PlayerGatewayImpl(this);
             var notifier = new OperationNotifierImpl();
+            var worldVersions = new WorldVersionServiceImpl(getServer().getWorldContainer().toPath());
             api = new MapManagerImpl(repository, repository, repository, projection, players,
-                    deletionPattern, blockedCreationPattern, getLogger());
+                    deletionPattern, blockedCreationPattern, getLogger(), worldVersions);
             MapAccessListener accessListener = new MapAccessListener(this, api.maps(), api.access(),
                     getConfig().getBoolean("access-control.strict-map-entry", true));
             getServer().getPluginManager().registerEvents(accessListener, this);

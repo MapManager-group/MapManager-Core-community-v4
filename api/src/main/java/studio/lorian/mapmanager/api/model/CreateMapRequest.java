@@ -20,6 +20,11 @@ public record CreateMapRequest(
         WorldType worldType,
         Map<String, String> parameters
 ) {
+    /** 创建平坦世界的请求，不附加生成参数。 */
+    public CreateMapRequest(String worldName, String displayName, String groupId, UUID ownerId) {
+        this(worldName, displayName, groupId, ownerId, WorldType.FLAT, Map.of());
+    }
+
     /** 兼容不带创建参数的请求。 */
     public CreateMapRequest(String worldName, String displayName, String groupId, UUID ownerId, WorldType worldType) {
         this(worldName, displayName, groupId, ownerId, worldType, Map.of());
