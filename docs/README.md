@@ -156,7 +156,7 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 | `generator=<生成器>`、`generator-settings=<参数>` | Multiverse 生成器配置 |
 | `property.<属性名>=<值>` | 设置 Multiverse 世界属性 |
 
-导入命令支持地图类型、`alias`、`group` 和 `admin`，不接受创建专用的地形生成参数。导入世界须直接位于服务端根目录，并包含有效的 `level.dat`；版本高于当前服务器的数据会被拒绝。
+导入命令支持地图类型、`alias`、`group` 和 `admin`，不接受生成参数。导入世界须直接位于服务端根目录，并包含有效的 `level.dat`；版本高于当前服务器的数据会被拒绝。
 
 ## 地图规则与准入
 

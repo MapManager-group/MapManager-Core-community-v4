@@ -113,7 +113,7 @@ public final class ExampleAddon extends JavaPlugin implements Listener {
 | `getOwnerWorlds/getAccessWorlds` | `access().administratedMaps(playerId)` / `access().accessibleMaps(playerId)` | 返回地图快照；准入取决于 MMC 角色、地图公开状态和 ACTIVE 状态。 |
 | `hasPermission(user, node)` | `access().decide(playerId, mapId)` | 查询地图准入决策；LP `multiverse.access.*` 不再决定 v4 地图访问权。 |
 | `createWorld/newWorld` | `worldLifeCycle().create(new CreateMapRequest(...))` | 所有者 ID 使用 UUID；`ownerId == null` 时不会自动分配首位管理员。 |
-| `importWorld` | `worldLifeCycle().importWorld(new ImportMapRequest(...))` | 只从服务端根目录导入，要求有效 `level.dat` 且版本兼容。 |
+| `importWorld` | `worldLifeCycle().importWorld(new ImportMapRequest(...))` | 只从服务端根目录导入，要求有效 `level.dat` 且版本兼容；导入请求不含生成参数。 |
 | `initWorld` | `worldLifeCycle().initialize(worldName)` | 需要已加载且已登记的地图。 |
 | `deleteWorld/removeWorld` | `worldLifeCycle().delete(worldName)` | 受配置中的删除名称正则、在线玩家、默认世界及目录安全检查限制。 |
 | `getVersionCheck()` | `worldVersions()` | 读取地图 dataVersion 并与服务器版本比较。 |

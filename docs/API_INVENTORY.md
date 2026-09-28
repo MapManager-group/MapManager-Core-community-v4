@@ -40,7 +40,7 @@
 | 功能 | v3 实际行为 | v4 实际行为 | 对照结论 |
 |---|---|---|---|
 | 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/world create <地图名> [类型] [alias=... group=... admin=...]`；`FLAT/SIFT/NORMAL/VOID/NETHER/END`，其中 SIFT、NETHER、END 当前复用 FLAT 生成逻辑；NETHER/END 仅切换环境；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | 已实现但命令语法、世界类型 token 和颜色设置方式不兼容；v4 不传 `admin=` 时不创建首位管理员 |
-| 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/world import` 接受 `alias/group/admin` 和类型；校验根目录 `level.dat`、路径及版本；仅 `VOID` 类型配置 VoidGen | 已实现；版本校验保留，生成器处理不同；v4 未提供 v3 的 `c:` 显式颜色参数 |
+| 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/world import` 接受 `alias/group/admin` 和类型；校验根目录 `level.dat`、路径及版本；仅 `VOID` 类型配置 VoidGen；不接受生成参数 | 已实现；版本校验保留，导入使用存档现有区块；v4 未提供 v3 的 `c:` 显式颜色参数 |
 | 初始化设置 | 自动加载、和平、创造、关闭常见生物生成，设置随机刻/火焰/天气/昼夜/生物破坏/生物生成/进度播报规则 | 创建、导入、手动初始化调用同组初始化规则，并校验配置是否成功 | 核心规则基本一致；别名颜色和失败记录策略不同 |
 | 删除地图 | `/delete <地图>` 后 10 秒内 `/delete confirm`；会先将在线玩家送回默认出生点，再卸载并清理 LP/MV 数据 | `/world delete <地图>` 由控制台发起，一次性六位码 10 秒有效；有在线玩家时拒绝，另校验默认世界、路径、符号链接和名称规则 | 已实现但确认交互和在线玩家策略不同；v4 增加删除保护 |
 | 地图组管理员/建筑者、单图访客 | ADMIN/BUILDER 作用于地图组，VISITOR 作用于单图；名单及权限主要从 LP 节点维护 | MMC UUID 角色为权威；管理员/建筑者仍按组作用，访客按地图作用；建筑权限投影到 LP `worldbase` | 核心角色功能已实现；数据权威从 LP 切换到 MMC，直接修改 LP 不再改变准入结果 |

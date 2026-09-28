@@ -264,7 +264,7 @@ public final class MapWorldCommand extends Command {
         if (current.startsWith("admin="))
             return suggestions(current, Bukkit.getOnlinePlayers().stream()
                     .map(player -> "admin=" + player.getName()).toList());
-        if (current.startsWith("structures="))
+        if (creating && current.startsWith("structures="))
             return suggestions(current, List.of("structures=true", "structures=false"));
         return suggestions(current, optionKeys(creating, args));
     }

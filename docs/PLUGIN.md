@@ -6,7 +6,7 @@ Paper 入口会读取 `config.yml` 并初始化 JSON 或 MySQL 存储。默认�
 
 地图准入监听由 `access-control.strict-map-entry` 控制，默认 `true`。开启时，插件会在传送前校验目标地图，并在传送后复核实际世界；玩家加入服务器、重生或失去当前地图最后一项有效进入权限时也会检查。未获准的玩家会返回 Multiverse 默认世界出生点；默认世界不可用、玩家也无权进入默认地图或传送失败时会断开连接。设为 `false` 会同时停用传送、登录、重生及撤权后的监听检查。`/world tp` 和 `/wtp` 仍按 MMC 准入结果判断是否允许传送。
 
-`/world create <地图名> [世界类型]` 和 `/world import <地图名> [世界类型]` 未指定世界类型时均使用平坦世界。创建支持 `flat`、`sift`、`nether` 和 `end` 类型的平坦生成逻辑；`nether` 与 `end` 只改变 Bukkit 环境。创建时可对这四种类型使用 `flat.height=<2–320>` 设置地形总层数，从底到顶依次为 1 层基岩、`N-2` 层泥土和 1 层草方块；例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。导入会读取 `level.dat` 的 `Data.DataVersion`，并与当前 Bukkit 服务器 dataVersion 比较；高于服务器版本或缺少有效版本信息的地图会被拒绝。`MapManager.worldVersions()` 提供公开版本查询接口，NBT 解析实现位于 plugin 模块。
+`/world create <地图名> [世界类型]` 和 `/world import <地图名> [世界类型]` 未指定世界类型时均使用平坦世界。创建支持 `flat`、`sift`、`nether` 和 `end` 类型的平坦生成逻辑；`nether` 与 `end` 只改变 Bukkit 环境。创建时可对这四种类型使用 `flat.height=<2–320>` 设置平坦生成器地形总层数；高度从底到顶依次为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。导入只接受地图类型及 `alias`、`group`、`admin` 元数据，不接受生成参数；已有区块按存档内容保留。导入会读取 `level.dat` 的 `Data.DataVersion`，并与当前 Bukkit 服务器 dataVersion 比较；高于服务器版本或缺少有效版本信息的地图会被拒绝。`MapManager.worldVersions()` 提供公开版本查询接口，NBT 解析实现位于 plugin 模块。
 
 创建和导入地图均拒绝固定保留名：`cache`、`config`、`world`、`log`、`test`、`overworld`、`default`、`worldbase`、`apply`、`public`、`private`，以及以 `plugin`、`version`、`admin`、`mapmanager`、`builder`、`visitor`、`lib`、`mmc` 开头的名称。`creation.blocked-world-name-regex` 可额外配置 Java 正则，匹配完整地图名；默认 `.*_bak$`，会拒绝 `_bak` 结尾的名称。例如 `(?:lobby|temp.*|.*_bak)` 可同时禁止 `lobby`、`temp` 前缀和 `_bak` 后缀。正则无效会阻止启动；内置限制始终生效。
 
