@@ -22,7 +22,7 @@
 - [`STRUCTURE.md`](STRUCTURE.md)：目录、入口、关键调用关系。
 - [`API_INVENTORY.md`](API_INVENTORY.md)：v3 能力到 v4 API/实现的对照。
 - [`API_GUIDE.md`](API_GUIDE.md)：外部 Paper 插件依赖、获取及调用 v4 API 的指南。
-- [`README.md`](README.md)：英文用户说明与命令用法。
+- [`README.md`](README.md)：中文用户介绍、安装、权限、命令、配置和开发接入。
 - [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为，包括地图准入、公开状态、显示名、出生点及物理/爆炸设置。
 - [`MIGRATION.md`](MIGRATION.md)：v3 自动迁移触发、字段映射、保护和限制。
 - [`STORAGE.md`](STORAGE.md)：存储配置、文件/表结构、后端约束。

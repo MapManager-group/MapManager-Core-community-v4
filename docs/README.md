@@ -1,56 +1,200 @@
 # MapManager Core v4
 
-MapManager Core v4 is a new implementation of the MapManager map-management plugin. This repository is the v4 project; the v3 checkout is used as a behavior and migration reference only.
+MapManager Core（MMC）是面向 Paper 服务器的地图管理插件。它管理地图元数据、地图角色和玩家准入，并通过 Multiverse-Core 执行世界操作，通过 LuckPerms 投影建造权限。
 
-## Framework decision
+## 功能
 
-- MMC owns map metadata, map roles, and every map-entry decision.
-- LuckPerms supplies permissions configured on the `worldbase` parent group. MMC may mirror map-role membership into child groups that inherit `worldbase`, but LuckPerms is not an authority for map admission.
-- Multiverse-Core performs world creation, import, initialization, and deletion operations. MMC owns the lifecycle workflow and its metadata updates. On-demand world loading is not implemented yet.
-- Public API contracts are separated from their implementation. Storage ports and storage models are internal to the implementation and are never part of the API module.
-- JSON and MySQL storage are selectable backends behind the same internal repository contracts.
-- Mutating operations return structured outcomes. A single notifier renders localized MiniMessage notifications; the API keeps stable failure-reason and operation codes. The default language is `zh_CN`, configured with `language` in `config.yml`; bundled languages are in `plugin/src/main/resources/langs/`.
+- 创建地图、导入已有世界、初始化和安全删除地图。
+- 按地图组管理管理员和建筑者，按单张地图管理访客。
+- 设置地图公开状态、展示名、出生点、方块物理和爆炸破坏。
+- 检查地图进入权限，并在传送、登录、重生和角色撤销后执行复核。
+- 使用 JSON 或 MySQL 保存地图和角色数据；可将 v3 的地图与角色数据迁移到 v4。
+- 向其他 Paper 插件注册 `MapManager` 服务。扩展插件接入方法见 [API_GUIDE.md](API_GUIDE.md)。
 
-The Maven reactor uses `studio.lorian.mapmanager` as its group ID and contains `api` (public contracts) and `plugin` (Paper entry point and implementation). All source code is Java. JSON/MySQL storage, map settings, roles, admission decisions, map creation, import, initialization, deletion, command-based teleportation, and configurable strict map-entry checks are implemented. Startup checks the sibling `plugins/MapManager-Core` directory for both `worlds.json` and `groups.json`; when present, it backs them up under the v4 data directory and imports their map and role data into the selected repository. Migration errors disable the plugin. After migration and LuckPerms `worldbase` initialization succeed, the plugin registers `MapManager` with Bukkit's service manager. Loading worlds on demand is not implemented. See [API_GUIDE.md](API_GUIDE.md) for external plugin integration.
+当前未实现 PVP 开关、未加载世界的按需加载和空闲卸载、龙蛋传送保护，以及全局物理/爆炸覆盖。生命周期操作会记录执行阶段，但崩溃后的自动恢复尚未实现。
 
-## Create a map
+## 安装
 
-`/world create <name> [flat|normal|void|nether|end] [alias=<display name>] [group=<group id>] [admin=<username>] [key=value ...]` is console-only and has no permission node. If no type is given, the world is flat. The map name must use 4–16 lowercase letters, digits, `_`, or `-`. An explicit group ID uses the same characters and allows 1–16 characters. The alias defaults to the map name; the group defaults to the map name. The effective group ID cannot be `default` or `worldbase`, since those are LuckPerms base groups. `admin` optionally names the first administrator. Creation and import reject built-in reserved names (`cache`, `config`, `world`, `log`, `test`, `overworld`, `default`, `worldbase`, `apply`, `public`, `private`) and names beginning with `plugin`, `version`, `admin`, `mapmanager`, `builder`, `visitor`, `lib`, or `mmc`. Configure an additional Java regular expression under `creation.blocked-world-name-regex` in `config.yml`; it matches the whole map name and defaults to `.*_bak$`. Configuration cannot remove built-in restrictions.
+### 环境要求
 
-Supported keys are `flat.height` (1–320), `seed`, `structures` (`true` or `false`), `biome`, `generator`, `generator-settings`, and `property.<Multiverse property>`. For example: `/world create buildworld flat flat.height=64 structures=false alias=BuildWorld`.
+| 项目 | 要求 |
+|---|---|
+| 服务端 | Paper；插件 API 目标版本为 1.20 |
+| Java | Java 21 |
+| 必需插件 | LuckPerms、Multiverse-Core |
+| 可选插件 | VoidGen；只有创建或导入 `void` 类型地图时需要 |
 
-World creation, import, and initialization are console-only operations. Player subcommands have no Bukkit permission node; MMC authorizes them using map access and roles.
+### 安装步骤
 
-Creation saves the map as `PENDING` before Multiverse creates the world. After saving its spawn, first administrator, and LuckPerms group inheritance, it changes the map to `ACTIVE`. A failed stage leaves the map `PENDING` for inspection and returns an operation ID. Automatic recovery is not implemented yet.
+1. 停服并备份世界目录、LuckPerms 数据和 `plugins/MapManager-Core/`。
+2. 在服务器安装并启用 LuckPerms 和 Multiverse-Core。
+3. 获取 MapManager Core v4 JAR，放入服务器的 `plugins/` 目录。若从源码构建，见下方[开发](#开发)章节。
+4. 启动服务器。首次启动会生成 `plugins/MapManager-Core/config.yml` 和所选存储文件。
+5. 按需修改配置，完整重启服务器使配置生效。
 
-After Multiverse creates or imports a world, MMC initializes its Multiverse difficulty (peaceful), game mode (creative), auto-load and spawn loading options, disables ordinary entity spawning, and applies the v3 gamerules for random ticks, fire, weather, daylight, mob griefing, mob spawning, and advancement announcements. These settings are saved before the map becomes `ACTIVE`. `/world init <name>` is console-only and reapplies them to an already loaded MMC map. Map admins can inspect or change the stored settings with `/world physics [true|false|info]` and `/world explosion [true|false|info]`. Physics controls block physics and falling blocks; explosion controls block and entity explosions in registered maps.
+如需把 v3 数据迁移到 v4，请在启动 v4 前确认旧 `worlds.json` 和 `groups.json` 均位于 `plugins/MapManager-Core/`，并备份旧数据。检测到两个文件后，插件会在启动时自动迁移并备份源文件；迁移错误会阻止插件启用。详细限制见 [MIGRATION.md](MIGRATION.md)。
 
-All players can run `/world tp <name>` or its shorthand `/wtp <name>`. MMC checks access to the active map and teleports to the saved map spawn or the world's default spawn. The target world must already be loaded; on-demand loading is not implemented.
+## 配置
 
-## Strict map entry
+首次启动生成的默认配置：
 
-`access-control.strict-map-entry` in `config.yml` defaults to `true`. When enabled, MMC checks and blocks unauthorized player teleports, then verifies the actual world after teleport and world-change events. It also checks a player's world on login and respawn. After `/world admin|builder|visitor remove`, a player who no longer has any effective access to their current map is returned to the Multiverse default world's spawn. If the default world is unavailable, the player cannot enter it, or the return teleport fails, MMC disconnects the player. Setting `strict-map-entry: false` under `access-control` disables this listener's entry and revocation checks. `/world tp` and `/wtp` continue to use their MMC access decision.
+```yaml
+language: zh_CN
 
-## Map settings
+storage:
+  type: json # json | mysql
+  mysql:
+    host: localhost
+    port: 3306
+    database: mapmanager
+    username: mapmanager
+    password: change-me
+    use-ssl: true
 
-The current map's MMC administrator can run `/world public [true|false|info]` to change or view public access. Players with an effective map role and everyone on public maps may enter. `/world setname <name>` changes the display name and Multiverse alias. `/world setspawn` saves the player's current location as the MMC, Bukkit, and Multiverse world spawn.
+deletion:
+  allowed-world-name-regex: '.*_bak$'
 
-An MMC administrator of the current map can run `/world kick <online-player>` while in a managed map. The target must be in the same map. MMC moves them to Multiverse-Core's default world spawn and reports a structured `KICK` result. Tab completion lists only online players in the current map.
+creation:
+  blocked-world-name-regex: '.*_bak$'
 
-The console can request deletion with `/world delete <name>`. MMC prints a random six-character code bound to the selected map; enter `/world delete <code>` within 10 seconds to confirm. Players cannot use this command. `deletion.allowed-world-name-regex` in `config.yml` limits eligible names and defaults to `.*_bak$`. MMC refuses the Multiverse default world, the server's first loaded world, and worlds containing players. It checks the expected world directory, records `DELETING`, asks Multiverse to delete the world files, and then removes MMC roles and LuckPerms projection. A failed deletion retains `DELETING`; repeat the two-step command after fixing the cause.
+access-control:
+  strict-map-entry: true
+```
 
-## Map members
+- `language` 支持 `zh_CN` 和 `en_US`。插件会把语言文件复制到数据目录的 `langs/`；自定义翻译可编辑对应文件。
+- `storage.type` 默认为 `json`，文件为 `plugins/MapManager-Core/maps.json`。选择 `mysql` 时，数据库和账户需提前创建，插件只创建表。
+- 存储后端及 MySQL 目标不会自动迁移数据。安装后若需要切换，请先使用专门的数据迁移方案；直接修改配置会被插件拒绝，以免误连空库。详见 [STORAGE.md](STORAGE.md)。
+- `access-control.strict-map-entry` 默认为 `true`。设为 `false` 会停用外部传送、登录、重生及撤销角色后的自动准入检查；`/world tp` 仍执行 MMC 权限检查。
+- 两个名称正则都匹配完整地图名。默认情况下，创建/导入会拒绝 `_bak` 结尾名称，删除则只允许 `_bak` 结尾地图。内置保留名称及名称格式限制始终生效。修改删除正则前请确认目标范围。
+- 如需取消 `_bak` 后缀限制，可将 `deletion.allowed-world-name-regex` 改为 `'.*'`。默认世界、首个 Bukkit 世界、在线玩家和目录边界检查仍然生效。
 
-Players who can enter the current managed map can use `/world admins`, `/world builders`, and `/world visitors` to list players directly assigned each role. `admin` and `builder` assignments cover every map in the current map group; `visitor` applies only to the current map. An admin also has effective builder and visitor access, and a builder has effective visitor access. Public maps allow everyone to visit regardless of the explicit visitor list.
+## 权限说明
 
-An MMC administrator of the current map can use `/world admin|builder|visitor add|remove <username-or-UUID>`. MMC stores the grants; admin and builder grants also mirror membership to the corresponding LuckPerms map group, which inherits `worldbase` in that group's worlds. LuckPerms does not authorize MMC commands. Removing one group role preserves LuckPerms membership while the other role remains. If LuckPerms sync fails after MMC storage succeeds, the command reports `Partial`; repeating the command retries the projection.
+MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准入以 MMC 中的角色和公开状态为准；OP 身份或 LuckPerms 的 `multiverse.access.<地图名>` 节点不能替代 MMC 地图角色。
 
-Tab completion filters subcommands by sender and MMC access or administrator role. It suggests accessible maps for `/world tp` and `/wtp`, managed maps for console `/world init`, importable root folders for `/world import`, world types and option keys for creation/import, and role actions and relevant player names for member commands. For members without a cached name, removal completion uses their UUID.
+| 角色/身份 | 范围 | 能力 |
+|---|---|---|
+| `ADMIN` | 地图组 | 管理该组地图的成员和设置；同时拥有建筑者、访客能力 |
+| `BUILDER` | 地图组 | 进入组内地图，并获得 `worldbase` 组提供的建造权限 |
+| `VISITOR` | 单张地图 | 进入被授予的地图，不获得建造权限 |
+| 公开地图玩家 | 单张公开地图 | 任何玩家都可进入；不会自动创建 `VISITOR` 授权记录 |
+| 控制台 | 全服操作 | 执行创建、导入、初始化和删除命令 |
 
-Initialization sets the Multiverse alias to `&3<name>` for private maps and `&2<name>` for public maps. The database stores alias text without Minecraft color codes; the Multiverse alias includes the visibility color. Creation and import use the world name when no alias is supplied, or the supplied alias otherwise. Manual initialization uses the saved alias. Changing a map's public status reads its current Multiverse alias, removes color codes, and applies the new color without changing the alias text. `MapAliasService#setAlias(UUID)` resets to the world name; `setAlias(UUID, String)` saves the supplied alias without color codes and updates the Multiverse alias.
+建造权限由服务器管理员配置在 LuckPerms 的 `worldbase` 组中。MMC 负责将地图管理员/建筑者映射到地图组并投影到 LuckPerms；LuckPerms 不负责地图准入。已有 `worldbase` 组不会被插件覆盖，首次缺失时插件只创建该组并继承 `default`，不会替服务器配置具体建造权限。
 
-## Import an existing world
+组角色变更会先写入 MMC，再投影到 LuckPerms。若 MMC 已保存但 LuckPerms 更新失败，命令会报告部分完成；重复相同的角色操作可再次尝试权限投影。
 
-Place the world folder directly under the server root, for example `server-root/buildworld/level.dat`, then run `/world import buildworld [normal|flat|void|nether|end] [alias=<display name>] [group=<group id>] [admin=<username>]`. This command is console-only, has no permission node, and defaults the type to `flat`. Import reads `Data.DataVersion` from `level.dat` and rejects maps newer than the server or with invalid version metadata. It follows the same `PENDING` to `ACTIVE` metadata and LuckPerms setup as creation. Failed imports leave the source world folder intact.
+建议创建或导入地图时通过 `admin=<玩家名>` 指定首位管理员。若省略该参数，地图不会自动分配管理员；之后只有 MMC 地图管理员能在游戏内授予角色。
 
-See [STRUCTURE.md](STRUCTURE.md) for the current directory and method dependencies, [ARCHITECTURE.md](ARCHITECTURE.md) for design and lifecycle flow, [API_INVENTORY.md](API_INVENTORY.md) for the source-based v3 interface classification, and [API_GUIDE.md](API_GUIDE.md) for external plugin API calls.
+## 快速使用
+
+1. 在控制台创建地图并指定管理员：
+
+   ```text
+   /world create buildworld flat alias=建筑地图 group=buildworld admin=Steve
+   ```
+
+2. 在地图组管理员所在的地图内授予角色：
+
+   ```text
+   /world builder add Alex
+   /world visitor add Pat
+   ```
+
+3. 管理员可设置出生点、展示名和地图规则：
+
+   ```text
+   /world setspawn
+   /world setname 建筑地图
+   /world physics false
+   /world explosion false
+   /world public true
+   ```
+
+4. 有权进入地图的玩家传送：
+
+   ```text
+   /world tp buildworld
+   /wtp buildworld
+   ```
+
+地图管理员/建筑者按地图组生效；访客授权只对当前地图生效。一个组中的地图共享管理员和建筑者，但各自有独立访客名单及地图设置。
+
+## 命令
+
+| 命令 | 使用者 | 说明 |
+|---|---|---|
+| `/world create <地图名> [类型] [选项...]` | 控制台 | 创建并初始化地图；类型默认为 `flat` |
+| `/world import <地图名> [类型] [选项...]` | 控制台 | 导入服务端根目录下的已有世界；默认类型为 `flat` |
+| `/world init <地图名>` | 控制台 | 对已加载的 MMC 地图重新应用初始化规则 |
+| `/world delete <地图名>` | 控制台 | 申请删除并取得一次性确认码；随后运行 `/world delete <6位确认码>`，须在 10 秒内完成 |
+| `/world tp <地图名>`、`/wtp <地图名>` | 玩家 | 传送到有权限进入的已加载地图 |
+| `/world admin add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图组管理员 |
+| `/world builder add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图组建筑者 |
+| `/world visitor add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图访客 |
+| `/world admins`、`/world builders`、`/world visitors` | 可进入当前地图的玩家 | 查看当前地图直接授予的各角色成员 |
+| `/world public [true\|false\|info]` | 当前地图管理员 | 修改或查看地图公开状态 |
+| `/world physics [true\|false\|info]` | 当前地图管理员 | 修改或查看方块物理设置；关闭后阻止方块物理和落沙 |
+| `/world explosion [true\|false\|info]` | 当前地图管理员 | 修改或查看方块及实体爆炸破坏设置 |
+| `/world setname <展示名>` | 当前地图管理员 | 修改地图展示名和 Multiverse 别名 |
+| `/world setspawn` | 当前地图管理员 | 将当前位置设为地图出生点 |
+| `/world kick <在线玩家>` | 当前地图管理员 | 将同一地图中的目标玩家送到 Multiverse 默认世界出生点 |
+
+创建命令支持类型 `flat`、`normal`、`void`、`nether`、`end`，并支持以下选项：
+
+地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 类型需要安装 VoidGen。`flat.height` 仅适用于 `flat` 类型，且不能同时使用 `generator-settings`。
+
+| 选项 | 作用 |
+|---|---|
+| `alias=<文本>` | 地图展示名，默认地图名 |
+| `group=<组ID>` | 地图组，默认地图名 |
+| `admin=<玩家名>` | 首位地图管理员，可省略但地图将没有管理员 |
+| `flat.height=<1–320>` | 平坦世界高度 |
+| `seed=<数值>` | 世界种子 |
+| `structures=true\|false` | 是否生成结构 |
+| `biome=<生物群系>` | 设置生物群系 |
+| `generator=<生成器>`、`generator-settings=<参数>` | Multiverse 生成器配置 |
+| `property.<属性名>=<值>` | 设置 Multiverse 世界属性 |
+
+导入命令支持地图类型、`alias`、`group` 和 `admin`，不接受创建专用的地形生成参数。导入世界须直接位于服务端根目录，并包含有效的 `level.dat`；版本高于当前服务器的数据会被拒绝。
+
+## 地图规则与准入
+
+新地图默认启用方块物理、关闭爆炸破坏并设为私有。地图设置随地图记录保存；未登记到 MMC 的世界不受物理/爆炸监听器影响。
+
+创建、导入和手动初始化会设置和平难度、创造模式、自动加载、出生点内存选项、生物生成分类及随机刻、火焰、天气、昼夜、生物破坏、生物生成和进度播报规则。公开地图 Multiverse 别名使用绿色 `&2`，私有地图使用深青色 `&3`；展示名保存为纯文本。
+
+启用严格准入后，插件会检查玩家传送目标和实际进入的世界，也会检查登录、重生及撤销角色后的当前地图。无权进入时会尝试将玩家送回 Multiverse 默认世界出生点；无法安全返回时会断开玩家。关闭严格准入后，其他插件直接发起的传送不再由这组监听器拦截。
+
+## 开发
+
+### 构建与测试
+
+项目使用 Java 21 和 Maven，包含两个模块：
+
+- `api`：外部插件可使用的模型、接口和结果类型。
+- `plugin`：Paper 插件入口、命令、事件、存储和 Multiverse/LuckPerms 实现。
+
+在仓库根目录运行：
+
+```shell
+mvn test
+mvn clean package
+```
+
+插件 JAR 输出到 `plugin/target/mapmanager-plugin-4.0.0-SNAPSHOT.jar`。Paper、LuckPerms 和 Multiverse-Core 是运行时依赖，不会随插件重复打包；MySQL 驱动及 API 等依赖由构建配置处理。
+
+### 外部插件接入
+
+扩展插件可通过 Bukkit `ServicesManager` 获取 `MapManager`。使用与服务端相同版本的 `mapmanager-api`，Maven 依赖设为 `provided`，并在 `paper-plugin.yml` 声明 `MapManager-Core` 服务依赖和 `join-classpath: true`。服务在迁移及启动初始化成功后异步注册，扩展插件应处理服务尚未就绪和撤销事件。
+
+完整依赖示例、服务获取示例和 API 线程限制见 [API_GUIDE.md](API_GUIDE.md)。公开 API 不暴露 repository、JSON/MySQL 实体、LuckPerms 或 Multiverse 实现对象。新增或调整存储及世界生命周期行为时，应遵守 [ARCHITECTURE.md](ARCHITECTURE.md) 中的模块边界。
+
+## 相关文档
+
+- [插件配置与运行行为](PLUGIN.md)
+- [权限、API 与 v3 功能对照](API_INVENTORY.md)
+- [外部插件 API 接入](API_GUIDE.md)
+- [v3 数据迁移说明](MIGRATION.md)
+- [存储后端说明](STORAGE.md)
+- [自动化测试与验收用例](TEST_CASES.md)
