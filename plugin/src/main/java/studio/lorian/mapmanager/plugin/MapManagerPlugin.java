@@ -5,6 +5,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
 import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
+import studio.lorian.mapmanager.plugin.internal.listener.MapAccessListener;
+import studio.lorian.mapmanager.plugin.internal.listener.MapSettingsListener;
 import studio.lorian.mapmanager.plugin.internal.migration.V3Migration;
 import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifierImpl;
 import studio.lorian.mapmanager.plugin.internal.notification.Messages;
@@ -51,6 +53,10 @@ public final class MapManagerPlugin extends JavaPlugin {
             var notifier = new OperationNotifierImpl();
             api = new MapManagerImpl(repository, repository, repository, projection, players,
                     deletionPattern, blockedCreationPattern, getLogger());
+            MapAccessListener accessListener = new MapAccessListener(this, api.maps(), api.access(),
+                    getConfig().getBoolean("access-control.strict-map-entry", true));
+            getServer().getPluginManager().registerEvents(accessListener, this);
+            getServer().getPluginManager().registerEvents(new MapSettingsListener(repository), this);
             getLogger().info(Messages.text("startup.storage_loaded", "backend", selected));
             Path oldDirectory = getDataFolder().getParentFile().toPath().resolve("MapManager-Core");
             new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms)
@@ -64,12 +70,13 @@ public final class MapManagerPlugin extends JavaPlugin {
                                 return;
                             }
                             getLogger().info(message);
+                            accessListener.checkOnlinePlayers();
                             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
-                                    notifier, deletionPattern));
+                                    api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
+                                    notifier, deletionPattern, accessListener));
                             Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
-                                    api.maps(), api.roles(), api.access(), api.travel(), api.worldLifeCycle(), players,
-                                    notifier, deletionPattern));
+                                    api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
+                                    notifier, deletionPattern, accessListener));
                         });
                     });
             projection.ensureWorldBase().whenComplete((created, error) -> {

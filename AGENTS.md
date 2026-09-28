@@ -2,6 +2,11 @@
 
 每次开始本仓库任务时，先读本文件，再按任务类型阅读 [`docs/INDEX.md`](docs/INDEX.md) 指定的文档。若任务跨多个领域，阅读所有相关文档。文档与源码冲突时以当前源码为准，并在同一任务中修正文档。
 
+## 项目结构
+
+MapManager-v4: mmc 4.x 版本项目目录
+MapManager-Core-Community: mmc 3.x 版本项目目录
+
 ## 不可违反的项目边界
 
 - `api` 只放公开模型和接口；实现与存储放在 `plugin`。`MapRepository`、`RoleRepository`、`OperationRepository` 不得移入公开 API。

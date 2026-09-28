@@ -13,6 +13,7 @@
 | JSON/MySQL 存储、schema 或后端切换 | [`STORAGE.md`](STORAGE.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
 | 通知、错误文本或翻译 | [`MESSAGES.md`](MESSAGES.md)、[`PLUGIN.md`](PLUGIN.md) |
 | 仅审阅/文档任务 | 本索引及用户点名的文档；涉及实现现状时再读 `CLASS_STATUS.md` 和 `STRUCTURE.md` |
+| 功能验收/测试设计 | [`TEST_CASES.md`](TEST_CASES.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md)、相关专题文档 |
 
 ## 文档职责
 
@@ -21,11 +22,12 @@
 - [`STRUCTURE.md`](STRUCTURE.md)：目录、入口、关键调用关系。
 - [`API_INVENTORY.md`](API_INVENTORY.md)：v3 能力到 v4 API/实现的对照。
 - [`README.md`](README.md)：英文用户说明与命令用法。
-- [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为。
+- [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为，包括地图物理与爆炸开关。
 - [`MIGRATION.md`](MIGRATION.md)：v3 自动迁移触发、字段映射、保护和限制。
 - [`STORAGE.md`](STORAGE.md)：存储配置、文件/表结构、后端约束。
 - [`MESSAGES.md`](MESSAGES.md)：语言选择、资源位置、MiniMessage 和翻译维护。
 - [`PROJECT_NOTES.md`](PROJECT_NOTES.md)：长期项目约定和阶段记录；可能随源码演进，执行前核对源码。
+- [`TEST_CASES.md`](TEST_CASES.md)：按当前实现整理的启动、命令、API、存储、迁移和适配器验收用例；不代表已经执行。
 
 ## 文档维护约定
 

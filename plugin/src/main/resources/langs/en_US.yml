@@ -41,9 +41,16 @@ roles:
   ADMIN: admin
   BUILDER: builder
   VISITOR: visitor
+access:
+  denied: '<red>You do not have permission to enter map <world>.'
+  returned_to_default: '<yellow>You do not have permission to enter map <world>; you were returned to the default world.'
+  permission_revoked: '<yellow>Your access to map <world> was revoked; you were returned to the default world.'
+  recovery_failed: '<red>You could not be moved safely to the default world, so your connection was closed.'
 command:
   usage_wtp: 'Usage: /wtp <map>'
-  usage_world: 'Usage: /world <create|import|init|delete|tp|kick|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: 'Usage: /world <create|import|init|delete|tp|kick|physics|explosion|admins|builders|visitors|admin|builder|visitor> ...'
+  setting_usage: '<red>Usage: /world <setting> [true|false|info]'
+  setting_info: '<aqua>Current map <setting>: <value>'
   delete_usage: 'Usage: /world delete <map>, then run /world delete <confirmation code> within 10 seconds'
   delete_expired: '<red>The deletion code expired. Select the map again.'
   delete_wrong_code: '<red>Incorrect confirmation code. Use the six-character code from the previous step.'
@@ -64,7 +71,7 @@ startup:
   worldbase_failed: 'Failed to initialize LuckPerms worldbase group: <error>'
   worldbase_created: Created and initialized LuckPerms worldbase group
   worldbase_exists: LuckPerms worldbase group already exists
-  incomplete: Other map lifecycle features and access listeners are still incomplete; the full API is not published.
+  incomplete: Some map lifecycle features remain incomplete; the full API is not published.
   failed: 'MapManager startup failed: <error>'
 player:
   mojang_failed: 'Mojang UUID lookup failed: <error>'

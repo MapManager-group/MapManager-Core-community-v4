@@ -19,9 +19,11 @@ import studio.lorian.mapmanager.api.service.MapService;
 import studio.lorian.mapmanager.api.service.MapAccessService;
 import studio.lorian.mapmanager.api.service.AccessDecision;
 import studio.lorian.mapmanager.api.service.MapRoleService;
+import studio.lorian.mapmanager.api.service.MapSettingsService;
 import studio.lorian.mapmanager.api.service.MapTravelService;
 import studio.lorian.mapmanager.api.service.PlayerGateway;
 import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
+import studio.lorian.mapmanager.plugin.internal.listener.MapAccessListener;
 import studio.lorian.mapmanager.plugin.internal.notification.NotificationTarget;
 import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifier;
 import studio.lorian.mapmanager.plugin.internal.notification.Messages;
@@ -48,11 +50,13 @@ public final class MapWorldCommand extends Command {
     private final MapService maps;
     private final MapAccessService access;
     private final MapRoleService roles;
+    private final MapSettingsService settings;
     private final MapTravelService travel;
     private final WorldLifeCycleService lifeCycle;
     private final PlayerGateway players;
     private final OperationNotifier notifier;
     private final Pattern deletionPattern;
+    private final MapAccessListener accessListener;
     private final Map<String, Subcommand> subcommands;
     private PendingDeletion pendingDeletion;
 
@@ -62,29 +66,33 @@ public final class MapWorldCommand extends Command {
      * 创建 /world 主命令。
      */
     public MapWorldCommand(JavaPlugin plugin, MapService maps, MapRoleService roles, MapAccessService access,
+                           MapSettingsService settings,
                            MapTravelService travel,
                            WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier,
-                           Pattern deletionPattern) {
-        this("world", plugin, maps, roles, access, travel, lifeCycle, players, notifier, deletionPattern);
+                           Pattern deletionPattern, MapAccessListener accessListener) {
+        this("world", plugin, maps, roles, access, settings, travel, lifeCycle, players, notifier,
+                deletionPattern, accessListener);
     }
 
     /**
      * 创建主命令或 /wtp 传送别名。
      */
     public MapWorldCommand(String name, JavaPlugin plugin, MapService maps, MapRoleService roles,
-                           MapAccessService access, MapTravelService travel,
+                           MapAccessService access, MapSettingsService settings, MapTravelService travel,
                            WorldLifeCycleService lifeCycle, PlayerGateway players, OperationNotifier notifier,
-                           Pattern deletionPattern) {
+                           Pattern deletionPattern, MapAccessListener accessListener) {
         super(name);
         this.plugin = plugin;
         this.maps = maps;
         this.access = access;
         this.roles = roles;
+        this.settings = settings;
         this.travel = travel;
         this.lifeCycle = lifeCycle;
         this.players = players;
         this.notifier = notifier;
         this.deletionPattern = deletionPattern;
+        this.accessListener = accessListener;
         this.subcommands = Map.ofEntries(
                 Map.entry("create", new Subcommand(true, OperationName.CREATE, this::create)),
                 Map.entry("import", new Subcommand(true, OperationName.IMPORT, this::importWorld)),
@@ -92,6 +100,10 @@ public final class MapWorldCommand extends Command {
                 Map.entry("delete", new Subcommand(true, OperationName.DELETE, this::delete)),
                 Map.entry("tp", new Subcommand(false, OperationName.TELEPORT, this::teleport)),
                 Map.entry("kick", new Subcommand(false, OperationName.KICK, this::kick)),
+                Map.entry("physics", new Subcommand(false, OperationName.SET_PHYSICAL,
+                        (sender, target, args) -> changeSetting((Player) sender, target, args, true))),
+                Map.entry("explosion", new Subcommand(false, OperationName.SET_EXPLOSION,
+                        (sender, target, args) -> changeSetting((Player) sender, target, args, false))),
                 Map.entry("admins", new Subcommand(false, OperationName.LIST_MEMBERS,
                         (sender, target, args) -> listMembers(sender, target, args, MapRole.ADMIN))),
                 Map.entry("builders", new Subcommand(false, OperationName.LIST_MEMBERS,
@@ -161,7 +173,7 @@ public final class MapWorldCommand extends Command {
                 return suggestions(args[0], subcommands.entrySet().stream()
                         .filter(entry -> entry.getValue().consoleOnly ? sender instanceof ConsoleCommandSender
                                 : sender instanceof Player)
-                        .filter(entry -> !Set.of("admin", "builder", "visitor", "kick").contains(entry.getKey()) || admin)
+                        .filter(entry -> !Set.of("admin", "builder", "visitor", "kick", "physics", "explosion").contains(entry.getKey()) || admin)
                         .filter(entry -> !Set.of("admins", "builders", "visitors").contains(entry.getKey()) || canEnter)
                         .map(Map.Entry::getKey).toList());
             }
@@ -189,6 +201,8 @@ public final class MapWorldCommand extends Command {
                         : creationSuggestions(command, args);
                 case "create" -> creationSuggestions(command, args);
                 case "admin", "builder", "visitor" -> roleSuggestions((Player) sender, command, args);
+                case "physics", "explosion" -> args.length == 2
+                        && manageableSettingMap((Player) sender) ? suggestions(currentArg, List.of("true", "false", "info")) : List.of();
                 default -> List.of();
             };
         } catch (StorageException exception) {
@@ -564,6 +578,8 @@ public final class MapWorldCommand extends Command {
                             ? roles.addMember(map.id(), memberId, role)
                             : roles.removeMember(map.id(), memberId, role);
                     notifier.notify(target, result);
+                    if (operation == OperationName.REMOVE_MEMBER && !(result instanceof OperationResult.Failure<?>))
+                        accessListener.enforceAfterPermissionRemoval(memberId);
                     if (result instanceof OperationResult.Success<?>)
                         notifier.notifyKey(target, operation == OperationName.ADD_MEMBER
                                 ? "command.member_added" : "command.member_removed",
@@ -581,6 +597,28 @@ public final class MapWorldCommand extends Command {
         } catch (IllegalArgumentException exception) {
             return players.resolveId(input);
         }
+    }
+
+    private boolean manageableSettingMap(Player player) {
+        MapInstance map = maps.findByWorldName(player.getWorld().getName());
+        return map != null && access.decide(player.getUniqueId(), map.id()).effectiveRole() == MapRole.ADMIN;
+    }
+
+    private void changeSetting(Player actor, NotificationTarget target, String[] args, boolean physics) {
+        OperationName operation = physics ? OperationName.SET_PHYSICAL : OperationName.SET_EXPLOSION;
+        if (args.length > 2 || (args.length == 2 && !Set.of("true", "false", "info").contains(args[1].toLowerCase(Locale.ROOT)))) {
+            notifier.notifyKey(target, "command.setting_usage", "setting", physics ? "physics" : "explosion");
+            return;
+        }
+        MapInstance map = manageableCurrentMap(actor, target, operation);
+        if (map == null) return;
+        if (args.length < 2 || args[1].equalsIgnoreCase("info")) {
+            notifier.notifyKey(target, "command.setting_info", "setting", physics ? "physics" : "explosion",
+                    "value", physics ? map.settings().physical() : map.settings().explosion());
+            return;
+        }
+        boolean enabled = Boolean.parseBoolean(args[1]);
+        notifier.notify(target, physics ? settings.setPhysical(map.id(), enabled) : settings.setExplosion(map.id(), enabled));
     }
 
     private MapInstance manageableCurrentMap(Player actor, NotificationTarget target, OperationName operation) {

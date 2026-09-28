@@ -9,7 +9,7 @@
 | `MapAgent.addPlayer/removePlayer/getPlayers/isAdmin` | admin、builder、visitor 成员管理 | `MapRoleService`；UUID 为玩家主键 |
 | `MapAgent.publicizeWorld/privatizeWorld/isPublic` | 地图公开状态 | `MapSettingsService.setPublic`、`MapSettings.isPublic` |
 | `MapAgent.getWorldAlias/setWorldAlias` | 地图显示名 | `MapInstance.displayName`、`MapSettingsService.setDisplayName` |
-| `MapAgent.setPhysical/isPhysical/setExploded/isExploded` | 地图及全局物理、爆炸设置 | 仅迁移各地图设置到 `MapSettings`；不保留全局覆盖 |
+| `MapAgent.setPhysical/isPhysical/setExploded/isExploded` | 地图及全局物理、爆炸设置 | 地图级设置已迁移到 `MapSettings`，`/world physics`、`/world explosion` 和事件监听已实现；v3 全局配置命令未保留 |
 | `MapAgent.getWorldGroupName/getWorldListByGroup` | 地图和地图组关系 | `MapService.findGroup/listGroupMaps`、`MapInstance.groupId` |
 | `MapAgent.getAdminSet/getBuilderSet/getVisitorSet` | 成员列表 | `MapRoleService.members` 返回只读集合 |
 | `MapAgent.containsWorld/getWorlds` | 托管地图查询 | `MapService.findByWorldName/listMaps` |
@@ -31,6 +31,36 @@
 | `VersionCheck` | 世界文件版本检查 | plugin 内部 `WorldVersionValidator`，不进入公开 API |
 | `WorldNode`、`WorldGroup`、`MapGroup`、`MMWorldType` | 地图数据、组、角色、世界类型 | `MapInstance`、`MapGroup`、`MapRole`、`WorldType`；不返回可变持久实体 |
 
-v3 命令中未由独立公开接口覆盖的能力也已预留：`/world setspawn` 对应 `MapSettingsService` 的出生点方法；`/world tp`、`/world kick` 对应 `MapTravelService`（目标世界按需加载尚未实现）；`/worldtp`、`/mapadmin` 的保存、重载、同步属于 v3 能力参考，v4 尚无对应命令。统一失败通知是 plugin 内部 `OperationNotifier`，公共结果为 `OperationResult`。
+## v3 用户功能迁移差异
+
+| v3 功能 | v4 当前状态 | 差异说明 |
+|---|---|---|
+| 地图创建、导入、初始化、删除 | 已实现 | 由 `WorldLifeCycleService` 编排并持久化操作阶段；失败自动恢复仍未实现 |
+| 地图组管理员/建筑者、单图访客 | 已实现 | MMC 角色为权威数据，组管理员/建筑者投影至 LuckPerms；投影自动重试未实现 |
+| 公开/私有地图 | 部分实现 | `MapSettingsService.setPublic` 和准入决策已实现，但没有 `/world public` 管理命令 |
+| 地图显示名/Multiverse 别名 | 部分实现 | `MapAliasService` 和 `MapSettingsService.setDisplayName` 可供内部服务使用，创建/导入和初始化会同步；没有 `/world setname` 命令，完整 `MapManager` API 也未注册到 Bukkit 服务 |
+| 地图出生点 | 部分实现 | `MapSettingsService.getSpawn/setSpawn` 只读写 MMC 出生点；没有 `/world setspawn`，手动设置不会同步 Bukkit/Multiverse 出生点 |
+| 地图物理和爆炸 | 已实现 | 单地图开关、状态查询和物理/落沙/两类爆炸事件均已接通；不提供全局覆盖 |
+| PVP 设置 | 未实现 | v3 `/world pvp` 读写并保存 Multiverse PVP；v4 `MapSettings`、设置服务和命令均无对应能力 |
+| 地图传送 `/world tp`、`/wtp` | 部分实现 | MMC 准入与已加载地图传送已实现；未加载地图不会按需加载；v3 的 `/worldtp` 名称未作为 v4 命令注册 |
+| 踢出当前地图玩家 | 已实现 | 管理员只能踢出同图在线玩家，目标传送到 Multiverse 默认世界出生点 |
+| 传送准入监听 | 已实现 | `MapAccessListener` 默认启用 `access-control.strict-map-entry`，用 MMC 检查传送目标、传送后实际世界、登录、重生和角色撤销后的当前地图；关闭配置会停用整套检查。v3 的 LP `multiverse.access.*` 不是 v4 的准入来源 |
+| 未加载地图按需加载及延迟卸载 | 未实现 | v3 有加载、取消卸载与延迟卸载实现；v4 传送要求目标世界已加载，也没有对应状态和任务 |
+| 导入世界版本兼容检查 | 未实现 | v3 导入会解析 `level.dat` 并拒绝高于服务器版本的地图；v4 导入只检查目录和 `level.dat` 是否存在，`WorldVersionValidatorImpl` 仍是未接线的固定 `false` 占位 |
+| 龙蛋传送保护 | 未实现 | v3 `BlockListener` 取消玩家右键龙蛋事件；v4 设置监听器中没有对应事件处理 |
+| LuckPerms `apply` 共享权限组 | 未迁移 | v3 地图组继承 `apply`（无世界上下文）；v4 地图组仅维护 `default` 和带世界上下文的 `worldbase`。v4 将 MMC 作为准入来源，旧 `public` LP 组也不再代表公开状态 |
+| `/mapadmin save`、`reload`、`sync` 与 `/write` | 无直接命令等价物 | v4 对业务数据自动持久化；没有手动导出/重载命令、LuckPerms 全量重同步命令或操作记录查看/恢复命令。LP 同步失败后可重复角色修改重试，但没有自动重试队列 |
+| 全局 physics/explosion 管理命令 | 未保留 | v3 有 `/mapadmin physics|explosion true|false|clear` 和配置字段，v4 明确只保留单地图设置。另经检查，v3 当前监听器调用的 `isPhysical/isExploded` 只读取地图节点，未读取这些全局值，因此不能把旧全局配置描述为当前有效的事件覆盖 |
+| 对外 `MapManager` API 使用 | 未接通 | v4 定义并组装了 `MapManager` 服务对象，但主类尚未注册到 Bukkit ServicesManager；其他插件无法通过标准服务注册获取该实例 |
+
+## 命令和策略变化（不是缺失实现）
+
+- v3 使用独立 `/create`、`/import`、`/delete`、`/init` 及 `n:`/`e:` 参数；v4 收敛为 `/world create|import|delete|init` 和 `key=value` 参数。
+- v3 多数玩家操作依赖 Bukkit/LuckPerms 权限节点；v4 玩家地图操作以 MMC 角色及地图准入判断为准，创建/导入/初始化/删除改为控制台专用。
+- v3 创建/导入默认世界类型为 FLAT；v4 当前 `/world create` 和 `/world import` 默认 NORMAL。需要兼容旧服命令行为时，这是一个需要产品决策的默认值变化。
+- v3 创建/导入未提供 owner 时使用命令发送者；v4 控制台命令未提供 `admin=<玩家>` 时不会添加首位管理员，地图仍可创建但没有默认管理员。
+- v3 `/world tp` 根据 LuckPerms `multiverse.access.<world>` 授权；v4 根据 MMC ACTIVE 状态、角色和 `isPublic` 授权。这是准入权威的替换，而不是待迁移的 LP 访问节点检查。
+
+统一失败通知是 plugin 内部 `OperationNotifier`，公共结果为 `OperationResult`。以上“未实现”按当前 v4 源码判断；API 类型存在但没有命令、事件或 ServicesManager 入口的能力明确标为“部分实现”或“未接通”。
 
 `PlayerGateway` 和 `WorldGateway` 接口位于 `api.service`，实现位于 `plugin`。迁移入口 `V3MigrationSource`、存储接口 `MapRepository`/`RoleRepository`/`OperationRepository` 及 LP 投影接口 `WorldBaseProjection` 仍位于 `plugin.internal`；存储细节不进入公开 API。

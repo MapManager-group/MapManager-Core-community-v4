@@ -41,9 +41,16 @@ roles:
   ADMIN: 管理员
   BUILDER: 建筑者
   VISITOR: 访客
+access:
+  denied: '<red>你没有进入地图 <world> 的权限。'
+  returned_to_default: '<yellow>你没有进入地图 <world> 的权限，已返回默认世界。'
+  permission_revoked: '<yellow>你在地图 <world> 的进入权限已被撤销，已返回默认世界。'
+  recovery_failed: '<red>无法安全返回默认世界，连接已断开。'
 command:
   usage_wtp: '用法：/wtp <地图名>'
-  usage_world: '用法：/world <create|import|init|delete|tp|kick|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: '用法：/world <create|import|init|delete|tp|kick|physics|explosion|admins|builders|visitors|admin|builder|visitor> ...'
+  setting_usage: '<red>用法：/world <setting> [true|false|info]'
+  setting_info: '<aqua>当前地图 <setting>：<value>'
   delete_usage: '用法：/world delete <地图名>，然后在 10 秒内执行 /world delete <确认码>'
   delete_expired: '<red>删除确认码已过期，请重新指定地图。'
   delete_wrong_code: '<red>确认码不正确；请使用上一步提供的 6 位字符串。'
@@ -64,7 +71,7 @@ startup:
   worldbase_failed: '初始化 LuckPerms worldbase 权限组失败：<error>'
   worldbase_created: 已创建并初始化 LuckPerms worldbase 权限组
   worldbase_exists: LuckPerms worldbase 权限组已存在
-  incomplete: 其他地图生命周期和准入监听仍未实现，尚未发布完整 API 服务。
+  incomplete: 部分地图生命周期功能仍未完成，完整 API 服务尚未发布。
   failed: 'MapManager 启动初始化失败：<error>'
 player:
   mojang_failed: '查询 Mojang UUID 失败：<error>'

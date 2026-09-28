@@ -21,10 +21,11 @@ plugin (mapmanager-plugin)
   └─ Bukkit commands / listeners / notifications
 ```
 
-| 模块 | 职责 | 可见边界 |
-|---|---|---|
-| `api` | 对外模型、服务接口、操作结果 | 不依赖 plugin、存储、LuckPerms 或 Multiverse 的类型 |
-| `plugin` | 插件入口、业务用例、地图准入、生命周期编排、命令和事件适配 | 依赖 api；存储与适配接口留在内部包 |
+| 模块     | 职责                                                       | 可见边界                                            |
+|----------|------------------------------------------------------------|-----------------------------------------------------|
+| `api`    | 对外模型、服务接口、操作结果                               | 不依赖 plugin、存储、LuckPerms 或 Multiverse 的类型 |
+| `plugin` | 插件入口、业务用例、地图准入、生命周期编排、命令和事件适配 | 依赖 api；存储与适配接口留在内部包                  |
+| `server` | 本地mc测试服，用于测试插件各项功能是否正常                 | -                                                   |
 
 当前包结构以 [STRUCTURE.md](STRUCTURE.md) 的源码目录和方法依赖为准。下面保留早期的能力划分作为后续扩展参考：
 
@@ -49,7 +50,7 @@ plugin/src/main/java/studio/lorian/mapmanager/plugin/
   notification/统一通知路由与消息格式
 ```
 
-`api` 是调用方编译依赖，`plugin` 已有 Paper 入口和实际业务实现。主类装配服务并注册 `/world`、`/wtp` 命令，但尚未通过 Bukkit ServicesManager 注册 `MapManager`，也未注册全路径准入监听器。`PlayerGateway` 和 `WorldGateway` 的接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
+`api` 是调用方编译依赖，`plugin` 已有 Paper 入口和实际业务实现。主类装配服务并注册 `/world`、`/wtp` 命令及 `MapAccessListener`，但尚未通过 Bukkit ServicesManager 注册 `MapManager`。`PlayerGateway` 和 `WorldGateway` 的接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
 
 ## 3. API 核心类型
 
@@ -93,14 +94,15 @@ public interface WorldLifeCycleService {
 
 `MapAccessService` 根据 MMC 持久数据计算角色、公开状态和准入决策。不得用 `multiverse.access.<world>` 或 LP 的权限查询作为地图准入依据。删除 v3 的 LP `multiverse.access.*` 同步逻辑，避免两套权威互相覆盖。
 
-准入监听必须覆盖所有实际进入地图的路径：
+`MapAccessListener` 通过 `access-control.strict-map-entry` 控制，默认启用；关闭时传送/换世界检查、加入检查、重生检查和撤销权限后的移出均停用。启用时覆盖所有实际进入地图的路径：
 
-1. 在传送/世界切换等可取消事件的高优先级阶段检查目标世界，拒绝未授权进入。
-2. 在 `MONITOR` 阶段排队进行实际位置复核，处理其他插件绕开或覆盖预检查后直接把玩家放入目标世界的情况。
-3. 对出生重生、登录落点和其他会改变所在世界的入口做对应检查。若目标不允许，送往已配置的安全世界出生点；安全世界不存在或传送失败时按配置执行断开连接并记录原因。
-4. 玩家在目标地图权限发生变化时，可按策略立即移出已失去访问权的玩家。
+1. 在 `PlayerTeleportEvent` 高优先级检查目标世界并取消未授权传送，覆盖原版传送命令、Multiverse 及调用 Bukkit 传送 API 的插件。
+2. 在 `MONITOR` 阶段排队复核传送后的实际世界，并监听 `PlayerChangedWorldEvent`，处理其他插件覆盖预检查或直接改变世界的情况。
+3. 在玩家加入和重生时检查当前/目标世界；目标不允许时送往 Multiverse 默认世界出生点。
+4. 角色撤销后重新计算当前地图的有效准入；只有实际失去进入权的在线玩家才会被移出。管理员、建筑者、访客或公开状态仍允许进入时不会被移出。
+5. 默认世界不可用、玩家没有权限进入默认世界或传送失败时断开连接，避免玩家留在未授权地图。
 
-事件监听仅负责接 Bukkit 事件和执行准入结果；规则集中在 `MapAccessService`，避免命令传送、插件传送各自实现权限判断。
+事件监听仅负责接 Bukkit 事件和执行准入结果；规则集中在 `MapAccessService`，避免命令传送、插件传送各自实现权限判断。v3 JSON 迁移完成后还会复核已在线玩家，避免启动期间进入迁移后才登记的地图。
 
 ### LuckPerms 只提供 `worldbase` 能力
 
@@ -167,7 +169,6 @@ ACTIVE → ARCHIVED / DELETING → DELETED
 
 ## 10. 尚未完成的工作
 
-1. 实现传送、登录、重生及实际换世界等全路径准入监听，并复核进入后的实际世界。
-2. 完成创建、导入和删除失败恢复；让 LP 投影异步执行并支持自动重试；实现玩家断线操作。
-3. 为 v3 自动迁移增加 dry-run、目标备份及详细差异报告；实现 JSON/MySQL 显式后端迁移。
-4. 将 `MapManager` 注册到 Bukkit ServicesManager，随后完成构建和 Paper、Multiverse-Core、LuckPerms 集成验证。
+1. 完成创建、导入和删除失败恢复；让 LP 投影异步执行并支持自动重试；实现玩家断线 API。
+2. 为 v3 自动迁移增加 dry-run、目标备份及详细差异报告；实现 JSON/MySQL 显式后端迁移。
+3. 将 `MapManager` 注册到 Bukkit ServicesManager，随后完成构建和 Paper、Multiverse-Core、LuckPerms 集成验证。

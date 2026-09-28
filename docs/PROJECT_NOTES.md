@@ -21,13 +21,13 @@
 
 - `api` 已声明 `MapInstance`、`MapGroup`、`MapRole`、请求/设置/结果类型，以及地图查询、角色、准入、设置、传送、世界生命周期服务接口；公开 JavaDoc 为中文。
 - `plugin` 已有 `MapManagerPlugin` 主类和 `paper-plugin.yml`。当前 Paper API 编译基线为 1.20.1，manifest 的 `api-version` 为 `1.20`；LuckPerms、Multiverse-Core 为必需依赖，VoidGen 为可选依赖。Maven 打包配置会将 `api` 模块包含进插件 JAR。
-- JSON/MySQL 存储、地图查询、地图设置、角色持久化、准入决策、生命周期、MiniMessage 多语言通知及 v3 JSON 启动迁移已有实现。LP `worldbase` 与地图组投影已实现；自动重试仍待补充。Bukkit 全路径准入监听尚未实现。
-- 主类加载所选存储，检测相邻 `MapManager-Core` 目录中的 `worlds.json` 与 `groups.json`，迁移完成后注册 `/world`、`/wtp`；尚未注册公开 API 服务或准入监听器。迁移失败会禁用插件。
-- 默认消息语言为 `zh_CN`，内置 `en_US`；语言文件位于 `plugin/src/main/resources/langs/`，运行时从插件数据目录加载。本次为 Markdown 文档审阅，未执行构建或服务端验证。
+- JSON/MySQL 存储、地图查询、地图设置、角色持久化、准入决策、可配置的全路径准入监听、生命周期、MiniMessage 多语言通知及 v3 JSON 启动迁移已有实现。LP `worldbase` 与地图组投影已实现；自动重试仍待补充。
+- 主类加载所选存储，注册地图设置和准入监听；检测相邻 `MapManager-Core` 目录中的 `worlds.json` 与 `groups.json`，迁移完成后复核在线玩家并注册 `/world`、`/wtp`；公开 API 服务尚未注册。迁移失败会禁用插件。
+- `access-control.strict-map-entry` 默认开启，关闭后传送、登录、重生和撤权后的准入检查都停用。默认消息语言为 `zh_CN`，内置 `en_US`；语言文件位于 `plugin/src/main/resources/langs/`，运行时从插件数据目录加载。
 
 ## 后续实现顺序
 
-1. 完成全路径 Bukkit 准入监听，并把高频判断调整为适合主线程的读取方式。
+1. 将准入检查的高频同步存储读取调整为适合主线程的方式，并完成其他插件组合下的服务器集成验证。
 2. 完成创建、导入和删除失败恢复；完成 LP 投影异步重试及玩家断线实现。
 3. 为已实现的 v3 自动迁移补充 dry-run 和差异报告，并完成 JSON/MySQL 后端切换流程。
 4. 发布公开 API 服务，完成 Maven 构建及 Paper、Multiverse-Core、LuckPerms 集成验证。

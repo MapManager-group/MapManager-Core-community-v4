@@ -17,3 +17,7 @@ deletion:
 creation:
   # 额外禁止创建或导入的地图名；Java 正则匹配整个名称。内置保留名始终生效。
   blocked-world-name-regex: '.*_bak$'
+
+access-control:
+  # 严格校验地图进入权限；关闭后传送、登录、重生和撤权后的强制移出均停用。
+  strict-map-entry: true
