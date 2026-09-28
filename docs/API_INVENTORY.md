@@ -20,8 +20,8 @@
 | `MapAgent.setLuckPerms/syncWithLuckPerms` | LP 实例注入与数据同步 | plugin 内部 `WorldBaseProjection`；仅投影 `worldbase` 能力 |
 | `MapAgent.ignoreColor` | 地图显示字符串处理 | plugin 内部展示工具，不作为服务接口 |
 | `DynamicWorld.createWorld/importWorld/initWorld/removeWorld` | MV 世界创建、导入、初始化和删除 | `WorldLifeCycleService` 统一编排；`WorldGateway` 仅负责目录查询 |
-| `DynamicWorld.loadWorld/unloadWorldLater/cancelUnloadTask` | 按需加载和延迟卸载 | `WorldLifeCycleService` |
-| `DynamicWorld.hasLoaded/isExist/isExtraLoad` | 世界运行状态 | `WorldLifeCycleService.state`；延迟任务标记留在 plugin 内部 |
+| `DynamicWorld.loadWorld/unloadWorldLater/cancelUnloadTask` | 按需加载和延迟卸载 | v4 尚未实现按需加载和延迟卸载；公开 `WorldLifeCycleService` 当前无 `load` 方法 |
+| `DynamicWorld.hasLoaded/isExist/isExtraLoad` | 世界运行状态 | plugin 内部世界状态查询；延迟任务标记留在 plugin 内部（当前公开 `WorldLifeCycleService` 无 `state` 方法） |
 | `DynamicWorld.getCorrectName/getCorrectUnloadedName/getWorlds/getPotentialWorlds` | 名称匹配及补全 | `MapService` 查询与 plugin 命令补全；不公开 MV 世界列表 |
 | `DynamicWorld.getOwnerWorlds/getAccessWorlds` | 管理/可进入地图列表 | `MapAccessService.administratedMaps/accessibleMaps`；MMC 自己判定 |
 | `DynamicWorld.getSpawnLocation/getDefaultSpawnLocation` | 地图及默认出生点 | `MapSettingsService.getSpawn`、plugin 安全世界配置 |
@@ -31,6 +31,6 @@
 | `VersionCheck` | 世界文件版本检查 | plugin 内部 `WorldVersionValidator`，不进入公开 API |
 | `WorldNode`、`WorldGroup`、`MapGroup`、`MMWorldType` | 地图数据、组、角色、世界类型 | `MapInstance`、`MapGroup`、`MapRole`、`WorldType`；不返回可变持久实体 |
 
-v3 命令中未由独立公开接口覆盖的能力也已预留：`/world setspawn` 在 `MapSettingsService`；`/world tp`、`/worldtp`、`/world kick` 在 `MapTravelService`；`/mapadmin` 的保存、重载、同步是 plugin 管理操作。统一失败通知是 plugin 内部 `OperationNotifier`，公共结果为 `OperationResult`。
+v3 命令中未由独立公开接口覆盖的能力也已预留：`/world setspawn` 对应 `MapSettingsService` 的出生点方法；`/world tp`、`/world kick` 对应 `MapTravelService`（目标世界按需加载尚未实现）；`/worldtp`、`/mapadmin` 的保存、重载、同步属于 v3 能力参考，v4 尚无对应命令。统一失败通知是 plugin 内部 `OperationNotifier`，公共结果为 `OperationResult`。
 
 `PlayerGateway` 和 `WorldGateway` 接口位于 `api.service`，实现位于 `plugin`。迁移入口 `V3MigrationSource`、存储接口 `MapRepository`/`RoleRepository`/`OperationRepository` 及 LP 投影接口 `WorldBaseProjection` 仍位于 `plugin.internal`；存储细节不进入公开 API。

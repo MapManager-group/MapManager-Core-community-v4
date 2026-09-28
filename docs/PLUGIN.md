@@ -6,7 +6,7 @@ Paper 入口会读取 `config.yml` 并初始化 JSON 或 MySQL 存储。默认�
 
 创建和导入地图均拒绝固定保留名：`cache`、`config`、`world`、`log`、`test`、`overworld`、`default`、`worldbase`、`apply`、`public`、`private`，以及以 `plugin`、`version`、`admin`、`mapmanager`、`builder`、`visitor`、`lib`、`mmc` 开头的名称。`creation.blocked-world-name-regex` 可额外配置 Java 正则，匹配完整地图名；默认 `.*_bak$`，会拒绝 `_bak` 结尾的名称。例如 `(?:lobby|temp.*|.*_bak)` 可同时禁止 `lobby`、`temp` 前缀和 `_bak` 后缀。正则无效会阻止启动；内置限制始终生效。
 
-地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。
+地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。当前 `/world` 命令尚未提供修改地图设置、别名或出生点的子命令；对应 API 服务已实现，但 `physical` 和 `explosion` 尚无事件监听器负责执行。
 
 MySQL 自动创建五张 InnoDB 表：
 
@@ -20,8 +20,10 @@ MySQL 自动创建五张 InnoDB 表：
 
 `settings_json` 和 `spawn_json` 在 `mm_maps` 中各占一个 JSON 字段，出生点可为 `NULL`。删除地图时访客授权级联删除；仍有地图引用的组不能删除。JSON 后端以相同的逻辑关系写入单文件，每次写入使用临时文件和原子替换。
 
-地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admins|builders|visitors` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名>` 和 `/world kick` 仅由 MMC 当前地图组管理员执行；所有玩家可执行 `/world tp`，但入图仍由 MMC 准入判断。玩家命令不检查 Bukkit 权限节点。组角色会同步 LP 地图组成员，若 MMC 写入成功而 LP 同步失败则返回 `Partial`；重复命令可以重新投影。自动重试、全路径准入监听和 v3 迁移仍未实现，当前版本不会发布完整 `MapManager` API。
+地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admins|builders|visitors` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名或 UUID>` 和 `/world kick` 仅由 MMC 当前地图组管理员执行；所有玩家可执行 `/world tp`，但只能进入已加载的地图且仍由 MMC 准入判断。玩家命令不检查 Bukkit 权限节点。组角色会同步 LP 地图组成员，若 MMC 写入成功而 LP 同步失败则返回 `Partial`；重复命令可以重新投影。启动时会检查相邻插件目录 `MapManager-Core`；其中同时存在 `worlds.json` 和 `groups.json` 时，插件备份旧文件并迁移地图、组和角色数据到所选仓储。自动重试、全路径准入监听仍未实现，当前版本不会发布完整 `MapManager` API。
 
-控制台先执行 `/world delete <地图名>`，然后在 10 秒内执行 `/world delete <6 位随机字符串>`；玩家不能执行。`config.yml` 的 `deletion.allowed-world-name-regex` 使用 Java 正则匹配整个地图名，默认 `.*_bak$`，只允许删除 `_bak` 结尾的地图；命令和生命周期 API 均执行该限制。删除前检查世界目录、主世界及在线玩家；删除中保留 `DELETING` 状态，失败后可重新走两步确认。删除世界成功后清理 LP 世界继承及 MMC 地图、角色和空组记录。
+控制台先执行 `/world delete <地图名>`，然后在 10 秒内执行 `/world delete <6 位随机字符串>`；玩家不能执行。`config.yml` 的 `deletion.allowed-world-name-regex` 使用 Java 正则匹配整个地图名，默认 `.*_bak$`，只允许删除 `_bak` 结尾的地图；命令和生命周期 API 均执行该限制。删除前检查世界目录、Multiverse 默认世界及在线玩家；删除中保留 `DELETING` 状态，失败后可重新走两步确认。删除世界成功后清理 LP 世界继承及 MMC 地图、角色和空组记录。
 
 `PlayerGateway.resolveId` 优先在线玩家和服务端缓存。未命中时先读取 `config/paper-global.yml` 中已启用的 Velocity/Bungee 代理的 `online-mode`，否则读取 `server.properties`；正版模式异步向 Mojang 补全 UUID，离线模式按 `OfflinePlayer:<用户名>` 计算 UUID。`WorldGateway` 只提供目录查询：先读取 `server.properties` 的 `level-name`，读取不到时使用 `Bukkit.getWorlds().get(0).getName()`；存在 `<level-name>/dimensions/minecraft` 时以此作为地图父目录，否则使用服务端工作目录。路径查询不会创建目录。创建和导入等操作统一由 `WorldLifeCycleService` 定义。
+
+默认通知语言为 `zh_CN`，可在 `config.yml` 设置 `language`；内置语言有 `zh_CN` 和 `en_US`。启动时插件把内置语言复制到数据目录的 `langs/`，自定义翻译可编辑对应 YAML；选定语言文件缺失或格式错误会导致插件启动失败，缺失翻译键回退到中文。
