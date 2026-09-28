@@ -143,9 +143,9 @@ errors:
   mysql_failed: MySQL 操作失败
   mysql_map_corrupt: MySQL 地图记录损坏
   structures_boolean: structures 必须是 true 或 false
-  flat_only: flat.height 仅支持 FLAT 世界
+  flat_only: flat.height 仅支持 FLAT、SIFT、NETHER 或 END 世界
   flat_generator_conflict: flat.height 与 generator-settings 不能同时设置
-  flat_height_range: flat.height 超出 1-320
+  flat_height_range: flat.height 必须在 2-320 之间
   voidgen_required: VOID 世界需要 VoidGen
   mv_alias_failed: 'Multiverse 别名同步失败：<world>'
   bukkit_world_unloaded: 'Bukkit 世界未加载：<world>'

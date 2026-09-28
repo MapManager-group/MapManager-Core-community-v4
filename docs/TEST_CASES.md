@@ -78,11 +78,11 @@ mvn clean package
 | LIFE-04 | 在 `arena` 所在组创建 `arena2`                                             | 共用同一组；组的地图列表包含两张图，组管理员/建筑者对两图生效                                                            |
 | LIFE-05 | 创建地图时省略 alias/group                                                 | 两者均使用世界名                                                                                                         |
 | LIFE-06 | 创建地图时提供带 Minecraft 颜色代码的 alias                                | 保存别名文本时去掉颜色代码；MV 别名根据公开状态附加颜色                                                                  |
-| LIFE-07 | 逐一使用 flat、normal、void、nether、end 创建                              | MV 世界类型/环境与请求匹配；虚空创建按配置要求 VoidGen                                                                   |
-| LIFE-08 | flat 创建使用合法 `flat.height=1`、`320`                                   | 边界值可通过校验并创建                                                                                                   |
-| LIFE-09 | flat.height 使用 `0`、`321` 或非数字                                       | 返回 INVALID_INPUT；不创建世界，不留下 PENDING 地图                                                                      |
+| LIFE-07 | 逐一使用 flat、sift、normal、void、nether、end 创建                        | MV 世界类型/环境与请求匹配；SIFT、NETHER、END 生成选项与 FLAT 相同，NETHER/END 仅环境不同；虚空创建按配置要求 VoidGen   |
+| LIFE-08 | flat/sift/nether/end 创建使用合法 `flat.height=2`、`320`                   | 四种类型的边界值均通过校验并创建                                                                                         |
+| LIFE-09 | flat.height 使用 `0`、`1`、`321` 或非数字                                  | 返回 INVALID_INPUT；不创建世界，不留下 PENDING 地图                                                                      |
 | LIFE-10 | structures 分别使用 `true`、`false`、其他文本                              | 两个布尔值映射正确；其他文本拒绝，世界不创建                                                                             |
-| LIFE-11 | 在非 flat 世界使用 flat.height；flat.height 与 generator-settings 同时提供 | 分别拒绝创建，错误信息指向参数冲突/适用类型                                                                              |
+| LIFE-11 | 在 NORMAL/VOID 使用 `flat.height`；在 FLAT/SIFT/NETHER/END 同时提供 `flat.height` 与 `generator-settings` | 分别拒绝创建，错误信息指向参数冲突/适用类型                                                                      |
 | LIFE-12 | 测试合法 seed、biome、generator、generator-settings、property.*            | 参数传入 MV 创建选项或世界属性；创建成功                                                                                 |
 | LIFE-13 | 提供未知参数键、空值、超过 4096 字符的值或非法 property 键                 | 请求被拒绝，不执行世界创建                                                                                               |
 | LIFE-14 | 世界名测试 4/16 字符及小写字母、数字、`_`、`-`                             | 长度及字符范围内允许；3/17 字符、大写、空格、路径分隔符拒绝                                                              |

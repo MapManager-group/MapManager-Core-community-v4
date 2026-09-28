@@ -2,6 +2,8 @@
 
 本清单依据 v3 `MapManager-API/src/main/kotlin` 中的全部接口和模型，并对照 `MapManager-Core` 的命令调用。v3 文件只用于识别能力，v4 不直接复制暴露存储状态的旧签名。v4 接口使用 Java 编写。
 
+外部插件开发者可从 [v3→v4 API 迁移指南](V3_TO_V4_API_MIGRATION.md) 查看依赖、服务获取和调用替换步骤；v4 服务的完整调用示例见 [API_GUIDE.md](API_GUIDE.md)，公开类型的 HTML Javadoc 在 [导出包](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
+
 | v3 来源 | v3 能力 | v4 归属 |
 |---|---|---|
 | `MapManager` | 获取 `DynamicWorld`、`MapAgent`、`MainYaml`、`VersionCheck`、LP | `api/MapManager` 暴露分类服务和 `WorldVersionService`；LP 与配置文件仍由 plugin 管理 |
@@ -37,7 +39,7 @@
 
 | 功能 | v3 实际行为 | v4 实际行为 | 对照结论 |
 |---|---|---|---|
-| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/world create <地图名> [类型] [alias=... group=... admin=...]`；`FLAT/NORMAL/VOID/NETHER/END`；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | 已实现但命令语法、世界类型 token 和颜色设置方式不兼容；v4 不传 `admin=` 时不创建首位管理员 |
+| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/world create <地图名> [类型] [alias=... group=... admin=...]`；`FLAT/SIFT/NORMAL/VOID/NETHER/END`，其中 SIFT、NETHER、END 当前复用 FLAT 生成逻辑；NETHER/END 仅切换环境；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | 已实现但命令语法、世界类型 token 和颜色设置方式不兼容；v4 不传 `admin=` 时不创建首位管理员 |
 | 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/world import` 接受 `alias/group/admin` 和类型；校验根目录 `level.dat`、路径及版本；仅 `VOID` 类型配置 VoidGen | 已实现；版本校验保留，生成器处理不同；v4 未提供 v3 的 `c:` 显式颜色参数 |
 | 初始化设置 | 自动加载、和平、创造、关闭常见生物生成，设置随机刻/火焰/天气/昼夜/生物破坏/生物生成/进度播报规则 | 创建、导入、手动初始化调用同组初始化规则，并校验配置是否成功 | 核心规则基本一致；别名颜色和失败记录策略不同 |
 | 删除地图 | `/delete <地图>` 后 10 秒内 `/delete confirm`；会先将在线玩家送回默认出生点，再卸载并清理 LP/MV 数据 | `/world delete <地图>` 由控制台发起，一次性六位码 10 秒有效；有在线玩家时拒绝，另校验默认世界、路径、符号链接和名称规则 | 已实现但确认交互和在线玩家策略不同；v4 增加删除保护 |

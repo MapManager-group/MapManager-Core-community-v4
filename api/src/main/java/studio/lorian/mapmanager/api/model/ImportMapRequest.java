@@ -17,7 +17,14 @@ public record ImportMapRequest(
         UUID ownerId,
         WorldType worldType
 ) {
-    /** 按平坦世界环境导入现有地图。 */
+    /**
+     * 按平坦世界环境导入现有地图。
+     *
+     * @param worldName 要导入的现有服务器世界名称
+     * @param displayName 面向玩家显示的地图名称
+     * @param groupId 管理员和建筑师共用的地图组标识
+     * @param ownerId 首位地图管理员的 UUID；可为 {@code null}
+     */
     public ImportMapRequest(String worldName, String displayName, String groupId, UUID ownerId) {
         this(worldName, displayName, groupId, ownerId, WorldType.FLAT);
     }

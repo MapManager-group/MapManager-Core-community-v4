@@ -1,6 +1,6 @@
 # MapManager v4 类清单与待办
 
-> 开始任务先读根目录 `AGENTS.md` 和 `docs/INDEX.md`；新增、删除或调整类职责与状态后同步更新本文件。以下状态以 **2026-09-28** 的源码为准。v3 仓库仅作功能和迁移格式参考。
+> 开始任务先读根目录 `AGENTS.md` 和 `docs/INDEX.md`；新增、删除或调整类职责与状态后同步更新本文件。以下状态以 **2026-09-29** 的源码为准。v3 仓库仅作功能和迁移格式参考。
 
 ## 边界与状态说明
 
@@ -24,7 +24,7 @@
 | `MapSettings`      | 单地图物理、爆炸、公开状态                                   | 数据；不包含 PVP 或全局覆盖                                        |
 | `MapStatus`        | `PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`       | 数据；创建及导入流程会从 `PENDING` 转为 `ACTIVE`；删除失败保留 `DELETING`，成功后移除地图记录 |
 | `SpawnPoint`       | 不依赖 Bukkit 的世界名、坐标与朝向                           | 数据；生命周期与设置服务都会将出生点写入 MMC，并同步 Bukkit/Multiverse |
-| `WorldType`        | 普通、平坦、虚空、下界、末地世界类型                         | 数据；创建与导入映射已实现；虚空类型依赖 VoidGen                 |
+| `WorldType`        | 普通、平坦、SIFT、虚空、下界、末地世界类型                   | 数据；创建与导入映射已实现；SIFT、NETHER、END 创建复用 FLAT 生成逻辑，仅环境不同；虚空依赖 VoidGen |
 | `FailureReason`    | 统一失败原因代码                                             | 数据；随业务实现补充必要原因，避免在命令中散写字符串               |
 | `OperationName`    | 统一操作名称代码                                             | 数据；随业务操作使用                                               |
 | `OperationResult`  | `Success`、`Failure`、`Partial` 及 operation ID              | 契约/数据；通知器用它分发成功、失败和部分完成消息                  |

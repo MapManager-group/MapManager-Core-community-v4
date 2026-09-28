@@ -171,14 +171,15 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     /**
      * 按世界类型和键值参数构造 Multiverse 创建选项。
      */
-    private static CreateWorldOptions options(CreateMapRequest request) {
+    static CreateWorldOptions options(CreateMapRequest request) {
         Map<String, String> params = request.parameters();
         WorldType type = request.worldType();
         CreateWorldOptions options = CreateWorldOptions.worldName(request.worldName()).doFolderCheck(true)
                 .generateStructures(Boolean.parseBoolean(params.getOrDefault("structures", "false")));
         if (params.containsKey("structures") && !Set.of("true", "false").contains(params.get("structures")))
             throw new IllegalArgumentException(Messages.text("errors.structures_boolean"));
-        if (params.containsKey("flat.height") && type != WorldType.FLAT)
+        if (params.containsKey("flat.height")
+                && !Set.of(WorldType.FLAT, WorldType.SIFT, WorldType.NETHER, WorldType.END).contains(type))
             throw new IllegalArgumentException(Messages.text("errors.flat_only"));
         if (params.containsKey("flat.height") && params.containsKey("generator-settings"))
             throw new IllegalArgumentException(Messages.text("errors.flat_generator_conflict"));
@@ -192,17 +193,32 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         });
         if (!properties.isEmpty()) options.worldPropertyStrings(properties);
         switch (type) {
-            case FLAT -> {
-                options.worldType(org.bukkit.WorldType.FLAT).environment(World.Environment.NORMAL);
+            case FLAT, SIFT, NETHER, END -> {
+                World.Environment environment = switch (type) {
+                    case NETHER -> World.Environment.NETHER;
+                    case END -> World.Environment.THE_END;
+                    default -> World.Environment.NORMAL;
+                };
+                options.worldType(org.bukkit.WorldType.FLAT).environment(environment);
                 if (params.containsKey("flat.height")) {
                     int height = Integer.parseInt(params.get("flat.height"));
-                    if (height < 1 || height > 320) throw new IllegalArgumentException(Messages.text("errors.flat_height_range"));
+                    if (height < 2 || height > 320) throw new IllegalArgumentException(Messages.text("errors.flat_height_range"));
                     JsonObject settings = new JsonObject();
                     JsonArray layers = new JsonArray();
-                    JsonObject layer = new JsonObject();
-                    layer.addProperty("block", "minecraft:stone");
-                    layer.addProperty("height", height);
-                    layers.add(layer);
+                    JsonObject bedrockLayer = new JsonObject();
+                    bedrockLayer.addProperty("block", "minecraft:bedrock");
+                    bedrockLayer.addProperty("height", 1);
+                    layers.add(bedrockLayer);
+                    if (height > 2) {
+                        JsonObject dirtLayer = new JsonObject();
+                        dirtLayer.addProperty("block", "minecraft:dirt");
+                        dirtLayer.addProperty("height", height - 2);
+                        layers.add(dirtLayer);
+                    }
+                    JsonObject grassLayer = new JsonObject();
+                    grassLayer.addProperty("block", "minecraft:grass_block");
+                    grassLayer.addProperty("height", 1);
+                    layers.add(grassLayer);
                     settings.add("layers", layers);
                     settings.addProperty("biome", params.getOrDefault("biome", "minecraft:plains"));
                     options.generatorSettings(settings.toString());
@@ -215,8 +231,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 options.worldType(org.bukkit.WorldType.FLAT).environment(World.Environment.NORMAL)
                         .generator(params.getOrDefault("generator", "VoidGen:{}"));
             }
-            case NETHER -> options.environment(World.Environment.NETHER).worldType(org.bukkit.WorldType.NORMAL);
-            case END -> options.environment(World.Environment.THE_END).worldType(org.bukkit.WorldType.NORMAL);
         }
         return options;
     }

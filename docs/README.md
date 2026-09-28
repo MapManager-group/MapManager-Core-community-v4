@@ -140,16 +140,16 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 | `/world setspawn` | 当前地图管理员 | 将当前位置设为地图出生点 |
 | `/world kick <在线玩家>` | 当前地图管理员 | 将同一地图中的目标玩家送到 Multiverse 默认世界出生点 |
 
-创建命令支持类型 `flat`、`normal`、`void`、`nether`、`end`，并支持以下选项：
+创建命令支持类型 `flat`、`sift`、`normal`、`void`、`nether`、`end`。`sift`、`nether` 和 `end` 当前复用 `flat` 的生成逻辑，其中 `nether`、`end` 仅改变 Bukkit 环境；`flat.height` 对 `flat`、`sift`、`nether` 和 `end` 均可用。创建命令还支持以下选项：
 
-地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 类型需要安装 VoidGen。`flat.height` 仅适用于 `flat` 类型，且不能同时使用 `generator-settings`。
+地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 类型需要安装 VoidGen。`flat.height` 仅适用于 `flat`、`sift`、`nether` 和 `end` 类型，且不能同时使用 `generator-settings`；它表示地形总层数，从底到顶为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。
 
 | 选项 | 作用 |
 |---|---|
 | `alias=<文本>` | 地图展示名，默认地图名 |
 | `group=<组ID>` | 地图组，默认地图名 |
 | `admin=<玩家名>` | 首位地图管理员，可省略但地图将没有管理员 |
-| `flat.height=<1–320>` | 平坦世界高度 |
+| `flat.height=<2–320>` | FLAT/SIFT/NETHER/END 世界总层数；底层基岩、泥土层、表层草方块 |
 | `seed=<数值>` | 世界种子 |
 | `structures=true\|false` | 是否生成结构 |
 | `biome=<生物群系>` | 设置生物群系 |
@@ -182,13 +182,13 @@ mvn test
 mvn clean package
 ```
 
-插件 JAR 输出到 `plugin/target/mapmanager-plugin-4.0.0-SNAPSHOT.jar`。Paper、LuckPerms 和 Multiverse-Core 是运行时依赖，不会随插件重复打包；MySQL 驱动及 API 等依赖由构建配置处理。
+插件 JAR 输出到 `../server/plugins/update/mapmanager-plugin-4.0.0-SNAPSHOT.jar`。Paper、LuckPerms 和 Multiverse-Core 是运行时依赖，不会随插件重复打包；MySQL 驱动及 API 等依赖由构建配置处理。
 
 ### 外部插件接入
 
 扩展插件可通过 Bukkit `ServicesManager` 获取 `MapManager`。使用与服务端相同版本的 `mapmanager-api`，Maven 依赖设为 `provided`，并在 `paper-plugin.yml` 声明 `MapManager-Core` 服务依赖和 `join-classpath: true`。服务在迁移及启动初始化成功后异步注册，扩展插件应处理服务尚未就绪和撤销事件。
 
-完整依赖示例、服务获取示例和 API 线程限制见 [API_GUIDE.md](API_GUIDE.md)。公开 API 不暴露 repository、JSON/MySQL 实体、LuckPerms 或 Multiverse 实现对象。新增或调整存储及世界生命周期行为时，应遵守 [ARCHITECTURE.md](ARCHITECTURE.md) 中的模块边界。
+完整依赖示例、服务获取示例和 API 线程限制见 [API_GUIDE.md](API_GUIDE.md)。已有 v3 扩展插件的依赖和接口迁移步骤见 [V3_TO_V4_API_MIGRATION.md](V3_TO_V4_API_MIGRATION.md)，逐项功能差异见 [API_INVENTORY.md](API_INVENTORY.md)。公开 API 不暴露 repository、JSON/MySQL 实体、LuckPerms 或 Multiverse 实现对象。新增或调整存储及世界生命周期行为时，应遵守 [ARCHITECTURE.md](ARCHITECTURE.md) 中的模块边界。
 
 ## 相关文档
 

@@ -2,6 +2,8 @@
 
 本文说明其他 Paper 插件如何依赖并获取 MapManager 服务，以及各服务的当前调用范围。公开契约在 `mapmanager-api` 模块；不要依赖 `plugin` 模块的实现类、repository、LuckPerms 或 Multiverse 对象。
 
+需要从 v3 插件迁移时，先看 [v3→v4 插件 API 迁移指南](V3_TO_V4_API_MIGRATION.md)；完整功能差异见 [v3/v4 对照表](API_INVENTORY.md)。v4 公共 API 的 HTML Javadoc 导出包：[`mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip`](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
+
 ## 添加编译依赖
 
 外部插件使用与服务端 MapManager 相同版本的 API。当前源码版本为 `4.0.0-SNAPSHOT`；本地从源码构建时，在 MapManager-v4 仓库根目录运行：
@@ -165,7 +167,7 @@ public final class MapTeleportExample extends JavaPlugin {
 - `worldLifeCycle().initialize(worldName)` 重放已加载 MMC 地图的 Multiverse 属性和 gamerule。
 - `worldLifeCycle().delete(worldName)` 删除地图及世界；受 `deletion.allowed-world-name-regex` 限制，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。
 
-生命周期操作必须在主线程调用。创建请求中的 `ownerId` 可为 null；若为空，地图不会自动获得首位管理员。创建/导入的初始设置为物理开启、爆炸关闭、私有。`CreateMapRequest` 和 `ImportMapRequest` 的便利构造器默认 `WorldType.FLAT`；需要其他类型时显式传入 `WorldType`。按需加载、操作崩溃恢复和自动补偿目前不属于已实现 API。
+生命周期操作必须在主线程调用。创建请求中的 `ownerId` 可为 null；若为空，地图不会自动获得首位管理员。创建/导入的初始设置为物理开启、爆炸关闭、私有。`CreateMapRequest` 和 `ImportMapRequest` 的便利构造器默认 `WorldType.FLAT`；需要其他类型时显式传入 `WorldType`。`SIFT`、`NETHER` 和 `END` 创建时复用 `FLAT` 生成逻辑；`NETHER` 与 `END` 仅切换 Bukkit 环境。`flat.height` 参数适用于 `FLAT`、`SIFT`、`NETHER` 和 `END`。按需加载、操作崩溃恢复和自动补偿目前不属于已实现 API。
 
 ### 世界版本
 
