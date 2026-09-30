@@ -1,13 +1,13 @@
 # MapManager v4 类清单与待办
 
-> 开始任务先读根目录 `AGENTS.md` 和 `docs/INDEX.md`；新增、删除或调整类职责与状态后同步更新本文件。以下状态以 **2026-09-29** 的源码为准。v3 仓库仅作功能和迁移格式参考。
+> 开始任务先读根目录 `AGENTS.md` 和 `docs/INDEX.md`；新增、删除或调整类职责与状态后同步更新本文件。以下状态以 **2026-09-30** 的源码为准。v3 仓库仅作功能和迁移格式参考。
 
 ## 边界与状态说明
 
 - `api` 放对外模型及接口，`plugin` 放实现。`PlayerGateway`、`WorldGateway` 接口在 `api.service`；存储接口 `MapRepository`、`RoleRepository`、`OperationRepository` 仍只在 `plugin` 内部。
 - MMC 是地图准入和角色的权威来源；LuckPerms 只投影 `worldbase` 建造权限；Multiverse-Core 负责世界操作。`WorldGateway` **只查存储目录**，创建、导入、删除等由 `WorldLifeCycleService` 定义。
 - 状态：**契约/数据**＝类型已定义；**已实现**＝列出的功能有实际代码；**部分实现**＝有真实逻辑但仍缺关键环节；**占位**＝方法仍返回 `null`/`false`/空值或空方法体。
-- 当前插件初始化 JSON/MySQL 存储并异步确保 LP `worldbase` 组存在；Paper 加载顺序使 MapManager-Core 先于 Multiverse-Core 启用，以便 Multiverse 加载地图时可解析内置生成器；v3 JSON 迁移等待 Multiverse-Core 启用后执行。存储迁移与 `worldbase` 初始化均成功后，通过 Bukkit ServicesManager 注册 `MapManager`，并注册地图命令、地图设置监听和可配置的全路径准入监听。`api` 与 `plugin` 单元测试由 Maven Surefire 在 `test` 阶段执行。当前目录和方法依赖见 [STRUCTURE.md](STRUCTURE.md)。
+- 当前插件初始化 JSON/MySQL 存储并异步确保 LP `worldbase` 组存在；Paper 加载顺序使 MapManager-Core 先于 Multiverse-Core 启用，以便 Multiverse 加载地图时可解析内置生成器；地图设置和准入监听在 `onEnable` 装配服务时注册，v3 JSON 迁移等待 Multiverse-Core 启用后执行。迁移与 `worldbase` 初始化均成功后，插件在主线程复核在线玩家、注册地图命令，并通过 Bukkit ServicesManager 发布 `MapManager`。`api` 与 `plugin` 单元测试由 Maven Surefire 在 `test` 阶段执行。当前目录和方法依赖见 [STRUCTURE.md](STRUCTURE.md)。
 
 ## api 模块：入口、模型与结果
 
@@ -54,7 +54,6 @@
 |-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `MapManagerPlugin`          | Paper 主类；加载语言文件与配置/存储，装配服务、命令和监听器，并取得 LuckPerms API 异步初始化 `worldbase` | 部分实现；MapManager-Core 先于 Multiverse-Core 启用以提供重载所需的世界生成器，v3 迁移等待 Multiverse-Core 启用；读取 `access-control.strict-map-entry`（默认开启）；迁移和 `worldbase` 初始化均成功后，在主线程注册 `MapManager` 服务、复核在线玩家并注册命令；任一初始化失败会禁用插件                                                                                                                                                                                                                              |
 | `MapWorldCommand` | 分派 `/world` 与 `/wtp` 的创建、导入、初始化、删除、传送、踢出、设置及成员命令 | 已实现命令和 Tab 补全；`public`、`setname`、`setspawn` 及物理/爆炸设置仅当前地图管理员可用；创建/导入/初始化/删除仅控制台；`/wtp` 补全只显示可进入地图；玩家命令改由 MMC 准入及角色授权；撤权后复核目标玩家；提示使用 MiniMessage 多语言 |
-| `MapWorldCommand` | 分派 `/world` 与 `/wtp` 的创建、导入、初始化、删除、传送、踢出、设置及成员命令 | 已实现命令和 Tab 补全；`public`、`setname`、`setspawn` 及物理/爆炸设置仅当前地图管理员可用；创建/导入/初始化/删除仅控制台；`/wtp` 补全只显示可进入地图；玩家命令改由 MMC 准入及角色授权；撤权后复核目标玩家；提示使用 MiniMessage 多语言 |
 | `MapSettingsListener` | 按地图设置控制方块物理、落沙和爆炸 | 已实现；仅作用于 MMC 已登记世界 |
 | `MapAccessListener` | 拦截和复核地图进入、加入、重生及权限撤销后的当前地图 | 已实现；`access-control.strict-map-entry` 默认开启，禁用时整套检查均停用；无权进入时返回 MV 默认世界出生点，无法安全返回时断开连接 |
 | `MapManagerImpl`            | 组装并返回各业务服务                                                                                                                                   | 部分实现；已注入版本查询服务、别名服务、存储、操作记录、LP 投影、玩家网关及名称正则；旅行服务接入准入并实现传送和踢出；生命周期已实现创建、导入、初始化、删除，按需加载仍待实现                                                                                                                                                                                                                                                                                                                              |
@@ -91,8 +90,8 @@
 | `MapRepository`             | 地图和组的内部持久化接口，支持删除空组                        | 契约；不得移入公开 API                                                     |
 | `RoleRepository`            | 组角色和地图访客的内部持久化接口                              | 契约；不得移入公开 API                                                     |
 | `OperationRepository`       | 生命周期操作记录的内部持久化接口                              | 契约；恢复流程尚未消费这些记录                                             |
-| `OperationRecord`           | 操作 ID、名称、世界、阶段和失败原因                           | 数据；创建流程已写入各阶段；恢复流程尚未消费                               |
-| `OperationStage`            | 开始、世界已变更、数据已保存、完成、失败                      | 数据；创建流程已使用；崩溃恢复流程待实现                                   |
+| `OperationRecord`           | 操作 ID、名称、世界、阶段和失败原因                           | 数据；创建、导入和删除流程写入操作阶段；恢复流程尚未消费                   |
+| `OperationStage`            | 开始、世界已变更、数据已保存、完成、失败                      | 数据；创建、导入和删除流程已使用；崩溃恢复流程待实现                       |
 | `StorageConfig`             | 解析并校验 JSON/MySQL 配置                                    | 已实现；对应资源为 `plugin/src/main/resources/config.yml`                  |
 | `StorageException`          | 存储异常的统一运行时类型                                      | 已实现                                                                     |
 | `StorageValidation`         | 校验地图、组 ID、出生点及世界名规范化键                       | 已实现；为 plugin 内部工具类                                               |

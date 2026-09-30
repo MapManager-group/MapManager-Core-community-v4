@@ -165,7 +165,7 @@ public final class MapTeleportExample extends JavaPlugin {
 - `worldLifeCycle().create(CreateMapRequest)` 创建世界并注册地图。
 - `worldLifeCycle().importWorld(ImportMapRequest)` 导入服务端根目录的世界；需要有效 `level.dat` 和不高于服务器的世界数据版本。导入请求不包含生成参数；地图按存档中的区块数据导入，所选生成器用于后续新区块。
 - `worldLifeCycle().initialize(worldName)` 重放已加载 MMC 地图的 Multiverse 属性和 gamerule。
-- `worldLifeCycle().delete(worldName)` 删除地图及世界；受 `deletion.allowed-world-name-regex` 限制，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。
+- `worldLifeCycle().delete(worldName)` 删除地图及世界；受 `deletion.allowed-world-name-regex` 限制，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。六位、10 秒确认码只适用于 `/world delete` 命令；直接调用此 API 不经过命令确认，外部插件仍须自行授权调用者。
 
 生命周期操作必须在主线程调用。创建请求中的 `ownerId` 可为 null；若为空，地图不会自动获得首位管理员。创建/导入的初始设置为物理开启、爆炸关闭、私有。两个请求都通过 `WorldType` 和 `Environment` 独立指定生成器及维度，例如：
 

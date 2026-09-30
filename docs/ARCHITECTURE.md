@@ -50,7 +50,7 @@ plugin/src/main/java/studio/lorian/mapmanager/plugin/
   notification/统一通知路由与消息格式
 ```
 
-`api` 是调用方编译依赖，`plugin` 有 Paper 入口和实际业务实现。存储迁移与 LP `worldbase` 初始化均成功后，主类在主线程通过 Bukkit ServicesManager 发布 `MapManager`，并注册 `/world`、`/wtp` 命令及 `MapAccessListener`。外部插件依赖和服务获取方式见 [API_GUIDE.md](API_GUIDE.md)。`PlayerGateway`、`WorldGateway` 和 `WorldVersionService` 接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，地图版本服务公开版本读取和兼容性判断，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
+`api` 是调用方编译依赖，`plugin` 有 Paper 入口和实际业务实现。主类在 `onEnable` 装配服务时注册 `MapSettingsListener` 和 `MapAccessListener`；存储迁移与 LP `worldbase` 初始化均成功后，再在主线程复核在线玩家、注册 `/world` 和 `/wtp` 命令，并通过 Bukkit ServicesManager 发布 `MapManager`。外部插件依赖和服务获取方式见 [API_GUIDE.md](API_GUIDE.md)。`PlayerGateway`、`WorldGateway` 和 `WorldVersionService` 接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，地图版本服务公开版本读取和兼容性判断，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
 
 ## 3. API 核心类型
 
@@ -125,15 +125,16 @@ Multiverse-Core 仅是世界操作后端：创建、导入、加载、出生点/
 
 为让 Multiverse 在启动自动加载世界时能解析已保存的 `MapManager-Core:flat:<settings>` 生成器，Paper 插件依赖顺序配置为 MapManager-Core 先于 Multiverse-Core 启用。v3 迁移会等到 `Multiverse-Core` 的启用事件后再读取其世界元数据；对外 `MapManager` 服务仍在迁移和 `worldbase` 初始化都完成后发布。
 
-`WorldLifeCycleService` 编排操作，不让命令直接调用 Multiverse。生命周期可采用以下状态：
+`WorldLifeCycleService` 编排操作，不让命令直接调用 Multiverse。当前生命周期实现实际写入的地图状态转换如下：
 
 ```text
-UNREGISTERED → PENDING → ACTIVE
-ACTIVE → ARCHIVED / DELETING → DELETED
-失败 → 在操作记录中保存失败阶段和原因，地图记录保留当前状态
+UNREGISTERED --创建/导入--> PENDING --成功--> ACTIVE
+                         └--失败--> PENDING
+ACTIVE --删除开始--> DELETING --失败--> DELETING
+                                └--成功--> 删除 MMC 地图记录
 ```
 
-世界文件操作和数据库事务不能组成一个原子事务，因此 create/import/delete 必须按步骤记录 operation ID 和阶段。失败时执行有边界的补偿：清除本次创建的 MMC 元数据或标记待恢复；删除操作在数据文件真正删除前验证地图 ID、世界目录和在线玩家，并保留操作记录。显式删除世界需要与 v3 一致的确认步骤。
+`MapStatus.ARCHIVED` 和 `MapStatus.DELETED` 已定义，但当前生命周期服务不会写入这两个状态。创建或导入在保存 `PENDING` 后发生失败时会保留该地图记录；删除在 `DELETING` 状态保存后发生失败时会保留该状态，成功后移除地图记录。当前没有自动回滚或崩溃恢复。通过前置校验并实际进入生命周期持久化步骤的创建、导入、初始化和删除会记录 operation ID 与适用阶段；名称、参数、重复地图或删除安全检查提前拒绝时不会持久化操作记录。删除操作在调用 Multiverse 前检查默认世界、玩家和目录边界。六位、10 秒确认码只由 `/world delete` 命令执行；直接调用 `WorldLifeCycleService.delete` 不经过命令确认，但仍受删除正则和生命周期安全校验约束。
 
 所有 Bukkit/Multiverse 世界对象操作在主线程执行；用户名 UUID 解析等可能访问网络的操作异步执行。当前存储访问与部分 LuckPerms 操作仍在调用线程同步等待，后续异步化时需保证 Bukkit 对象操作回到主线程。
 
@@ -151,7 +152,7 @@ ACTIVE → ARCHIVED / DELETING → DELETED
 
 `FailureReason` 使用稳定代码，展示文本通过插件数据目录中的 `langs/<语言代码>.yml` 本地化，默认语言为 `zh_CN`；缺失翻译项回退到内置中文资源。通知和内部启动/存储诊断使用 `Messages`；部分底层库异常详情及 Java 插件框架自身产生的报错仍由依赖原样提供，未经过语言文件转换。`OperationNotifier` 将操作名和失败原因渲染为 MiniMessage Component，发送给命令调用者；日志使用相同模板的纯文本。API 结果继续保留原因代码、operation ID 和操作名称，供调用方处理。
 
-命令层只做参数解析、发送者上下文检查和权限节点校验，然后调用一个应用用例并交给 notifier。Tab 补全也使用同一个准入/可见性规则，不根据 LP `multiverse.access.*` 单独过滤。
+命令层解析参数并检查发送者上下文及 MMC 地图角色，再调用应用服务并交给 notifier；这里不使用 Bukkit 权限节点。公开 API 的角色和设置写方法没有操作者参数，外部插件必须自行授权调用者。Tab 补全也使用同一个准入/可见性规则，不根据 LP `multiverse.access.*` 单独过滤。
 
 ## 8. v3 数据迁移
 
@@ -172,9 +173,9 @@ ACTIVE → ARCHIVED / DELETING → DELETED
 ## 9. 安全、并发和失败约定
 
 - 以 UUID 为玩家主键，世界名称规范化后唯一；显示名与内部 ID 分离。
-- 对所有命令输入做边界校验；玩家命令权限和应用服务授权都要校验，避免绕过命令直接调用 API。
+- 对所有命令输入做边界校验；命令入口按 MMC 地图角色授权。公开 API 没有操作者参数，调用方需在自己的入口校验授权，服务不会代替调用方判断。
 - 世界创建/删除对同一世界串行化；跨线程调用 Bukkit 对象要禁止。
-- 每个 lifecycle 操作有稳定 operation ID、当前阶段和失败原因；操作记录尚未用于崩溃恢复，当前也没有 `/mapadmin operations` 命令。
+- 进入生命周期持久化步骤的操作会记录 operation ID、适用阶段和失败原因；操作记录尚未用于崩溃恢复，当前也没有 `/mapadmin operations` 命令。
 - 数据写入成功但 LP 镜像失败时，地图角色仍按 MMC 数据生效，结果应明确标记部分失败并允许重试同步。
 - 缺失可选依赖时在启动期给出明确诊断；Multiverse-Core 是世界生命周期所需依赖，LuckPerms 连接器只影响 `worldbase` 能力镜像，不影响 MMC 准入判断。
 

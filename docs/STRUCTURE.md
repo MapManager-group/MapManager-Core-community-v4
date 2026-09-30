@@ -28,7 +28,7 @@ MapManager-v4/
 │     │     ├─ storage/                       内部仓储接口、JSON/MySQL 实现
 │     │     └─ world/                         世界目录查询、版本检查及特殊环境平坦区块生成器
 │     └─ resources/                           config.yml、paper-plugin.yml、langs/*.yml
-│  └─ src/test/java/                           服务规则、JSON 存储和目录适配器单元测试
+│  └─ src/test/java/                           API 契约、生命周期选项、服务规则、存储和适配器单元测试
 ├─ AGENTS.md                                 任务入口和强制项目边界
 └─ docs/                                     项目说明、索引与专题文档
    ├─ INDEX.md                               按任务类型选择必读文档
@@ -36,18 +36,21 @@ MapManager-v4/
    ├─ ARCHITECTURE.md                        架构设计与边界
    ├─ API_INVENTORY.md                       v3 功能分类参考
    ├─ API_GUIDE.md                            外部 Paper 插件 API 调用指南
+   ├─ V3_TO_V4_API_MIGRATION.md               v3 外部插件迁移指南
    ├─ MIGRATION.md                           v3 数据迁移
    ├─ STORAGE.md                             JSON/MySQL 存储
    ├─ MESSAGES.md                            MiniMessage 与语言资源
    ├─ PLUGIN.md                              插件配置和命令用法
-   └─ README.md                              英文用户说明
+   ├─ PROJECT_NOTES.md                       项目约定和阶段记录
+   ├─ TEST_CASES.md                          自动化测试与集成验收用例
+   └─ README.md                              中文用户说明
 ```
 
 `api` 不引用 Bukkit、LuckPerms、Multiverse 或存储实现。`plugin.impl` 实现公开服务，`plugin.internal` 承载仅插件可见的适配器与仓储接口。当前目录已按这些职责分开，无需为角色命令另建一套存储层。
 
 ## 自动测试与打包
 
-`api/src/test` 和 `plugin/src/test` 使用 JUnit Jupiter；父 POM 配置 Maven Surefire，在 Maven `test` 阶段运行。`mvn package` 会先执行测试阶段，测试失败时 Maven 生命周期停止，不生成该构建的最终插件包。当前自动用例覆盖 API 模型、JSON 仓储和存储配置、地图服务规则、世界目录、NBT 版本读取、别名清理、v3 源文件解析和语言回退；需真实 Paper 服务生命周期、Multiverse-Core、LuckPerms、MySQL 或 Mojang 的场景保留为集成验收。用例映射见 [TEST_CASES.md](TEST_CASES.md)。
+`api/src/test` 和 `plugin/src/test` 使用 JUnit Jupiter；父 POM 配置 Maven Surefire，在 Maven `test` 阶段运行。`mvn package` 会先执行测试阶段，测试失败时 Maven 生命周期停止，不生成该构建的最终插件包。当前自动用例覆盖 API 模型、JSON 仓储和存储配置、地图服务规则、创建/导入生成器与环境选项、世界目录、NBT 版本读取、别名清理、v3 源文件解析和语言回退；需真实 Paper 服务生命周期、Multiverse-Core、LuckPerms、MySQL 或 Mojang 的场景保留为集成验收。用例映射见 [TEST_CASES.md](TEST_CASES.md)。
 
 ## 启动与服务依赖
 

@@ -184,7 +184,7 @@ mvn test
 mvn clean package
 ```
 
-插件 JAR 输出到 `../server/plugins/update/mapmanager-plugin-4.0.0-SNAPSHOT.jar`。Paper、LuckPerms 和 Multiverse-Core 是运行时依赖，不会随插件重复打包；MySQL 驱动及 API 等依赖由构建配置处理。
+插件 JAR 构建输出为 `plugin/target/mapmanager-plugin-4.0.0-SNAPSHOT.jar`；将该文件复制到服务器的 `plugins/` 目录。Paper、LuckPerms 和 Multiverse-Core 是运行时依赖，不会随插件重复打包；MySQL 驱动及 API 等依赖由构建配置处理。
 
 ### 外部插件接入
 
