@@ -9,8 +9,9 @@ import java.util.UUID;
  * @param displayName 面向玩家显示的地图名称
  * @param groupId 管理员和建筑师共用的地图组标识
  * @param ownerId 首位地图管理员的 UUID；可为 {@code null}
- * @param worldType 请求世界后端使用的生成类型
- * @param parameters 可选的创建参数键值对；支持 flat.height、seed、structures、biome、generator、generator-settings 和 property. 前缀的 Multiverse 世界属性；SIFT 使用原版 FLAT 生成，NETHER/END 使用内置平坦区块生成器并保留对应环境。FLAT/SIFT 总层高为 2..320，NETHER/END 为 2..254
+ * @param worldType 请求世界后端使用的地形生成器类型
+ * @param environment 请求世界后端使用的维度环境
+ * @param parameters 可选的创建参数键值对；支持 flat.height、seed、structures、biome、generator、generator-settings 和 property. 前缀的 Multiverse 世界属性；flat.height 仅适用于 FLAT，在 NORMAL 环境为 2..320，在 NETHER/THE_END 环境为 2..254
  */
 public record CreateMapRequest(
         String worldName,
@@ -18,6 +19,7 @@ public record CreateMapRequest(
         String groupId,
         UUID ownerId,
         WorldType worldType,
+        Environment environment,
         Map<String, String> parameters
 ) {
     /**
@@ -29,20 +31,35 @@ public record CreateMapRequest(
      * @param ownerId 首位地图管理员的 UUID；可为 {@code null}
      */
     public CreateMapRequest(String worldName, String displayName, String groupId, UUID ownerId) {
-        this(worldName, displayName, groupId, ownerId, WorldType.FLAT, Map.of());
+        this(worldName, displayName, groupId, ownerId, WorldType.FLAT, Environment.NORMAL, Map.of());
     }
 
     /**
-     * 创建指定世界类型且不附加生成参数的请求。
+     * 创建指定生成器类型的请求，维度环境默认为主世界。
      *
      * @param worldName 要创建的服务器世界唯一名称
      * @param displayName 面向玩家显示的地图名称
      * @param groupId 管理员和建筑师共用的地图组标识
      * @param ownerId 首位地图管理员的 UUID；可为 {@code null}
-     * @param worldType 请求世界后端使用的生成类型
+     * @param worldType 请求世界后端使用的地形生成器类型
      */
     public CreateMapRequest(String worldName, String displayName, String groupId, UUID ownerId, WorldType worldType) {
-        this(worldName, displayName, groupId, ownerId, worldType, Map.of());
+        this(worldName, displayName, groupId, ownerId, worldType, Environment.NORMAL, Map.of());
+    }
+
+    /**
+     * 兼容旧版请求构造器；维度环境默认为主世界。
+     *
+     * @param worldName 要创建的服务器世界唯一名称
+     * @param displayName 面向玩家显示的地图名称
+     * @param groupId 管理员和建筑师共用的地图组标识
+     * @param ownerId 首位地图管理员的 UUID；可为 {@code null}
+     * @param worldType 请求世界后端使用的地形生成器类型
+     * @param parameters 创建参数键值对
+     */
+    public CreateMapRequest(String worldName, String displayName, String groupId, UUID ownerId,
+                            WorldType worldType, Map<String, String> parameters) {
+        this(worldName, displayName, groupId, ownerId, worldType, Environment.NORMAL, parameters);
     }
 
     /** 复制创建参数，避免调用方在执行期间修改。 */

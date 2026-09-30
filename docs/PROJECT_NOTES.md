@@ -20,6 +20,7 @@
 ## 当前代码状态（2026-09-28）
 
 - `api` 已声明 `MapInstance`、`MapGroup`、`MapRole`、请求/设置/结果类型，以及地图查询、角色、准入、设置、传送、世界生命周期服务接口；公开 JavaDoc 为中文。
+- 创建和导入请求分别接收 `WorldType`（`FLAT/NORMAL/VOID`）与 `Environment`（`NORMAL/NETHER/THE_END`）；`SIFT` 环境为预留值，当前返回不支持结果。导入不接收生成参数，已有区块不变。
 - `plugin` 已有 `MapManagerPlugin` 主类和 `paper-plugin.yml`。当前 Paper API 编译基线为 1.20.1，manifest 的 `api-version` 为 `1.20`；LuckPerms、Multiverse-Core 为必需依赖，VoidGen 为可选依赖。Maven 打包配置会将 `api` 模块包含进插件 JAR。
 - JSON/MySQL 存储、地图查询、地图设置、角色持久化、准入决策、可配置的全路径准入监听、生命周期、MiniMessage 多语言通知及 v3 JSON 启动迁移已有实现。LP `worldbase` 与地图组投影已实现；自动重试仍待补充。
 - 主类加载所选存储，注册地图设置和准入监听；检测相邻 `MapManager-Core` 目录中的 `worlds.json` 与 `groups.json`，迁移及 LP `worldbase` 初始化成功后注册 `MapManager` 服务、复核在线玩家并注册 `/world`、`/wtp`；任一初始化失败会禁用插件。

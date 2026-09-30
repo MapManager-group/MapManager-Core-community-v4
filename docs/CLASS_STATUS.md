@@ -16,15 +16,16 @@
 | 类型               | 作用                                                         | 状态与待办                                                         |
 |--------------------|--------------------------------------------------------------|--------------------------------------------------------------------|
 | `MapManager`       | 地图、角色、准入、设置、别名、传送、生命周期服务的统一入口   | 注册逻辑已实现；存储迁移与 LP `worldbase` 初始化成功后由插件以 `Normal` 优先级发布，禁用时撤销 |
-| `CreateMapRequest` | 创建地图所需名称、组、可选首位管理员、世界类型和多组生成参数 | 数据；参数在创建用例中校验                                         |
-| `ImportMapRequest` | 导入服务端根目录现有世界的名称、类型和所有者                  | 数据；不包含生成参数；流程校验目录和 `level.dat`                 |
+| `CreateMapRequest` | 创建地图所需名称、组、可选首位管理员、生成器类型、维度环境和生成参数 | 数据；参数在创建用例中校验                                      |
+| `ImportMapRequest` | 导入服务端根目录现有世界的名称、生成器类型、维度环境和所有者 | 数据；不包含生成参数；流程校验目录和 `level.dat`                 |
 | `MapGroup`         | 组 ID 与组内世界名的不可变快照                               | 数据；世界名由地图的 `groupId` 关联计算                            |
 | `MapInstance`      | 地图 UUID、世界名、组、展示名、设置、持久状态及出生点快照    | 数据；创建和导入从 `PENDING` 转为 `ACTIVE`，失败保留 `PENDING`；删除成功后移除记录 |
 | `MapRole`          | `ADMIN`、`BUILDER`、`VISITOR` 三种角色                       | 数据；组角色已接 LP 投影，MMC 仍为权威来源                         |
 | `MapSettings`      | 单地图物理、爆炸、公开状态                                   | 数据；不包含 PVP 或全局覆盖                                        |
 | `MapStatus`        | `PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`       | 数据；创建及导入流程会从 `PENDING` 转为 `ACTIVE`；删除失败保留 `DELETING`，成功后移除地图记录 |
 | `SpawnPoint`       | 不依赖 Bukkit 的世界名、坐标与朝向                           | 数据；生命周期与设置服务都会将出生点写入 MMC，并同步 Bukkit/Multiverse |
-| `WorldType`        | 普通、平坦、SIFT、虚空、下界、末地世界类型                   | 数据；创建与导入映射已实现；SIFT 使用原版 FLAT；NETHER/END 通过内置区块生成器复用 FLAT 层和 biome，仅环境不同；下界/末地层高限 254；虚空依赖 VoidGen |
+| `WorldType`        | `FLAT`、原版 `NORMAL`、`VOID` 地形生成器类型                 | 数据；与维度环境独立组合；VOID 依赖 VoidGen                     |
+| `Environment`      | `NORMAL`、`NETHER`、`THE_END`、预留的 `SIFT` 维度环境        | 数据；NORMAL/NETHER/THE_END 已实现；SIFT 返回不支持结果          |
 | `FailureReason`    | 统一失败原因代码                                             | 数据；随业务实现补充必要原因，避免在命令中散写字符串               |
 | `OperationName`    | 统一操作名称代码                                             | 数据；随业务操作使用                                               |
 | `OperationResult`  | `Success`、`Failure`、`Partial` 及 operation ID              | 契约/数据；通知器用它分发成功、失败和部分完成消息                  |
@@ -63,8 +64,8 @@
 | `MapSettingsServiceImpl`    | 将单地图设置及出生点写入 repository；公开状态切换时读取 MV 原别名、去除前导颜色代码后换色；展示名修改委托别名服务                                      | 已实现；出生点写入 MMC 并同步 Bukkit/Multiverse，公开状态和显示名同步 MV 别名；地图管理员授权由命令入口执行                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `MapAliasServiceImpl`       | 无别名参数时使用地图名；显式别名时清除颜色代码并保存纯文本，再根据 MMC `isPublic` 设置、保存 MV 别名                                                   | 已实现；存储别名不含颜色代码，MV 非公开为 `&3<name>`、公开为 `&2<name>`，需在主线程调用                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `MapTravelServiceImpl`      | 检查入图准入并传送玩家；将玩家移出地图                                                                                                       | 已实现这些操作；`teleport` 要求主线程、检查在线状态和 MMC 准入，要求目标世界已加载，再传送至保存出生点或世界默认出生点；按需加载未实现；`kickFromMap` 要求主线程、双方在线且同在操作者当前 MMC 地图、操作者为管理员，目标为 MV 默认世界出生点                                                                                                                                                                                                                                                                                                                          |
-| `WorldLifeCycleServiceImpl` | 创建、导入、初始化和删除的用例入口 | 部分实现；创建/导入共用名称校验，以固定正则拒绝精确保留名 `cache/config/world/log/test/overworld/default/worldbase/apply/public/private` 及前缀 `plugin/version/admin/mapmanager/builder/visitor/lib/mmc`，另以配置正则（默认 `.*_bak$`）拒绝额外名称；导入前校验 NBT 地图版本，导入不接收生成参数；创建前校验生成参数；SIFT 走原版 FLAT，NETHER/END 调用 `FlatChunkGenerator` 并限制总层高 254；失败留下 `PENDING`；删除需匹配配置正则（默认仅 `_bak` 后缀），拒绝 MV 默认世界、服务器首个加载世界、在线玩家和异常目录，记录阶段并转为 `DELETING` 后调用 MV 删除世界，清理 LP 投影和 MMC 数据，失败保留状态供重试；按需加载未实现；调用要求主线程且 LP 写入目前会同步等待 |
-| `FlatChunkGenerator` | 按平坦层设置为非主世界环境生成区块 | 已实现；读取创建时编码到 Multiverse generator ID 的层设置，在下界/末地实际维度高度内铺设方块；区块生成由 Paper 调用，测试用 Paper 26.2 区块数据验证 |
+| `WorldLifeCycleServiceImpl` | 创建、导入、初始化和删除的用例入口 | 部分实现；创建/导入共用名称校验，以固定正则拒绝精确保留名 `cache/config/world/log/test/overworld/default/worldbase/apply/public/private` 及前缀 `plugin/version/admin/mapmanager/builder/visitor/lib/mmc`，另以配置正则（默认 `.*_bak$`）拒绝额外名称；导入前校验 NBT 地图版本且不接收生成参数；创建前校验生成参数；生成器类型与环境分别映射；FLAT 在 NETHER/THE_END 环境由 `FlatChunkGenerator` 生成并限制总层高 254；SIFT 环境暂不支持；失败留下 `PENDING`；删除需匹配配置正则（默认仅 `_bak` 后缀），拒绝 MV 默认世界、服务器首个加载世界、在线玩家和异常目录，记录阶段并转为 `DELETING` 后调用 MV 删除世界，清理 LP 投影和 MMC 数据，失败保留状态供重试；按需加载未实现；调用要求主线程且 LP 写入目前会同步等待 |
+| `FlatChunkGenerator` | 按编码层设置生成平坦区块 | 已实现；读取 Multiverse generator ID 中的层设置，可用于非主世界环境及导入后的后续生成；生成由 Paper 调用，测试用 Paper 26.2 区块数据验证 |
 
 ## plugin 模块：迁移、通知、权限和玩家
 

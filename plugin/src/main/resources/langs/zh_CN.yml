@@ -29,6 +29,7 @@ reasons:
   WORLD_VERSION_INCOMPATIBLE: 地图版本高于服务器版本或版本信息无效
   ALREADY_EXISTS: 地图或世界已存在
   INVALID_INPUT: 参数无效
+  UNSUPPORTED_ENVIRONMENT: SIFT 环境尚未支持
   PLAYER_NOT_FOUND: 玩家不存在或无法解析
   PLAYER_NOT_IN_MAP: 玩家不在该地图
   NO_PERMISSION: 没有操作权限
@@ -143,10 +144,10 @@ errors:
   mysql_failed: MySQL 操作失败
   mysql_map_corrupt: MySQL 地图记录损坏
   structures_boolean: structures 必须是 true 或 false
-  flat_only: flat.height 仅支持 FLAT、SIFT、NETHER 或 END 世界
+  flat_only: flat.height 仅支持 FLAT 生成器
   flat_generator_conflict: flat.height 与 generator-settings 不能同时设置
   flat_height_range: flat.height 必须在 2-320 之间
-  flat_dimension_height_range: NETHER 和 END 的 flat.height 及 generator-settings 层总高度必须在 2-254 格之间
+  flat_dimension_height_range: NETHER 和 THE_END 环境的 FLAT 生成器层总高度必须在 2-254 格之间
   voidgen_required: VOID 世界需要 VoidGen
   mv_alias_failed: 'Multiverse 别名同步失败：<world>'
   bukkit_world_unloaded: 'Bukkit 世界未加载：<world>'

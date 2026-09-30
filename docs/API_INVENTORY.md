@@ -39,8 +39,8 @@
 
 | 功能 | v3 实际行为 | v4 实际行为 | 对照结论 |
 |---|---|---|---|
-| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/world create <地图名> [类型] [alias=... group=... admin=...]`；`FLAT/SIFT/NORMAL/VOID/NETHER/END`，SIFT 使用 FLAT；NETHER/END 使用内置平坦层生成器并保留对应环境；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | 已实现但命令语法、世界类型 token 和颜色设置方式不兼容；v4 不传 `admin=` 时不创建首位管理员；NETHER/END 最大平坦总层高为 254 |
-| 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/world import` 接受 `alias/group/admin` 和类型；校验根目录 `level.dat`、路径及版本；仅 `VOID` 类型配置 VoidGen；不接受生成参数 | 已实现；版本校验保留，导入使用存档现有区块；v4 未提供 v3 的 `c:` 显式颜色参数 |
+| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/world create <地图名> [WorldType] [Environment] [选项...]`；WorldType 为 `FLAT/NORMAL/VOID`，Environment 为 `NORMAL/NETHER/THE_END/SIFT`（SIFT 预留且当前不支持）；二者可独立组合；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | v4 将生成器和环境分开；命令 token 与颜色设置方式不兼容；不传 `admin=` 时不创建首位管理员；FLAT 层高按环境限制 |
+| 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/world import <地图名> [WorldType] [Environment] [alias=... group=... admin=...]`；校验根目录 `level.dat`、路径及版本；按生成器和环境配置 MV；不接受生成参数 | 已实现；版本校验保留，已有区块按存档数据保留，所选生成器用于后续新区块；v4 未提供 v3 的 `c:` 显式颜色参数 |
 | 初始化设置 | 自动加载、和平、创造、关闭常见生物生成，设置随机刻/火焰/天气/昼夜/生物破坏/生物生成/进度播报规则 | 创建、导入、手动初始化调用同组初始化规则，并校验配置是否成功 | 核心规则基本一致；别名颜色和失败记录策略不同 |
 | 删除地图 | `/delete <地图>` 后 10 秒内 `/delete confirm`；会先将在线玩家送回默认出生点，再卸载并清理 LP/MV 数据 | `/world delete <地图>` 由控制台发起，一次性六位码 10 秒有效；有在线玩家时拒绝，另校验默认世界、路径、符号链接和名称规则 | 已实现但确认交互和在线玩家策略不同；v4 增加删除保护 |
 | 地图组管理员/建筑者、单图访客 | ADMIN/BUILDER 作用于地图组，VISITOR 作用于单图；名单及权限主要从 LP 节点维护 | MMC UUID 角色为权威；管理员/建筑者仍按组作用，访客按地图作用；建筑权限投影到 LP `worldbase` | 核心角色功能已实现；数据权威从 LP 切换到 MMC，直接修改 LP 不再改变准入结果 |
@@ -65,7 +65,7 @@
 ### 命令和策略差异
 
 - v3 的 `/create`、`/import`、`/init`、`/delete` 是独立命令并按权限节点授权；v4 合并到 `/world`，创建、导入、初始化、删除仅允许控制台执行。
-- v3 与 v4 创建/导入未指定类型时均默认为 `FLAT`；v3 未提供 group 时用地图名，v4 也默认地图名。
+- v3 与 v4 创建/导入未指定生成器时均默认为 `FLAT`；v4 环境默认为 `NORMAL`。v3 未提供 group 时用地图名，v4 也默认地图名。
 - v3 创建/导入未提供 owner 时使用命令发送者；v4 控制台命令未提供 `admin=<玩家>` 时不添加管理员。
 - v3 传送补全及准入读取 LuckPerms 的 `multiverse.access.<world>`；v4 按 MMC ACTIVE 状态、角色和 `isPublic` 判定。
 

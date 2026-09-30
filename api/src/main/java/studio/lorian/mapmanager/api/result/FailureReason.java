@@ -12,6 +12,8 @@ public enum FailureReason {
     ALREADY_EXISTS,
     /** 请求中有一个或多个参数无效。 */
     INVALID_INPUT,
+    /** 请求的维度环境尚未实现。 */
+    UNSUPPORTED_ENVIRONMENT,
     /** 无法解析请求中的玩家。 */
     PLAYER_NOT_FOUND,
     /** 玩家不在要操作的地图内。 */

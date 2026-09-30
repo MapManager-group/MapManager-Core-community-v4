@@ -7,6 +7,7 @@ import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.api.model.CreateMapRequest;
+import studio.lorian.mapmanager.api.model.Environment;
 import studio.lorian.mapmanager.api.model.ImportMapRequest;
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
@@ -253,6 +254,13 @@ public final class MapWorldCommand extends Command {
             choices.addAll(optionKeys(false, args));
             return suggestions(current, choices);
         }
+        if (args.length == 4 && !current.contains("=") && isWorldType(args[2])) {
+            List<String> choices = Arrays.stream(Environment.values())
+                    .map(environment -> environment.name().toLowerCase(Locale.ROOT))
+                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+            choices.addAll(optionKeys(creating, args));
+            return suggestions(current, choices);
+        }
         if (args.length < 3) return List.of();
         if (current.startsWith("group=")) {
             List<String> choices = new ArrayList<>();
@@ -267,6 +275,15 @@ public final class MapWorldCommand extends Command {
         if (creating && current.startsWith("structures="))
             return suggestions(current, List.of("structures=true", "structures=false"));
         return suggestions(current, optionKeys(creating, args));
+    }
+
+    private static boolean isWorldType(String value) {
+        try {
+            WorldType.valueOf(value.toUpperCase(Locale.ROOT));
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 
     private static List<String> optionKeys(boolean creating, String[] args) {
@@ -322,6 +339,7 @@ public final class MapWorldCommand extends Command {
 
         int optionsStart = 2;
         WorldType type = WorldType.FLAT;
+        Environment environment = Environment.NORMAL;
         if (args.length > 2 && !args[2].contains("=")) {
             try {
                 type = WorldType.valueOf(args[2].toUpperCase(Locale.ROOT));
@@ -330,6 +348,15 @@ public final class MapWorldCommand extends Command {
                 return;
             }
             optionsStart = 3;
+            if (args.length > 3 && !args[3].contains("=")) {
+                try {
+                    environment = Environment.valueOf(args[3].toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException exception) {
+                    fail(target, operation, FailureReason.INVALID_INPUT);
+                    return;
+                }
+                optionsStart = 4;
+            }
         }
 
         String alias = null;
@@ -379,10 +406,11 @@ public final class MapWorldCommand extends Command {
         String displayName = alias;
         String groupId = group;
         WorldType worldType = type;
+        Environment worldEnvironment = environment;
         Map<String, String> creationParameters = Map.copyOf(parameters);
         if (admin == null) {
             runCreateOrImport(target, importing, worldName, displayName, groupId, null,
-                    worldType, creationParameters);
+                    worldType, worldEnvironment, creationParameters);
             return;
         }
         players.resolveId(admin).whenComplete((owner, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
@@ -391,16 +419,17 @@ public final class MapWorldCommand extends Command {
                 return;
             }
             runCreateOrImport(target, importing, worldName, displayName, groupId, owner,
-                    worldType, creationParameters);
+                    worldType, worldEnvironment, creationParameters);
         }));
     }
 
     private void runCreateOrImport(NotificationTarget target, boolean importing,
                                    String worldName, String displayName, String groupId, UUID owner,
-                                   WorldType type, Map<String, String> parameters) {
+                                   WorldType type, Environment environment, Map<String, String> parameters) {
         OperationResult<MapInstance> result = importing
-                ? lifeCycle.importWorld(new ImportMapRequest(worldName, displayName, groupId, owner, type))
-                : lifeCycle.create(new CreateMapRequest(worldName, displayName, groupId, owner, type, parameters));
+                ? lifeCycle.importWorld(new ImportMapRequest(worldName, displayName, groupId, owner, type, environment))
+                : lifeCycle.create(new CreateMapRequest(worldName, displayName, groupId, owner,
+                        type, environment, parameters));
         notifier.notify(target, result);
     }
 

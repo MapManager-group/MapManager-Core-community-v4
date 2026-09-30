@@ -29,6 +29,7 @@ reasons:
   WORLD_VERSION_INCOMPATIBLE: World data version is newer than the server or invalid
   ALREADY_EXISTS: Map or world already exists
   INVALID_INPUT: Invalid input
+  UNSUPPORTED_ENVIRONMENT: The SIFT environment is not supported yet
   PLAYER_NOT_FOUND: Player not found or could not be resolved
   PLAYER_NOT_IN_MAP: Player is not in this map
   NO_PERMISSION: You do not have permission
@@ -143,10 +144,10 @@ errors:
   mysql_failed: MySQL operation failed
   mysql_map_corrupt: MySQL map record is corrupt
   structures_boolean: structures must be true or false
-  flat_only: flat.height is only supported for FLAT, SIFT, NETHER, or END worlds
+  flat_only: flat.height is only supported for the FLAT generator
   flat_generator_conflict: flat.height and generator-settings cannot be set together
   flat_height_range: flat.height must be between 2 and 320
-  flat_dimension_height_range: flat.height in NETHER and END worlds, and their generator-settings layers, must total between 2 and 254 blocks
+  flat_dimension_height_range: FLAT generator layers in NETHER and THE_END environments must total between 2 and 254 blocks
   voidgen_required: VOID worlds require VoidGen
   mv_alias_failed: 'Multiverse alias sync failed: <world>'
   bukkit_world_unloaded: 'Bukkit world is not loaded: <world>'

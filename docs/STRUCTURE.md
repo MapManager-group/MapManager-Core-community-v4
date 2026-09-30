@@ -63,7 +63,7 @@ MapManager-v4/
 | `MapAccessListener` | `PlayerTeleportEvent`、`PlayerChangedWorldEvent`、`PlayerJoinEvent`、`PlayerRespawnEvent`；`MapService`；`MapAccessService`；MV 默认世界 | 严格校验开启时预先拦截并在事件后复核地图进入；加入和重生时检查；撤权后复核当前地图；无法安全送回默认世界时断开连接 |
 | `MapWorldCommand.public/setname/setspawn` | 当前 MMC 地图、`MapAccessService`、`MapSettingsService` | 只允许当前地图管理员修改公开状态、显示名和出生点；出生点取玩家当前位置并同步 MMC、Bukkit 与 Multiverse |
 | `MapSettingsServiceImpl.setSpawn` | `MapRepository`、Bukkit `World`、Multiverse `MultiverseWorld` | 先持久化 MMC 出生点，再更新 Bukkit 和 Multiverse 出生点并保存 Multiverse 配置；外部同步失败返回 `Partial` |
-| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`FlatChunkGenerator`、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 导入前校验 `level.dat` 版本；导入请求不接收生成参数；创建时 SIFT 使用 FLAT 类型，NETHER/END 用 `FlatChunkGenerator` 生成相同平坦层并保留对应环境；地图后续写入首位管理员、初始化并转换状态 |
+| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`FlatChunkGenerator`、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 创建/导入分别接收 `WorldType` 生成器和 `Environment` 环境；导入前校验 `level.dat` 版本且不接受生成参数；FLAT 在 NETHER/THE_END 环境使用 `FlatChunkGenerator`；SIFT 环境保留为未支持的预留值；地图后续写入首位管理员、初始化并转换状态 |
 | `MapWorldCommand.delete` → `WorldLifeCycleServiceImpl.delete` | 控制台一次性确认码、删除名称正则、`WorldGateway`、Bukkit、Multiverse、操作记录、`WorldBaseProjection`、地图与角色存储 | 首次输入地图名取得 10 秒有效的 6 位确认码；二次输入确认码后检查 MV 默认世界、服务器首个加载世界、在线玩家和目录；删除世界后清理 LP 投影与 MMC 数据；失败保留 `DELETING` 供重试 |
 | `MapTravelServiceImpl.teleport` | `MapAccessService`、`MapRepository`、`PlayerGateway` | 准入通过后传送到已加载世界；按需加载尚未实现 |
 | `MapWorldCommand.kick` → `MapTravelServiceImpl.kickFromMap` | Bukkit 在线玩家、内部地图存储、`MapAccessService.decide`、Multiverse 默认世界 | 服务按操作者当前世界定位地图，确认管理员及目标在同图，再使用 MV 默认世界出生点传送 |

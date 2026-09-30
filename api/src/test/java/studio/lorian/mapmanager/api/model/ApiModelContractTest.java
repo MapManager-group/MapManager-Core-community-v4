@@ -8,17 +8,36 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ApiModelContractTest {
     @Test
-    void createAndImportRequestsDefaultToFlatWorlds() {
+    void createAndImportRequestsDefaultToFlatWorldsInNormalEnvironment() {
         CreateMapRequest create = new CreateMapRequest("arena", "Arena", "team", null);
         ImportMapRequest importRequest = new ImportMapRequest("arena", "Arena", "team", null);
 
         assertEquals(WorldType.FLAT, create.worldType());
+        assertEquals(Environment.NORMAL, create.environment());
         assertEquals(Map.of(), create.parameters());
         assertEquals(WorldType.FLAT, importRequest.worldType());
+        assertEquals(Environment.NORMAL, importRequest.environment());
+        assertArrayEquals(new WorldType[]{WorldType.FLAT, WorldType.NORMAL, WorldType.VOID}, WorldType.values());
+        assertArrayEquals(new Environment[]{Environment.NORMAL, Environment.NETHER, Environment.THE_END,
+                Environment.SIFT}, Environment.values());
+    }
+
+    @Test
+    void lifecycleRequestsKeepGeneratorTypeAndEnvironmentIndependent() {
+        CreateMapRequest create = new CreateMapRequest("arena", "Arena", "team", null,
+                WorldType.NORMAL, Environment.NETHER, Map.of());
+        ImportMapRequest importRequest = new ImportMapRequest("arena", "Arena", "team", null,
+                WorldType.VOID, Environment.THE_END);
+
+        assertEquals(WorldType.NORMAL, create.worldType());
+        assertEquals(Environment.NETHER, create.environment());
+        assertEquals(WorldType.VOID, importRequest.worldType());
+        assertEquals(Environment.THE_END, importRequest.environment());
     }
 
     @Test
@@ -34,6 +53,8 @@ class ApiModelContractTest {
                 () -> request.parameters().put("structures", "false"));
         assertEquals(Map.of(), new CreateMapRequest(
                 "arena", "Arena", "team", null, WorldType.NORMAL, null).parameters());
+        assertEquals(Environment.NORMAL, new CreateMapRequest(
+                "arena", "Arena", "team", null, WorldType.NORMAL, null).environment());
     }
 
     @Test

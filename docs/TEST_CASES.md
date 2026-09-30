@@ -26,7 +26,7 @@ mvn clean package
 
 | 自动用例                         | 测试类                                                                                               | 覆盖点                                                                                                        |
 |----------------------------------|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| UNIT-API-01 至 UNIT-API-03       | `api/src/test/java/studio/lorian/mapmanager/api/model/ApiModelContractTest.java`                     | 创建/导入请求默认类型、创建参数防御性复制、地图组世界集合不可变                                               |
+| UNIT-API-01 至 UNIT-API-04       | `api/src/test/java/studio/lorian/mapmanager/api/model/ApiModelContractTest.java`                     | 创建/导入请求默认 FLAT+NORMAL、生成器与环境独立指定、参数防御性复制、地图组世界集合不可变                       |
 | UNIT-STO-01 至 UNIT-STO-05       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/JsonStorageTest.java`         | JSON 重启恢复、大小写不敏感查询、角色和操作持久化、非法状态不提交、地图删除访客清理、重复授权及损坏文件拒绝   |
 | UNIT-SVC-01 至 UNIT-SVC-07       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServicesTest.java`                     | 角色组/单图范围、有效角色继承、公开和 ACTIVE 准入、LP 部分失败、物理/爆炸字段隔离、`MapManager` 服务图 getter |
 | UNIT-WORLD-01 至 UNIT-WORLD-04   | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/WorldGatewayImplTest.java`      | `server.properties` 地图根目录定位、维度目录选择和世界名路径穿越防护                                          |
@@ -35,9 +35,9 @@ mvn clean package
 | UNIT-MIG-01 至 UNIT-MIG-02       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationSourceTest.java` | v3 地图、组、角色范围和物理/爆炸设置解析；组地图清单不一致时拒绝                                              |
 | UNIT-MSG-01 至 UNIT-MSG-03       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文资源与安全占位符、缺项中文回退、占位参数校验                                                              |
 | UNIT-CONFIG-01 至 UNIT-CONFIG-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageConfigTest.java`       | JSON 默认值、MySQL 配置读取与空白裁剪、未知类型及必填项/端口/数据库名校验                                     |
-| UNIT-LIFE-01 至 UNIT-LIFE-04     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | SIFT 复用平坦参数；NETHER/END 生成器编码和环境映射；拒绝超过维度安全层高的预设及自定义层设置                    |
+| UNIT-LIFE-01 至 UNIT-LIFE-06     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | 创建和导入覆盖三种生成器与三种已实现环境的组合；SIFT 保持未支持；校验 FLAT 层高和非 FLAT 的 flat.height 拒绝 |
 
-当前共 37 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。服务注册事件/插件类路径、Bukkit 事件、Multiverse/LuckPerms 实际写入、MySQL 建表及完整启动迁移仍需真实集成环境，不纳入这批单元测试。
+当前共 40 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。服务注册事件/插件类路径、Bukkit 事件、Multiverse/LuckPerms 实际写入、MySQL 建表及完整启动迁移仍需真实集成环境，不纳入这批单元测试。
 
 ## 启动、配置与本地化
 
@@ -73,17 +73,17 @@ mvn clean package
 
 | ID      | 前置条件与操作                                                             | 预期结果                                                                                                                 |
 |---------|----------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| LIFE-01 | 控制台执行 `/world create arena normal`                                    | 创建世界、登记地图和组，初始化 MV 配置，地图最终为 ACTIVE，默认组/别名为 `arena`                                         |
+| LIFE-01 | 控制台执行 `/world create arena flat normal`                               | 以 FLAT 生成器和 NORMAL 环境创建世界、登记地图和组，初始化 MV 配置，地图最终为 ACTIVE，默认组/别名为 `arena`             |
 | LIFE-02 | 玩家执行 create、import、init 或 delete                                    | 返回无权限结果；世界、地图、存储均未改变                                                                                 |
 | LIFE-03 | 为新地图指定 `group=team admin=AdminA`                                     | 地图进入 `team`；管理员授予保存到组；LP 地图组继承 `worldbase` 并投影 AdminA                                             |
 | LIFE-04 | 在 `arena` 所在组创建 `arena2`                                             | 共用同一组；组的地图列表包含两张图，组管理员/建筑者对两图生效                                                            |
 | LIFE-05 | 创建地图时省略 alias/group                                                 | 两者均使用世界名                                                                                                         |
 | LIFE-06 | 创建地图时提供带 Minecraft 颜色代码的 alias                                | 保存别名文本时去掉颜色代码；MV 别名根据公开状态附加颜色                                                                  |
-| LIFE-07 | 逐一使用 flat、sift、normal、void、nether、end 创建                        | MV 世界类型/环境与请求匹配；SIFT 复用原版 FLAT；NETHER/END 用内置平坦区块生成器复用 FLAT 层设置，只改变环境；虚空按配置要求 VoidGen |
-| LIFE-08 | FLAT/SIFT 使用 `flat.height=2`、`320`；NETHER/END 使用 `2`、`254`          | 各环境在自身可安全生成和出生的高度范围内通过校验；超过各自上限拒绝                                                                 |
-| LIFE-09 | flat.height 使用 `0`、`1`、`321` 或非数字                                  | 返回 INVALID_INPUT；不创建世界，不留下 PENDING 地图                                                                      |
+| LIFE-07 | 组合 `flat/normal/void` 与 `normal/nether/the_end` 创建并导入               | Multiverse 配置中的生成器和 Bukkit 环境分别匹配请求；FLAT+非 NORMAL 使用编码的内置生成器；VOID 需要 VoidGen       |
+| LIFE-08 | 创建或导入时选择 `sift` 环境                                               | 返回 `UNSUPPORTED_ENVIRONMENT`；不改变世界或登记 PENDING 地图                                                          |
+| LIFE-09 | FLAT+NORMAL 使用 `flat.height=2`、`320`；FLAT+NETHER/THE_END 使用 `2`、`254` | 各组合在对应高度范围内通过校验；超出环境上限拒绝                                                                     |
 | LIFE-10 | structures 分别使用 `true`、`false`、其他文本                              | 两个布尔值映射正确；其他文本拒绝，世界不创建                                                                             |
-| LIFE-11 | 在 NORMAL/VOID 使用 `flat.height`；在 FLAT/SIFT/NETHER/END 同时提供 `flat.height` 与 `generator-settings` | 分别拒绝创建，错误信息指向参数冲突/适用类型                                                                      |
+| LIFE-11 | 在 NORMAL/VOID 生成器使用 `flat.height`；FLAT 同时提供 `flat.height` 与 `generator-settings` | 分别拒绝创建，错误信息指向参数冲突或适用生成器                                                                      |
 | LIFE-12 | 测试合法 seed、biome、generator、generator-settings、property.*            | 参数传入 MV 创建选项或世界属性；创建成功                                                                                 |
 | LIFE-13 | 提供未知参数键、空值、超过 4096 字符的值或非法 property 键                 | 请求被拒绝，不执行世界创建                                                                                               |
 | LIFE-14 | 世界名测试 4/16 字符及小写字母、数字、`_`、`-`                             | 长度及字符范围内允许；3/17 字符、大写、空格、路径分隔符拒绝                                                              |
@@ -92,17 +92,17 @@ mvn clean package
 | LIFE-17 | 组 ID 测试长度边界、非法字符、`default`、`worldbase`                       | 合法组 ID 接受；非法字符/长度及 LP 基础组名称拒绝                                                                        |
 | LIFE-18 | 展示名为 null/空、255 字符、256 字符；清理颜色后为空                       | 空值回退地图名；最大长度允许；超长或清理后空白的别名拒绝                                                                 |
 | LIFE-19 | 对 MMC、Bukkit 或 MV 中已存在的世界名再次创建/导入                         | 返回 ALREADY_EXISTS；既有世界和记录不变                                                                                  |
-| LIFE-20 | 在根目录准备带有效 level.dat 的未注册世界，执行 import                     | MV 导入成功，执行与 create 相同的初始化、角色投影和 ACTIVE 登记                                                          |
+| LIFE-20 | 在根目录准备有效未注册世界，执行 `/world import arena-copy normal nether` | 以 NORMAL 生成器和 NETHER 环境导入，执行初始化、角色投影和 ACTIVE 登记；现有区块不变 |
 | LIFE-21 | 导入目录不存在、不是目录或缺少 level.dat                                   | 返回 WORLD_NOT_FOUND 或 INVALID_INPUT；不创建 MMC 地图记录                                                               |
-| LIFE-22 | 导入 VOID 类型但 VoidGen 未启用                                            | 返回世界后端失败；不注册为 ACTIVE                                                                                        |
+| LIFE-22 | 创建或导入 VOID 生成器但 VoidGen 未启用                                    | 返回世界后端失败；不注册为 ACTIVE                                                                                        |
 | LIFE-23 | 导入目录为符号链接或名称试图逃逸世界根目录                                 | 输入校验或目录检查拒绝，不触碰根目录外文件                                                                               |
 | LIFE-24 | 创建/导入过程中分别令 MV 操作、初始化、存储或 LP 投影失败                  | 返回 Failure/Partial；记录 operation ID 和失败阶段；保留源码定义的 PENDING/失败记录以供检查                              |
 | LIFE-25 | 成功创建或导入后检查世界属性                                               | difficulty peaceful、creative、自动加载开启、出生区块常驻关闭；普通生物生成关闭、MISC 开启；规定 gamerule 全部生效并保存 |
 | LIFE-26 | 对已加载且已登记地图执行 `/world init <name>`                              | 控制台重放 MV 与 gamerule 初始化；不重建角色、不改变地图状态；返回成功                                                   |
 | LIFE-27 | init 目标不存在、未登记或未加载                                            | 分别返回 MAP_NOT_FOUND 或 WORLD_NOT_FOUND；不产生其他世界变更                                                            |
 | LIFE-28 | init 名称含非法字符或由玩家执行                                            | 返回 INVALID_INPUT/NO_PERMISSION；不执行 MV 操作                                                                         |
-| LIFE-29 | 在 NETHER/END 创建 `flat.height=64` 或自定义 `generator-settings`；保存后检查区块调色板和 Environment | 分别生成预期平坦层和 biome；NETHER/END 环境保留；非法方块、非法 JSON 和总层高超过 254 在写入地图记录前拒绝 |
-| LIFE-30 | 创建 NETHER/END 平坦地图后重启服务器，确认 MapManager-Core 先于 Multiverse-Core 启用；进入新坐标并检查新区块 | Multiverse 成功解析持久化生成器 ID；新生成区块层设置和 biome 正确，Environment 仍为 NETHER/END |
+| LIFE-29 | 在 FLAT+NETHER/THE_END 创建 `flat.height=64` 或自定义 `generator-settings`；检查区块和 Environment | 生成预期平坦层和 biome；选定环境保留；非法方块、非法 JSON 和总层高超过 254 在登记前拒绝 |
+| LIFE-30 | 创建 FLAT+NETHER/THE_END 后重启；确认 MapManager-Core 先于 Multiverse-Core 启用并进入新区块 | Multiverse 解析持久化生成器 ID；新生成区块层设置正确，Environment 仍与所选维度一致 |
 
 ## 地图设置、别名与事件
 
@@ -183,7 +183,7 @@ mvn clean package
 | CMD-02 | 为不同角色检查 `/world` 一级补全                          | 仅出现当前发送者可调用的命令；ADMIN 专属子命令对非管理员隐藏                                                                             |
 | CMD-03 | 补全 `/world tp`、`/wtp`                                  | 只建议该玩家可进入的地图                                                                                                                 |
 | CMD-04 | 补全 `/world kick`                                        | 只建议当前同图在线玩家                                                                                                                   |
-| CMD-05 | 控制台补全 init/delete/import/create                      | init 仅提示非 DELETED 地图；delete 仅提示 ACTIVE/DELETING 且命名符合删除正则的图；import 限服务器根目录候选；create 给出世界类型及参数键 |
+| CMD-05 | 控制台补全 init/delete/import/create                      | init 仅提示非 DELETED 地图；delete 仅提示 ACTIVE/DELETING 且命名符合删除正则的图；import 限服务器根目录候选；create/import 分别补全生成器、环境和参数键 |
 | CMD-06 | 成员命令补全 add/remove 和成员名                          | 只按准入/ADMIN 权限提供操作；在线玩家、同图目标和已有成员提示正确；无缓存名称时可用 UUID                                                 |
 
 ## 删除与操作记录

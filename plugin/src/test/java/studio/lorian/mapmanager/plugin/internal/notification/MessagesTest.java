@@ -46,6 +46,8 @@ class MessagesTest {
                 "player", "<red>Alice", "role", "admin"));
         assertTrue(safe.contains("<red>Alice"));
         assertTrue(Messages.text("command.usage_wtp").contains("<map>"));
+        assertEquals("The SIFT environment is not supported yet",
+                Messages.text("reasons.UNSUPPORTED_ENVIRONMENT"));
     }
 
     @Test

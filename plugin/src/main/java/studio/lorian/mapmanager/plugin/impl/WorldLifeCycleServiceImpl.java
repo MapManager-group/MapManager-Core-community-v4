@@ -18,6 +18,7 @@ import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
 import org.mvplugins.multiverse.core.world.options.ImportWorldOptions;
 import org.mvplugins.multiverse.core.world.options.DeleteWorldOptions;
 import studio.lorian.mapmanager.api.model.CreateMapRequest;
+import studio.lorian.mapmanager.api.model.Environment;
 import studio.lorian.mapmanager.api.model.ImportMapRequest;
 import studio.lorian.mapmanager.api.model.MapGroup;
 import studio.lorian.mapmanager.api.model.MapInstance;
@@ -96,8 +97,14 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         UUID operationId = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || request == null || !validMapInput(request.worldName(),
                 request.groupId(), request.displayName()) || request.worldType() == null
+                || request.environment() == null
                 || !validParameters(request.parameters()))
             return new OperationResult.Failure<>(OperationName.CREATE, operationId, FailureReason.INVALID_INPUT);
+        if (request.environment() == Environment.SIFT)
+            return new OperationResult.Failure<>(OperationName.CREATE, operationId,
+                    FailureReason.UNSUPPORTED_ENVIRONMENT);
+        if (request.worldType() == WorldType.VOID && !Bukkit.getPluginManager().isPluginEnabled("VoidGen"))
+            return new OperationResult.Failure<>(OperationName.CREATE, operationId, FailureReason.WORLD_BACKEND_FAILED);
         final CreateWorldOptions options;
         try {
             options = options(request);
@@ -174,17 +181,20 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     }
 
     /**
-     * 按世界类型和键值参数构造 Multiverse 创建选项。
+     * 按生成器类型、维度环境和键值参数构造 Multiverse 创建选项。
      */
     static CreateWorldOptions options(CreateMapRequest request) {
+        if (request == null || request.worldType() == null || request.environment() == null)
+            throw new IllegalArgumentException("World type and environment are required");
         Map<String, String> params = request.parameters();
         WorldType type = request.worldType();
+        World.Environment environment = bukkitEnvironment(request.environment());
+        boolean otherDimensionEnvironment = otherDimensionEnvironment(request.environment());
         CreateWorldOptions options = CreateWorldOptions.worldName(request.worldName()).doFolderCheck(true)
                 .generateStructures(Boolean.parseBoolean(params.getOrDefault("structures", "false")));
         if (params.containsKey("structures") && !Set.of("true", "false").contains(params.get("structures")))
             throw new IllegalArgumentException(Messages.text("errors.structures_boolean"));
-        if (params.containsKey("flat.height")
-                && !Set.of(WorldType.FLAT, WorldType.SIFT, WorldType.NETHER, WorldType.END).contains(type))
+        if (params.containsKey("flat.height") && type != WorldType.FLAT)
             throw new IllegalArgumentException(Messages.text("errors.flat_only"));
         if (params.containsKey("flat.height") && params.containsKey("generator-settings"))
             throw new IllegalArgumentException(Messages.text("errors.flat_generator_conflict"));
@@ -198,22 +208,15 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         });
         if (!properties.isEmpty()) options.worldPropertyStrings(properties);
         switch (type) {
-            case FLAT, SIFT, NETHER, END -> {
-                // 非主世界维度
-                boolean OtherDimensionsEnvironment = type == WorldType.NETHER || type == WorldType.END || type == WorldType.SIFT;
-                World.Environment environment = switch (type) {
-                    case NETHER -> World.Environment.NETHER;
-                    case END -> World.Environment.THE_END;
-                    default -> World.Environment.NORMAL;
-                };
+            case FLAT -> {
                 options.worldType(org.bukkit.WorldType.FLAT).environment(environment);
                 String flatSettings = params.get("generator-settings");
-                // 限制不同维度的平坦地图生成高度
-                int flatHeightLimit = OtherDimensionsEnvironment ? 254 : 320;
+                int flatHeightLimit = otherDimensionEnvironment ? 254 : 320;
                 if (params.containsKey("flat.height")) {
                     int height = Integer.parseInt(params.get("flat.height"));
                     if (height < 2 || height > flatHeightLimit) {
-                        String key = OtherDimensionsEnvironment ? "errors.flat_dimension_height_range" : "errors.flat_height_range";
+                        String key = otherDimensionEnvironment
+                                ? "errors.flat_dimension_height_range" : "errors.flat_height_range";
                         throw new IllegalArgumentException(Messages.text(key));
                     }
                     JsonObject settings = new JsonObject();
@@ -236,7 +239,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     settings.addProperty("biome", params.getOrDefault("biome", "minecraft:plains"));
                     flatSettings = settings.toString();
                 }
-                if (OtherDimensionsEnvironment) {
+                if (otherDimensionEnvironment) {
                     if (flatSettings == null) flatSettings = defaultFlatSettings();
                     // Paper's vanilla flat generator ignores generator-settings for Nether and End environments.
                     String generatorId = FlatChunkGenerator.generatorId(flatSettings);
@@ -255,15 +258,26 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     options.generatorSettings(flatSettings);
                 }
             }
-            case NORMAL -> options.worldType(org.bukkit.WorldType.NORMAL).environment(World.Environment.NORMAL);
+            case NORMAL -> options.worldType(org.bukkit.WorldType.NORMAL).environment(environment);
             case VOID -> {
-                if (!Bukkit.getPluginManager().isPluginEnabled("VoidGen"))
-                    throw new IllegalArgumentException(Messages.text("errors.voidgen_required"));
-                options.worldType(org.bukkit.WorldType.FLAT).environment(World.Environment.NORMAL)
+                options.worldType(org.bukkit.WorldType.FLAT).environment(environment)
                         .generator(params.getOrDefault("generator", "VoidGen:{}"));
             }
         }
         return options;
+    }
+
+    private static boolean otherDimensionEnvironment(Environment environment) {
+        return environment == Environment.NETHER || environment == Environment.THE_END || environment == Environment.SIFT;
+    }
+
+    private static World.Environment bukkitEnvironment(Environment environment) {
+        return switch (environment) {
+            case NORMAL -> World.Environment.NORMAL;
+            case NETHER -> World.Environment.NETHER;
+            case THE_END -> World.Environment.THE_END;
+            case SIFT -> throw new IllegalArgumentException("SIFT environment is not supported yet");
+        };
     }
 
     private static String biomeProvider(String biome) {
@@ -304,8 +318,12 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         // 导入仅接收服务端根目录中的现有世界；先校验名称和文件，再写入 MMC 数据。
         UUID operationId = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || request == null || request.worldType() == null
+                || request.environment() == null
                 || !validMapInput(request.worldName(), request.groupId(), request.displayName()))
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.INVALID_INPUT);
+        if (request.environment() == Environment.SIFT)
+            return new OperationResult.Failure<>(OperationName.IMPORT, operationId,
+                    FailureReason.UNSUPPORTED_ENVIRONMENT);
         String name = request.worldName();
         Path root = Path.of("").toAbsolutePath().normalize();
         Path folder = root.resolve(name);
@@ -316,16 +334,10 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         if (!worldVersions.isCompatible(folder))
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId,
                     FailureReason.WORLD_VERSION_INCOMPATIBLE);
-        // 环境和虚空生成器只属于导入流程；其余注册步骤与创建共用。
+        // 环境和导入时的生成器配置由 MV 保存；其余注册步骤与创建共用。
         if (request.worldType() == WorldType.VOID && !Bukkit.getPluginManager().isPluginEnabled("VoidGen"))
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.WORLD_BACKEND_FAILED);
-        ImportWorldOptions options = ImportWorldOptions.worldName(name).doFolderCheck(true)
-                .environment(switch (request.worldType()) {
-                    case NETHER -> World.Environment.NETHER;
-                    case END -> World.Environment.THE_END;
-                    default -> World.Environment.NORMAL;
-                });
-        if (request.worldType() == WorldType.VOID) options.generator("VoidGen:{}");
+        ImportWorldOptions options = importOptions(request);
         return registerWorld(OperationName.IMPORT, operationId, name, request.groupId(), request.displayName(),
                 request.ownerId(), () -> {
                     var result = MultiverseCoreApi.get().getWorldManager().importWorld(options);
@@ -333,6 +345,24 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                             "reason", result.getFailureReason()));
                     return result.getOrNull();
                 });
+    }
+
+    /** 构造导入时使用的环境和生成器配置；已有区块数据不会被替换。 */
+    static ImportWorldOptions importOptions(ImportMapRequest request) {
+        if (request == null || request.worldType() == null || request.environment() == null)
+            throw new IllegalArgumentException("World type and environment are required");
+        ImportWorldOptions options = ImportWorldOptions.worldName(request.worldName()).doFolderCheck(true)
+                .environment(bukkitEnvironment(request.environment()));
+        switch (request.worldType()) {
+            case NORMAL -> options.generator(null);
+            case FLAT -> {
+                String settings = defaultFlatSettings();
+                options.generator("MapManager-Core:" + FlatChunkGenerator.generatorId(settings))
+                        .generatorSettings(settings).biome(biomeProvider(flatSettingsBiome(settings)));
+            }
+            case VOID -> options.generator("VoidGen:{}");
+        }
+        return options;
     }
 
     /**

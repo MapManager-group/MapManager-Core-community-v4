@@ -91,7 +91,7 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 1. 在控制台创建地图并指定管理员：
 
    ```text
-   /world create buildworld flat alias=建筑地图 group=buildworld admin=Steve
+   /world create buildworld flat normal alias=建筑地图 group=buildworld admin=Steve
    ```
 
 2. 在地图组管理员所在的地图内授予角色：
@@ -124,8 +124,8 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 
 | 命令 | 使用者 | 说明 |
 |---|---|---|
-| `/world create <地图名> [类型] [选项...]` | 控制台 | 创建并初始化地图；类型默认为 `flat` |
-| `/world import <地图名> [类型] [选项...]` | 控制台 | 导入服务端根目录下的已有世界；默认类型为 `flat` |
+| `/world create <地图名> [生成器类型] [环境] [选项...]` | 控制台 | 创建并初始化地图；默认生成器为 `flat`，环境为 `normal` |
+| `/world import <地图名> [生成器类型] [环境] [选项...]` | 控制台 | 导入服务端根目录下的已有世界；默认生成器为 `flat`，环境为 `normal` |
 | `/world init <地图名>` | 控制台 | 对已加载的 MMC 地图重新应用初始化规则 |
 | `/world delete <地图名>` | 控制台 | 申请删除并取得一次性确认码；随后运行 `/world delete <6位确认码>`，须在 10 秒内完成 |
 | `/world tp <地图名>`、`/wtp <地图名>` | 玩家 | 传送到有权限进入的已加载地图 |
@@ -140,23 +140,25 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 | `/world setspawn` | 当前地图管理员 | 将当前位置设为地图出生点 |
 | `/world kick <在线玩家>` | 当前地图管理员 | 将同一地图中的目标玩家送到 Multiverse 默认世界出生点 |
 
-创建命令支持类型 `flat`、`sift`、`normal`、`void`、`nether`、`end`。`sift` 使用 FLAT 生成器；`nether` 和 `end` 用内置区块生成器铺设 FLAT 层，同时保留对应 Bukkit 环境。创建命令还支持以下选项：
+生成器类型与维度环境是两个独立选项，创建和导入都可组合使用：生成器类型为 `flat`、`normal`、`void`，环境为 `normal`、`nether`、`the_end`、`sift`。`normal` 生成器使用原版标准地形，`flat` 生成平坦地形，`void` 需要 VoidGen。环境 `sift` 是预留值，当前会返回“不支持”错误，不会创建或导入地图。省略生成器和环境时分别默认为 `flat` 与 `normal`。
 
-地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 类型需要安装 VoidGen。`flat.height` 仅适用于 `flat`、`sift`、`nether` 和 `end` 类型，且不能同时使用 `generator-settings`；它表示地形总层数，从底到顶为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。FLAT/SIFT 的范围是 2–320，NETHER/END 的范围是 2–254；后两者的自定义生成设置总层高也不能超过 254，以保留出生空间。
+创建命令还支持以下选项：
+
+地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 生成器需要安装 VoidGen。`flat.height` 仅适用于 `flat` 生成器，且不能同时使用 `generator-settings`；它表示地形总层数，从底到顶为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。`normal` 环境的范围是 2–320；`nether` 和 `the_end` 环境的范围是 2–254，以保留出生空间。
 
 | 选项 | 作用 |
 |---|---|
 | `alias=<文本>` | 地图展示名，默认地图名 |
 | `group=<组ID>` | 地图组，默认地图名 |
 | `admin=<玩家名>` | 首位地图管理员，可省略但地图将没有管理员 |
-| `flat.height=<2–320>` | FLAT/SIFT 的世界总层数；NETHER/END 使用 2–254；底层基岩、泥土层、表层草方块 |
+| `flat.height=<2–320>` | 仅供 `flat` 生成器使用；`nether`/`the_end` 环境使用 2–254；底层基岩、泥土层、表层草方块 |
 | `seed=<数值>` | 世界种子 |
 | `structures=true\|false` | 是否生成结构 |
 | `biome=<生物群系>` | 设置生物群系 |
 | `generator=<生成器>`、`generator-settings=<参数>` | Multiverse 生成器配置 |
 | `property.<属性名>=<值>` | 设置 Multiverse 世界属性 |
 
-导入命令支持地图类型、`alias`、`group` 和 `admin`，不接受生成参数。导入世界须直接位于服务端根目录，并包含有效的 `level.dat`；版本高于当前服务器的数据会被拒绝。
+导入命令同样可指定生成器类型和环境，另支持 `alias`、`group` 和 `admin`，不接受生成参数。导入不会替换存档已有区块；所选环境和生成器用于 Multiverse 配置及后续新生成区块。导入世界须直接位于服务端根目录，并包含有效的 `level.dat`；版本高于当前服务器的数据会被拒绝。
 
 ## 地图规则与准入
 

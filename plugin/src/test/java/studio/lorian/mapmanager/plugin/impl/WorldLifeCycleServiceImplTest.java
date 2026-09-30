@@ -3,80 +3,132 @@ package studio.lorian.mapmanager.plugin.impl;
 import org.bukkit.World;
 import org.junit.jupiter.api.Test;
 import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
-import studio.lorian.mapmanager.plugin.internal.world.FlatChunkGenerator;
+import org.mvplugins.multiverse.core.world.options.ImportWorldOptions;
 import studio.lorian.mapmanager.api.model.CreateMapRequest;
+import studio.lorian.mapmanager.api.model.Environment;
+import studio.lorian.mapmanager.api.model.ImportMapRequest;
 import studio.lorian.mapmanager.api.model.WorldType;
+import studio.lorian.mapmanager.plugin.internal.world.FlatChunkGenerator;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorldLifeCycleServiceImplTest {
     @Test
-    void siftCreationReusesFlatWorldGenerationOptions() {
-        CreateWorldOptions flat = options(WorldType.FLAT);
-        CreateWorldOptions sift = options(WorldType.SIFT);
+    void creationCombinesEachGeneratorWithEveryImplementedEnvironment() {
+        for (Environment environment : implementedEnvironments()) {
+            CreateWorldOptions flat = createOptions(WorldType.FLAT, environment);
+            assertEquals(org.bukkit.WorldType.FLAT, flat.worldType());
+            assertEquals(toBukkit(environment), flat.environment());
+            if (environment == Environment.NORMAL) {
+                assertNull(flat.generator());
+            } else {
+                assertFlatGenerator(flat.generator());
+            }
 
-        assertFlatGenerationOptions(flat, sift);
-        assertEquals(World.Environment.NORMAL, sift.environment());
-        assertEquals(flat.generator(), sift.generator());
-        assertTrue(sift.generatorSettings().contains("minecraft:bedrock"));
-        assertTrue(sift.generatorSettings().contains("minecraft:grass_block"));
+            CreateWorldOptions normal = createOptions(WorldType.NORMAL, environment);
+            assertEquals(org.bukkit.WorldType.NORMAL, normal.worldType());
+            assertEquals(toBukkit(environment), normal.environment());
+            assertNull(normal.generator());
+
+            CreateWorldOptions voidWorld = createOptions(WorldType.VOID, environment);
+            assertEquals(org.bukkit.WorldType.FLAT, voidWorld.worldType());
+            assertEquals(toBukkit(environment), voidWorld.environment());
+            assertEquals("VoidGen:{}", voidWorld.generator());
+        }
     }
 
     @Test
-    void netherAndEndReuseFlatGenerationOptionsWithTheirOwnEnvironments() {
-        CreateWorldOptions flat = options(WorldType.FLAT);
-        CreateWorldOptions nether = options(WorldType.NETHER);
-        CreateWorldOptions end = options(WorldType.END);
+    void importCombinesEachGeneratorWithEveryImplementedEnvironment() {
+        for (Environment environment : implementedEnvironments()) {
+            ImportWorldOptions flat = importOptions(WorldType.FLAT, environment);
+            assertEquals(toBukkit(environment), flat.environment());
+            assertFlatGenerator(flat.generator());
+            assertEquals("@single:minecraft:plains", flat.biome());
 
-        assertFlatGenerationOptions(flat, nether);
-        assertFlatGenerationOptions(flat, end);
-        assertNotNull(nether.generator());
-        assertNotNull(end.generator());
-        assertTrue(nether.generator().startsWith("MapManager-Core:flat:"));
-        assertTrue(end.generator().startsWith("MapManager-Core:flat:"));
-        new FlatChunkGenerator(nether.generator().substring("MapManager-Core:".length()));
-        new FlatChunkGenerator(end.generator().substring("MapManager-Core:".length()));
-        assertEquals(World.Environment.NETHER, nether.environment());
-        assertEquals(World.Environment.THE_END, end.environment());
+            ImportWorldOptions normal = importOptions(WorldType.NORMAL, environment);
+            assertEquals(toBukkit(environment), normal.environment());
+            assertNull(normal.generator());
+
+            ImportWorldOptions voidWorld = importOptions(WorldType.VOID, environment);
+            assertEquals(toBukkit(environment), voidWorld.environment());
+            assertEquals("VoidGen:{}", voidWorld.generator());
+        }
     }
 
     @Test
-    void netherAndEndRejectFlatLayersAboveTheirSafeBuildHeight() {
-        assertThrows(IllegalArgumentException.class, () -> options(WorldType.NETHER, 255));
-        assertThrows(IllegalArgumentException.class, () -> options(WorldType.END, 255));
+    void siftEnvironmentIsReservedUntilSupported() {
+        assertThrows(IllegalArgumentException.class, () -> createOptions(WorldType.FLAT, Environment.SIFT));
+        assertThrows(IllegalArgumentException.class, () -> importOptions(WorldType.FLAT, Environment.SIFT));
     }
 
     @Test
-    void netherAndEndRejectCustomGeneratorSettingsOutsideTheirHeightRange() {
+    void flatHeightLimitsFollowTheSelectedEnvironment() {
+        assertEquals(320, FlatChunkGenerator.totalHeight(
+                createOptions(WorldType.FLAT, Environment.NORMAL, 320).generatorSettings()));
+        for (Environment environment : new Environment[]{Environment.NETHER, Environment.THE_END}) {
+            assertEquals(254, FlatChunkGenerator.totalHeight(
+                    createOptions(WorldType.FLAT, environment, 254).generatorSettings()));
+            assertThrows(IllegalArgumentException.class,
+                    () -> createOptions(WorldType.FLAT, environment, 255));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> createOptions(WorldType.FLAT, Environment.NORMAL, 321));
+    }
+
+    @Test
+    void flatHeightIsRejectedForOtherGeneratorTypes() {
+        for (WorldType type : new WorldType[]{WorldType.NORMAL, WorldType.VOID}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> WorldLifeCycleServiceImpl.options(new CreateMapRequest("test", "Test", "test", null,
+                            type, Environment.NORMAL, Map.of("flat.height", "64"))));
+        }
+    }
+
+    @Test
+    void customFlatSettingsRespectTheSelectedDimensionHeight() {
         CreateMapRequest request = new CreateMapRequest("sift-test", "SIFT Test", "sift-test", null,
-                WorldType.NETHER, Map.of("generator-settings", "{\"layers\":[{\"block\":\"stone\",\"height\":255}]}"));
+                WorldType.FLAT, Environment.THE_END,
+                Map.of("generator-settings", "{\"layers\":[{\"block\":\"stone\",\"height\":255}]}"));
 
         assertThrows(IllegalArgumentException.class, () -> WorldLifeCycleServiceImpl.options(request));
     }
 
-    private static void assertFlatGenerationOptions(CreateWorldOptions flat, CreateWorldOptions generated) {
-        assertEquals(flat.worldType(), generated.worldType());
-        assertEquals(flat.seed(), generated.seed());
-        assertEquals(flat.generateStructures(), generated.generateStructures());
-        assertEquals(flat.biome(), generated.biome());
-        assertEquals(flat.generatorSettings(), generated.generatorSettings());
-        assertEquals(flat.worldPropertyStrings(), generated.worldPropertyStrings());
+    private static Environment[] implementedEnvironments() {
+        return new Environment[]{Environment.NORMAL, Environment.NETHER, Environment.THE_END};
     }
 
-    private static CreateWorldOptions options(WorldType type) {
-        return options(type, 64);
+    private static World.Environment toBukkit(Environment environment) {
+        return switch (environment) {
+            case NORMAL -> World.Environment.NORMAL;
+            case NETHER -> World.Environment.NETHER;
+            case THE_END -> World.Environment.THE_END;
+            case SIFT -> throw new IllegalArgumentException("SIFT is not supported yet");
+        };
     }
 
-    private static CreateWorldOptions options(WorldType type, int height) {
+    private static CreateWorldOptions createOptions(WorldType type, Environment environment) {
         return WorldLifeCycleServiceImpl.options(new CreateMapRequest(
-                "sift-test", "SIFT Test", "sift-test", null, type,
-                Map.of("flat.height", Integer.toString(height), "seed", "42", "structures", "true",
-                        "biome", "minecraft:desert",
-                        "property.keep-spawn-in-memory", "true")));
+                "combo-test", "Combo Test", "combo-test", null, type, environment, Map.of()));
+    }
+
+    private static CreateWorldOptions createOptions(WorldType type, Environment environment, int height) {
+        return WorldLifeCycleServiceImpl.options(new CreateMapRequest(
+                "combo-test", "Combo Test", "combo-test", null, type, environment,
+                Map.of("flat.height", Integer.toString(height))));
+    }
+
+    private static ImportWorldOptions importOptions(WorldType type, Environment environment) {
+        return WorldLifeCycleServiceImpl.importOptions(new ImportMapRequest(
+                "combo-test", "Combo Test", "combo-test", null, type, environment));
+    }
+
+    private static void assertFlatGenerator(String generator) {
+        assertTrue(generator.startsWith("MapManager-Core:flat:"));
+        new FlatChunkGenerator(generator.substring("MapManager-Core:".length()));
     }
 }

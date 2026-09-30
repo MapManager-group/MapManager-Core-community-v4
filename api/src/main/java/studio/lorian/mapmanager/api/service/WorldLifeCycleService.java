@@ -10,7 +10,7 @@ public interface    WorldLifeCycleService {
     /**
      * 创建世界并将其注册为 MMC 地图。
      *
-     * @param request 创建参数和初始所有者
+     * @param request 创建参数、生成器类型、维度环境和初始所有者
      * @return 创建后的地图，或操作失败结果
      */
     OperationResult<MapInstance> create(CreateMapRequest request);
@@ -18,7 +18,7 @@ public interface    WorldLifeCycleService {
     /**
      * 导入服务端根目录下包含 {@code level.dat} 的已有世界，并将其注册为 MMC 地图。
      *
-     * @param request 导入参数和初始所有者
+     * @param request 导入参数、生成器类型、维度环境和初始所有者
      * @return 导入后的地图，或操作失败结果
      */
     OperationResult<MapInstance> importWorld(ImportMapRequest request);
