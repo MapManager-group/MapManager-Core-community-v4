@@ -35,8 +35,9 @@ mvn clean package
 | UNIT-MIG-01 至 UNIT-MIG-02       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationSourceTest.java` | v3 地图、组、角色范围和物理/爆炸设置解析；组地图清单不一致时拒绝                                              |
 | UNIT-MSG-01 至 UNIT-MSG-03       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文资源与安全占位符、缺项中文回退、占位参数校验                                                              |
 | UNIT-CONFIG-01 至 UNIT-CONFIG-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageConfigTest.java`       | JSON 默认值、MySQL 配置读取与空白裁剪、未知类型及必填项/端口/数据库名校验                                     |
+| UNIT-LIFE-01 至 UNIT-LIFE-04     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | SIFT 复用平坦参数；NETHER/END 生成器编码和环境映射；拒绝超过维度安全层高的预设及自定义层设置                    |
 
-当前共 33 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。服务注册事件/插件类路径、Bukkit 事件、Multiverse/LuckPerms 实际写入、MySQL 建表及完整启动迁移仍需真实集成环境，不纳入这批单元测试。
+当前共 37 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。服务注册事件/插件类路径、Bukkit 事件、Multiverse/LuckPerms 实际写入、MySQL 建表及完整启动迁移仍需真实集成环境，不纳入这批单元测试。
 
 ## 启动、配置与本地化
 
@@ -78,8 +79,8 @@ mvn clean package
 | LIFE-04 | 在 `arena` 所在组创建 `arena2`                                             | 共用同一组；组的地图列表包含两张图，组管理员/建筑者对两图生效                                                            |
 | LIFE-05 | 创建地图时省略 alias/group                                                 | 两者均使用世界名                                                                                                         |
 | LIFE-06 | 创建地图时提供带 Minecraft 颜色代码的 alias                                | 保存别名文本时去掉颜色代码；MV 别名根据公开状态附加颜色                                                                  |
-| LIFE-07 | 逐一使用 flat、sift、normal、void、nether、end 创建                        | MV 世界类型/环境与请求匹配；SIFT、NETHER、END 生成选项与 FLAT 相同，NETHER/END 仅环境不同；虚空创建按配置要求 VoidGen   |
-| LIFE-08 | flat/sift/nether/end 创建使用合法 `flat.height=2`、`320`                   | 四种类型的边界值均通过校验并创建                                                                                         |
+| LIFE-07 | 逐一使用 flat、sift、normal、void、nether、end 创建                        | MV 世界类型/环境与请求匹配；SIFT 复用原版 FLAT；NETHER/END 用内置平坦区块生成器复用 FLAT 层设置，只改变环境；虚空按配置要求 VoidGen |
+| LIFE-08 | FLAT/SIFT 使用 `flat.height=2`、`320`；NETHER/END 使用 `2`、`254`          | 各环境在自身可安全生成和出生的高度范围内通过校验；超过各自上限拒绝                                                                 |
 | LIFE-09 | flat.height 使用 `0`、`1`、`321` 或非数字                                  | 返回 INVALID_INPUT；不创建世界，不留下 PENDING 地图                                                                      |
 | LIFE-10 | structures 分别使用 `true`、`false`、其他文本                              | 两个布尔值映射正确；其他文本拒绝，世界不创建                                                                             |
 | LIFE-11 | 在 NORMAL/VOID 使用 `flat.height`；在 FLAT/SIFT/NETHER/END 同时提供 `flat.height` 与 `generator-settings` | 分别拒绝创建，错误信息指向参数冲突/适用类型                                                                      |
@@ -100,6 +101,8 @@ mvn clean package
 | LIFE-26 | 对已加载且已登记地图执行 `/world init <name>`                              | 控制台重放 MV 与 gamerule 初始化；不重建角色、不改变地图状态；返回成功                                                   |
 | LIFE-27 | init 目标不存在、未登记或未加载                                            | 分别返回 MAP_NOT_FOUND 或 WORLD_NOT_FOUND；不产生其他世界变更                                                            |
 | LIFE-28 | init 名称含非法字符或由玩家执行                                            | 返回 INVALID_INPUT/NO_PERMISSION；不执行 MV 操作                                                                         |
+| LIFE-29 | 在 NETHER/END 创建 `flat.height=64` 或自定义 `generator-settings`；保存后检查区块调色板和 Environment | 分别生成预期平坦层和 biome；NETHER/END 环境保留；非法方块、非法 JSON 和总层高超过 254 在写入地图记录前拒绝 |
+| LIFE-30 | 创建 NETHER/END 平坦地图后重启服务器，确认 MapManager-Core 先于 Multiverse-Core 启用；进入新坐标并检查新区块 | Multiverse 成功解析持久化生成器 ID；新生成区块层设置和 biome 正确，Environment 仍为 NETHER/END |
 
 ## 地图设置、别名与事件
 

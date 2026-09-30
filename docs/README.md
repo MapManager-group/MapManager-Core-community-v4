@@ -140,16 +140,16 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 | `/world setspawn` | 当前地图管理员 | 将当前位置设为地图出生点 |
 | `/world kick <在线玩家>` | 当前地图管理员 | 将同一地图中的目标玩家送到 Multiverse 默认世界出生点 |
 
-创建命令支持类型 `flat`、`sift`、`normal`、`void`、`nether`、`end`。`sift`、`nether` 和 `end` 当前复用 `flat` 的生成逻辑，其中 `nether`、`end` 仅改变 Bukkit 环境；`flat.height` 对 `flat`、`sift`、`nether` 和 `end` 均可用。创建命令还支持以下选项：
+创建命令支持类型 `flat`、`sift`、`normal`、`void`、`nether`、`end`。`sift` 使用 FLAT 生成器；`nether` 和 `end` 用内置区块生成器铺设 FLAT 层，同时保留对应 Bukkit 环境。创建命令还支持以下选项：
 
-地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 类型需要安装 VoidGen。`flat.height` 仅适用于 `flat`、`sift`、`nether` 和 `end` 类型，且不能同时使用 `generator-settings`；它表示地形总层数，从底到顶为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。
+地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 类型需要安装 VoidGen。`flat.height` 仅适用于 `flat`、`sift`、`nether` 和 `end` 类型，且不能同时使用 `generator-settings`；它表示地形总层数，从底到顶为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。FLAT/SIFT 的范围是 2–320，NETHER/END 的范围是 2–254；后两者的自定义生成设置总层高也不能超过 254，以保留出生空间。
 
 | 选项 | 作用 |
 |---|---|
 | `alias=<文本>` | 地图展示名，默认地图名 |
 | `group=<组ID>` | 地图组，默认地图名 |
 | `admin=<玩家名>` | 首位地图管理员，可省略但地图将没有管理员 |
-| `flat.height=<2–320>` | FLAT/SIFT/NETHER/END 世界总层数；底层基岩、泥土层、表层草方块 |
+| `flat.height=<2–320>` | FLAT/SIFT 的世界总层数；NETHER/END 使用 2–254；底层基岩、泥土层、表层草方块 |
 | `seed=<数值>` | 世界种子 |
 | `structures=true\|false` | 是否生成结构 |
 | `biome=<生物群系>` | 设置生物群系 |

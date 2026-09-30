@@ -167,7 +167,7 @@ public final class MapTeleportExample extends JavaPlugin {
 - `worldLifeCycle().initialize(worldName)` 重放已加载 MMC 地图的 Multiverse 属性和 gamerule。
 - `worldLifeCycle().delete(worldName)` 删除地图及世界；受 `deletion.allowed-world-name-regex` 限制，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。
 
-生命周期操作必须在主线程调用。创建请求中的 `ownerId` 可为 null；若为空，地图不会自动获得首位管理员。创建/导入的初始设置为物理开启、爆炸关闭、私有。`CreateMapRequest` 和 `ImportMapRequest` 的便利构造器默认 `WorldType.FLAT`；需要其他类型时显式传入 `WorldType`。`SIFT`、`NETHER` 和 `END` 创建时复用 `FLAT` 生成逻辑；`NETHER` 与 `END` 仅切换 Bukkit 环境。`flat.height` 仅用于创建 `FLAT`、`SIFT`、`NETHER` 和 `END` 类型地图；导入不接受生成参数。按需加载、操作崩溃恢复和自动补偿目前不属于已实现 API。
+生命周期操作必须在主线程调用。创建请求中的 `ownerId` 可为 null；若为空，地图不会自动获得首位管理员。创建/导入的初始设置为物理开启、爆炸关闭、私有。`CreateMapRequest` 和 `ImportMapRequest` 的便利构造器默认 `WorldType.FLAT`；需要其他类型时显式传入 `WorldType`。`SIFT` 使用 FLAT 生成器；`NETHER` 和 `END` 由内置区块生成器复用 FLAT 层设置，并保留对应 Bukkit 环境。`flat.height` 仅用于创建 `FLAT`、`SIFT`、`NETHER` 和 `END` 类型地图；FLAT/SIFT 范围为 2–320，NETHER/END 范围为 2–254；导入不接受生成参数。按需加载、操作崩溃恢复和自动补偿目前不属于已实现 API。
 
 ### 世界版本
 

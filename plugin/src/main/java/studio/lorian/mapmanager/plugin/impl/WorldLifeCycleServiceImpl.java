@@ -2,11 +2,14 @@ package studio.lorian.mapmanager.plugin.impl;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
 import org.bukkit.GameMode;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.World;
 import org.bukkit.entity.SpawnCategory;
 import org.mvplugins.multiverse.core.MultiverseCoreApi;
@@ -39,9 +42,11 @@ import studio.lorian.mapmanager.plugin.internal.storage.OperationStage;
 import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageException;
 import studio.lorian.mapmanager.plugin.internal.world.WorldGatewayImpl;
+import studio.lorian.mapmanager.plugin.internal.world.FlatChunkGenerator;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -184,7 +189,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         if (params.containsKey("flat.height") && params.containsKey("generator-settings"))
             throw new IllegalArgumentException(Messages.text("errors.flat_generator_conflict"));
         if (params.containsKey("seed")) options.seed(Long.parseLong(params.get("seed")));
-        if (params.containsKey("biome")) options.biome(params.get("biome"));
+        if (params.containsKey("biome")) options.biome(biomeProvider(params.get("biome")));
         if (params.containsKey("generator")) options.generator(params.get("generator"));
         if (params.containsKey("generator-settings")) options.generatorSettings(params.get("generator-settings"));
         Map<String, String> properties = new HashMap<>();
@@ -194,15 +199,23 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         if (!properties.isEmpty()) options.worldPropertyStrings(properties);
         switch (type) {
             case FLAT, SIFT, NETHER, END -> {
+                // 非主世界维度
+                boolean OtherDimensionsEnvironment = type == WorldType.NETHER || type == WorldType.END || type == WorldType.SIFT;
                 World.Environment environment = switch (type) {
                     case NETHER -> World.Environment.NETHER;
                     case END -> World.Environment.THE_END;
                     default -> World.Environment.NORMAL;
                 };
                 options.worldType(org.bukkit.WorldType.FLAT).environment(environment);
+                String flatSettings = params.get("generator-settings");
+                // 限制不同维度的平坦地图生成高度
+                int flatHeightLimit = OtherDimensionsEnvironment ? 254 : 320;
                 if (params.containsKey("flat.height")) {
                     int height = Integer.parseInt(params.get("flat.height"));
-                    if (height < 2 || height > 320) throw new IllegalArgumentException(Messages.text("errors.flat_height_range"));
+                    if (height < 2 || height > flatHeightLimit) {
+                        String key = OtherDimensionsEnvironment ? "errors.flat_dimension_height_range" : "errors.flat_height_range";
+                        throw new IllegalArgumentException(Messages.text(key));
+                    }
                     JsonObject settings = new JsonObject();
                     JsonArray layers = new JsonArray();
                     JsonObject bedrockLayer = new JsonObject();
@@ -221,7 +234,25 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     layers.add(grassLayer);
                     settings.add("layers", layers);
                     settings.addProperty("biome", params.getOrDefault("biome", "minecraft:plains"));
-                    options.generatorSettings(settings.toString());
+                    flatSettings = settings.toString();
+                }
+                if (OtherDimensionsEnvironment) {
+                    if (flatSettings == null) flatSettings = defaultFlatSettings();
+                    // Paper's vanilla flat generator ignores generator-settings for Nether and End environments.
+                    String generatorId = FlatChunkGenerator.generatorId(flatSettings);
+                    long layerHeight = FlatChunkGenerator.totalHeight(flatSettings);
+                    if (layerHeight < 2 || layerHeight > flatHeightLimit)
+                        throw new IllegalArgumentException(Messages.text("errors.flat_dimension_height_range"));
+                    options.generatorSettings(flatSettings);
+                    if (!params.containsKey("biome")) {
+                        String settingsBiome = flatSettingsBiome(flatSettings);
+                        options.biome(biomeProvider(settingsBiome == null ? "minecraft:plains" : settingsBiome));
+                    }
+                    if (!params.containsKey("generator")) {
+                        options.generator("MapManager-Core:" + generatorId);
+                    }
+                } else if (flatSettings != null) {
+                    options.generatorSettings(flatSettings);
                 }
             }
             case NORMAL -> options.worldType(org.bukkit.WorldType.NORMAL).environment(World.Environment.NORMAL);
@@ -233,6 +264,39 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             }
         }
         return options;
+    }
+
+    private static String biomeProvider(String biome) {
+        NamespacedKey key = NamespacedKey.fromString(biome);
+        if (key == null) return biome;
+        if (Bukkit.getServer() == null) {
+            return key.getNamespace().equals("minecraft") ? "@single:" + key : biome;
+        }
+        if (Registry.BIOME.get(key) != null) return "@single:" + key;
+        if (key.getNamespace().equals("minecraft"))
+            throw new IllegalArgumentException("Unknown Minecraft biome: " + key);
+        return biome;
+    }
+
+    private static String flatSettingsBiome(String settings) {
+        JsonObject json = JsonParser.parseString(settings).getAsJsonObject();
+        return json.has("biome") && json.get("biome").isJsonPrimitive()
+                ? json.get("biome").getAsString() : null;
+    }
+
+    private static String defaultFlatSettings() {
+        JsonObject settings = new JsonObject();
+        JsonArray layers = new JsonArray();
+        for (var layer : List.of(Map.entry("minecraft:bedrock", 1), Map.entry("minecraft:dirt", 2),
+                Map.entry("minecraft:grass_block", 1))) {
+            JsonObject jsonLayer = new JsonObject();
+            jsonLayer.addProperty("block", layer.getKey());
+            jsonLayer.addProperty("height", layer.getValue());
+            layers.add(jsonLayer);
+        }
+        settings.add("layers", layers);
+        settings.addProperty("biome", "minecraft:plains");
+        return settings.toString();
     }
 
     @Override

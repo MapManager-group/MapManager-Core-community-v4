@@ -146,6 +146,7 @@ errors:
   flat_only: flat.height is only supported for FLAT, SIFT, NETHER, or END worlds
   flat_generator_conflict: flat.height and generator-settings cannot be set together
   flat_height_range: flat.height must be between 2 and 320
+  flat_dimension_height_range: flat.height in NETHER and END worlds, and their generator-settings layers, must total between 2 and 254 blocks
   voidgen_required: VOID worlds require VoidGen
   mv_alias_failed: 'Multiverse alias sync failed: <world>'
   bukkit_world_unloaded: 'Bukkit world is not loaded: <world>'

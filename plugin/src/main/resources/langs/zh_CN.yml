@@ -146,6 +146,7 @@ errors:
   flat_only: flat.height 仅支持 FLAT、SIFT、NETHER 或 END 世界
   flat_generator_conflict: flat.height 与 generator-settings 不能同时设置
   flat_height_range: flat.height 必须在 2-320 之间
+  flat_dimension_height_range: NETHER 和 END 的 flat.height 及 generator-settings 层总高度必须在 2-254 格之间
   voidgen_required: VOID 世界需要 VoidGen
   mv_alias_failed: 'Multiverse 别名同步失败：<world>'
   bukkit_world_unloaded: 'Bukkit 世界未加载：<world>'

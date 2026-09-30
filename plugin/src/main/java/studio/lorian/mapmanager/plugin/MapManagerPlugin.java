@@ -2,6 +2,12 @@ package studio.lorian.mapmanager.plugin;
 
 import net.luckperms.api.LuckPerms;
 import org.bukkit.Bukkit;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.PluginEnableEvent;
+import org.bukkit.generator.ChunkGenerator;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.api.MapManager;
@@ -18,6 +24,7 @@ import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjectionIm
 import studio.lorian.mapmanager.plugin.internal.storage.JsonStorage;
 import studio.lorian.mapmanager.plugin.internal.storage.MySqlStorage;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageConfig;
+import studio.lorian.mapmanager.plugin.internal.world.FlatChunkGenerator;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +35,18 @@ import java.util.regex.Pattern;
 /** Paper 插件入口；加载配置和选定的持久化后端。 */
 public final class MapManagerPlugin extends JavaPlugin {
     private MapManagerImpl api;
+
+    @Override
+    public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
+        if (id == null || !id.startsWith("flat:")) return null;
+        try {
+            return new FlatChunkGenerator(id);
+        } catch (IllegalArgumentException exception) {
+            getLogger().warning("Invalid flat generator settings for world " + worldName + ": "
+                    + exception.getMessage());
+            return null;
+        }
+    }
 
     @Override
     public void onEnable() {
@@ -64,8 +83,7 @@ public final class MapManagerPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new MapSettingsListener(repository), this);
             getLogger().info(Messages.text("startup.storage_loaded", "backend", selected));
             Path oldDirectory = getDataFolder().getParentFile().toPath().resolve("MapManager-Core");
-            CompletableFuture<String> migration = new V3Migration(
-                    oldDirectory, directory, repository, repository, players, luckPerms).migrate();
+            CompletableFuture<String> migration = new CompletableFuture<>();
             CompletableFuture<Boolean> worldBase = projection.ensureWorldBase();
             migration.whenComplete((message, error) -> {
                 if (error != null && isEnabled()) {
@@ -85,6 +103,17 @@ public final class MapManagerPlugin extends JavaPlugin {
                     }
                 } else {
                     getLogger().info(Messages.text(created ? "startup.worldbase_created" : "startup.worldbase_exists"));
+                }
+            });
+            whenPluginEnabled("Multiverse-Core", () -> {
+                try {
+                    new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms)
+                            .migrate().whenComplete((message, error) -> {
+                                if (error != null) migration.completeExceptionally(error);
+                                else migration.complete(message);
+                            });
+                } catch (Exception exception) {
+                    migration.completeExceptionally(exception);
                 }
             });
             CompletableFuture.allOf(migration, worldBase).whenComplete((ignored, error) -> {
@@ -113,5 +142,22 @@ public final class MapManagerPlugin extends JavaPlugin {
     public void onDisable() {
         if (api != null) Bukkit.getServicesManager().unregister(MapManager.class, api);
         api = null;
+    }
+
+    private void whenPluginEnabled(String pluginName, Runnable action) {
+        Plugin dependency = getServer().getPluginManager().getPlugin(pluginName);
+        if (dependency != null && dependency.isEnabled()) {
+            action.run();
+            return;
+        }
+        Listener listener = new Listener() {
+            @EventHandler
+            public void onPluginEnable(PluginEnableEvent event) {
+                if (!event.getPlugin().getName().equalsIgnoreCase(pluginName)) return;
+                HandlerList.unregisterAll(this);
+                action.run();
+            }
+        };
+        getServer().getPluginManager().registerEvents(listener, this);
     }
 }

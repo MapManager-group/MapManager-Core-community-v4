@@ -26,7 +26,7 @@ MapManager-v4/
 │     │     ├─ permission/                    LuckPerms worldbase 投影
 │     │     ├─ player/                        Paper 玩家适配
 │     │     ├─ storage/                       内部仓储接口、JSON/MySQL 实现
-│     │     └─ world/                         世界目录查询及版本检查
+│     │     └─ world/                         世界目录查询、版本检查及特殊环境平坦区块生成器
 │     └─ resources/                           config.yml、paper-plugin.yml、langs/*.yml
 │  └─ src/test/java/                           服务规则、JSON 存储和目录适配器单元测试
 ├─ AGENTS.md                                 任务入口和强制项目边界
@@ -53,7 +53,7 @@ MapManager-v4/
 
 | 入口或方法 | 直接依赖 | 结果或副作用 |
 |---|---|---|
-| `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；`V3Migration`；`Messages`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl`；`access-control.strict-map-entry` | 装配服务并注册地图设置/准入监听；存储迁移和 `worldbase` 初始化均成功后，在主线程注册 `MapManager` 服务、复核在线玩家并注册命令 |
+| `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；`V3Migration`；`Messages`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl`；`access-control.strict-map-entry` | MapManager-Core 先于 Multiverse-Core 启用以注册可持久化的自定义生成器；v3 迁移等待 Multiverse-Core 启用后执行；存储迁移和 `worldbase` 初始化均成功后，在主线程注册 `MapManager` 服务、复核在线玩家并注册命令 |
 | `Messages` | `config.yml` 的 `language`、插件数据目录 `langs/<语言代码>.yml`、内置中文资源 | 生成 MiniMessage Component；缺项回退中文，日志与异常使用纯文本 |
 | `V3Migration.migrate` | `V3MigrationSourceImpl`、LP 默认组只读节点、MV 别名/出生点只读元数据、`PlayerGateway.resolveId`、`MapRepository`、`RoleRepository` | 校验并备份 v3 JSON；UUID 全部解析成功后写入 MMC 存储，成功写完成标记；不写 LP 或 MV |
 | `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家与服务端世界目录 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标；`/wtp` 包含公开地图 |
@@ -63,7 +63,7 @@ MapManager-v4/
 | `MapAccessListener` | `PlayerTeleportEvent`、`PlayerChangedWorldEvent`、`PlayerJoinEvent`、`PlayerRespawnEvent`；`MapService`；`MapAccessService`；MV 默认世界 | 严格校验开启时预先拦截并在事件后复核地图进入；加入和重生时检查；撤权后复核当前地图；无法安全送回默认世界时断开连接 |
 | `MapWorldCommand.public/setname/setspawn` | 当前 MMC 地图、`MapAccessService`、`MapSettingsService` | 只允许当前地图管理员修改公开状态、显示名和出生点；出生点取玩家当前位置并同步 MMC、Bukkit 与 Multiverse |
 | `MapSettingsServiceImpl.setSpawn` | `MapRepository`、Bukkit `World`、Multiverse `MultiverseWorld` | 先持久化 MMC 出生点，再更新 Bukkit 和 Multiverse 出生点并保存 Multiverse 配置；外部同步失败返回 `Partial` |
-| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 导入前校验 `level.dat` 版本；导入请求不接收生成参数；创建或导入地图后写入首位管理员、初始化地图并转换状态 |
+| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`FlatChunkGenerator`、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 导入前校验 `level.dat` 版本；导入请求不接收生成参数；创建时 SIFT 使用 FLAT 类型，NETHER/END 用 `FlatChunkGenerator` 生成相同平坦层并保留对应环境；地图后续写入首位管理员、初始化并转换状态 |
 | `MapWorldCommand.delete` → `WorldLifeCycleServiceImpl.delete` | 控制台一次性确认码、删除名称正则、`WorldGateway`、Bukkit、Multiverse、操作记录、`WorldBaseProjection`、地图与角色存储 | 首次输入地图名取得 10 秒有效的 6 位确认码；二次输入确认码后检查 MV 默认世界、服务器首个加载世界、在线玩家和目录；删除世界后清理 LP 投影与 MMC 数据；失败保留 `DELETING` 供重试 |
 | `MapTravelServiceImpl.teleport` | `MapAccessService`、`MapRepository`、`PlayerGateway` | 准入通过后传送到已加载世界；按需加载尚未实现 |
 | `MapWorldCommand.kick` → `MapTravelServiceImpl.kickFromMap` | Bukkit 在线玩家、内部地图存储、`MapAccessService.decide`、Multiverse 默认世界 | 服务按操作者当前世界定位地图，确认管理员及目标在同图，再使用 MV 默认世界出生点传送 |

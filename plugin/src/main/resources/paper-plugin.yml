@@ -12,7 +12,7 @@ dependencies:
       required: true
       join-classpath: true
     Multiverse-Core:
-      load: BEFORE
+      load: AFTER
       required: true
       join-classpath: true
     VoidGen:
