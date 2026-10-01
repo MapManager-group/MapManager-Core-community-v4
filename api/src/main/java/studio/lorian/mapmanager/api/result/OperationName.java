@@ -12,6 +12,8 @@ public enum OperationName {
     DELETE,
     /** 将世界加载到服务器。 */
     LOAD,
+    /** 继续持久化记录中的未完成生命周期操作。 */
+    RECOVER,
     /** 向玩家授予地图角色。 */
     ADD_MEMBER,
     /** 撤销玩家的地图角色。 */

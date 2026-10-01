@@ -43,7 +43,7 @@ public interface PlayerGateway {
     boolean teleport(UUID playerId, SpawnPoint point);
 
     /**
-     * 断开在线玩家的连接。
+     * 在主线程断开在线玩家的连接；异步调用返回 false，原因按纯文本显示。
      *
      * @param playerId 玩家 UUID
      * @param reason 断开原因

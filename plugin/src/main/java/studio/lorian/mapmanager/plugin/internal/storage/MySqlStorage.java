@@ -103,6 +103,15 @@ public final class MySqlStorage implements MapRepository, RoleRepository, Operat
             }
         });
     }
+    @Override public List<MapGroup> allGroups() {
+        return inConnection(connection -> {
+            List<MapGroup> groups = new ArrayList<>();
+            try (Statement query = connection.createStatement(); ResultSet rows = query.executeQuery("SELECT id FROM mm_groups")) {
+                while (rows.next()) groups.add(findGroup(rows.getString(1)));
+            }
+            return List.copyOf(groups);
+        });
+    }
     @Override public void save(MapInstance map) {
         StorageValidation.map(map);
         inConnection(connection -> {
@@ -208,6 +217,15 @@ public final class MySqlStorage implements MapRepository, RoleRepository, Operat
         return inConnection(connection -> {
             List<OperationRecord> result = new ArrayList<>();
             try (Statement query = connection.createStatement(); ResultSet rows = query.executeQuery("SELECT * FROM mm_operations WHERE stage NOT IN ('COMPLETED','FAILED')")) {
+                while (rows.next()) result.add(readOperation(rows));
+            }
+            return List.copyOf(result);
+        });
+    }
+    @Override public List<OperationRecord> allOperations() {
+        return inConnection(connection -> {
+            List<OperationRecord> result = new ArrayList<>();
+            try (Statement query = connection.createStatement(); ResultSet rows = query.executeQuery("SELECT * FROM mm_operations")) {
                 while (rows.next()) result.add(readOperation(rows));
             }
             return List.copyOf(result);

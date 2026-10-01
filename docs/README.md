@@ -11,7 +11,7 @@ MapManager Core（MMC）是面向 Paper 服务器的地图管理插件。它管�
 - 使用 JSON 或 MySQL 保存地图和角色数据；可将 v3 的地图与角色数据迁移到 v4。
 - 向其他 Paper 插件注册 `MapManager` 服务。扩展插件接入方法见 [API_GUIDE.md](API_GUIDE.md)。
 
-当前未实现 PVP 开关、未加载世界的按需加载和空闲卸载、龙蛋传送保护，以及全局物理/爆炸覆盖。生命周期操作会记录执行阶段，但崩溃后的自动恢复尚未实现。
+已实现 ACTIVE 地图按需加载、完整请求落盘和启动恢复，以及 LP 持久队列重试。当前未实现 PVP 开关、空闲卸载、龙蛋传送保护和全局物理/爆炸覆盖；旧 PENDING 记录缺少完整请求时需人工核查。
 
 ## 安装
 
@@ -82,7 +82,7 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 
 建造权限由服务器管理员配置在 LuckPerms 的 `worldbase` 组中。MMC 负责将地图管理员/建筑者映射到地图组并投影到 LuckPerms；LuckPerms 不负责地图准入。已有 `worldbase` 组不会被插件覆盖，首次缺失时插件只创建该组并继承 `default`，不会替服务器配置具体建造权限。
 
-组角色变更会先写入 MMC，再投影到 LuckPerms。若 MMC 已保存但 LuckPerms 更新失败，命令会报告部分完成；重复相同的角色操作可再次尝试权限投影。
+组角色变更会先写入 MMC，再投影到 LuckPerms。若 MMC 已保存但 LuckPerms 更新失败，命令会报告部分完成；权限投影在持久队列中自动重试，重启后继续；待同步返回 Partial(PERMISSION_SYNC_PENDING)，MMC 角色已生效。
 
 建议创建或导入地图时通过 `admin=<玩家名>` 指定首位管理员。若省略该参数，地图不会自动分配管理员；之后只有 MMC 地图管理员能在游戏内授予角色。
 
@@ -91,7 +91,7 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 1. 在控制台创建地图并指定管理员：
 
    ```text
-   /world create buildworld flat normal alias=建筑地图 group=buildworld admin=Steve
+   /mapadmin create buildworld flat normal alias=建筑地图 group=buildworld admin=Steve
    ```
 
 2. 在地图组管理员所在的地图内授予角色：
@@ -124,11 +124,11 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 
 | 命令 | 使用者 | 说明 |
 |---|---|---|
-| `/world create <地图名> [生成器类型] [环境] [选项...]` | 控制台 | 创建并初始化地图；默认生成器为 `flat`，环境为 `normal` |
-| `/world import <地图名> [生成器类型] [环境] [选项...]` | 控制台 | 导入服务端根目录下的已有世界；默认生成器为 `flat`，环境为 `normal` |
-| `/world init <地图名>` | 控制台 | 对已加载的 MMC 地图重新应用初始化规则 |
-| `/world delete <地图名>` | 控制台 | 申请删除并取得一次性确认码；随后运行 `/world delete <6位确认码>`，须在 10 秒内完成 |
-| `/world tp <地图名>`、`/wtp <地图名>` | 玩家 | 传送到有权限进入的已加载地图 |
+| `/mapadmin create <地图名> [生成器类型] [环境] [选项...]` | 控制台 | 创建并初始化地图；默认生成器为 `flat`，环境为 `normal` |
+| `/mapadmin import <地图名> [生成器类型] [环境] [选项...]` | 控制台 | 导入服务端根目录下的已有世界；默认生成器为 `flat`，环境为 `normal` |
+| `/mapadmin init <地图名>` | 控制台 | 对已加载的 MMC 地图重新应用初始化规则 |
+| `/mapadmin delete <地图名>` | 控制台 | 申请删除并取得一次性确认码；随后运行 `/mapadmin delete <6位确认码>`，须在 10 秒内完成 |
+| `/world tp <地图名>`、`/wtp <地图名>` | 玩家 | 准入通过后按需加载 ACTIVE 地图并传送 |
 | `/world admin add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图组管理员 |
 | `/world builder add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图组建筑者 |
 | `/world visitor add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图访客 |
@@ -150,7 +150,7 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 |---|---|
 | `alias=<文本>` | 地图展示名，默认地图名 |
 | `group=<组ID>` | 地图组，默认地图名 |
-| `admin=<玩家名>` | 首位地图管理员，可省略但地图将没有管理员 |
+| `admin=<玩家名或UUID>` | 首位地图管理员，可省略但地图将没有管理员 |
 | `flat.height=<2–320>` | 仅供 `flat` 生成器使用；`nether`/`the_end` 环境使用 2–254；底层基岩、泥土层、表层草方块 |
 | `seed=<数值>` | 世界种子 |
 | `structures=true\|false` | 是否生成结构 |
@@ -200,3 +200,18 @@ mvn clean package
 - [v3 数据迁移说明](MIGRATION.md)
 - [存储后端说明](STORAGE.md)
 - [自动化测试与验收用例](TEST_CASES.md)
+
+## 运维与故障恢复
+
+以下命令仅控制台可执行；创建、导入、初始化和删除也统一使用 `/mapadmin`，参数见上方命令表。旧 `/world` 生命周期子命令已移除：
+
+| 命令 | 用途 |
+|---|---|
+| `/mapadmin load <地图>` | 加载已登记 ACTIVE 地图 |
+| `/mapadmin recover <地图>` | 按已保存请求继续创建/导入/删除 |
+| `/mapadmin operations` | 查看未完成与失败操作 |
+| `/mapadmin migration dry-run` | 预检 v3 数据，生成差异报告，不写目标 |
+| `/mapadmin migration apply` | 备份并迁移，失败后使用冻结计划恢复 |
+| `/mapadmin storage export <文件名>` | 导出地图、角色和全部操作快照 |
+
+重启自动恢复有完整请求的操作；删除恢复会核对目录身份，拒绝被替换的目录。LP 投影失败在后台自动重试，MMC 角色立即生效；全局 FIFO 中持续失败的任务会延后后续任务。导出仅含业务数据，完整备份须保留插件数据目录、世界文件和 MySQL 数据；显式切换存储见 [STORAGE.md](STORAGE.md)，迁移见 [MIGRATION.md](MIGRATION.md)。

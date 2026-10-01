@@ -1,7 +1,18 @@
 language: zh_CN # langs/<语言代码>.yml；缺失条目回退到内置 zh_CN
 
 storage:
-  type: json # json | mysql；切换后端不会自动迁移数据
+  type: json # json | mysql
+  # 显式后端迁移：变更 type 时填原后端 json/mysql；完成后清空。
+  migrate-from: ''
+  # 原后端为 MySQL 时填写原连接；与 storage-backend.txt 的目标必须一致。
+  migration-source:
+    mysql:
+      host: localhost
+      port: 3306
+      database: mapmanager
+      username: mapmanager
+      password: change-me
+      use-ssl: true
   mysql:
     host: localhost
     port: 3306
@@ -21,3 +32,7 @@ creation:
 access-control:
   # 严格校验地图进入权限；关闭后传送、登录、重生和撤权后的强制移出均停用。
   strict-map-entry: true
+
+migration:
+  # v3 迁移只生成差异报告；设置 false 或控制台执行 /mapadmin migration apply 才写入。
+  dry-run: false

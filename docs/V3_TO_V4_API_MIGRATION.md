@@ -117,7 +117,7 @@ public final class ExampleAddon extends JavaPlugin implements Listener {
 | `initWorld` | `worldLifeCycle().initialize(worldName)` | 需要已加载且已登记的地图。 |
 | `deleteWorld/removeWorld` | `worldLifeCycle().delete(worldName)` | 受配置中的删除名称正则、在线玩家、默认世界及目录安全检查限制。 |
 | `getVersionCheck()` | `worldVersions()` | 读取地图 dataVersion 并与服务器版本比较。 |
-| `getDynamicWorld().loadWorld/unloadWorldLater` | 暂无等价 API | v4 当前不提供按需加载和延迟卸载。目标世界须已加载才能通过 `travel().teleport` 传送。 |
+| `getDynamicWorld().loadWorld/unloadWorldLater` | `worldLifeCycle().load(worldName)` | v4 支持 ACTIVE 地图按需加载，`travel().teleport` 会先准入再加载；没有延迟卸载。 |
 | `getLuckPerms()` / `syncWithLuckPerms()` | 暂无对外替代 | LuckPerms 由 v4 plugin 内部用于投影 `worldbase` 建造权限；不要直接用 LP 同步 MMC 角色或判断进图权限。 |
 | `getMainYaml()`、`save()`、`reload()` | 暂无对外替代 | 扩展插件配置由扩展插件自己管理；MMC 服务修改会自动持久化。 |
 | `getNodeMap/getGroupMap` | `maps().listMaps()`、`maps().findGroup/listGroupMaps()` | v4 不暴露可变 repository/map；调用方改为读取快照并调用服务写入。 |
@@ -170,7 +170,7 @@ public final class ExampleAddon extends JavaPlugin {
 - `MapRoleService` 和多数设置方法不接收操作者参数，不会替扩展插件做管理员授权；在插件自己的命令/API 层验证操作者。
 - 生命周期、传送、踢出、别名、公开状态和出生点相关调用在服务器主线程执行。不要从异步回调直接操作 Bukkit/Multiverse。
 - 不再假设可通过 API 直接修改 LP、MV 实例、全局 YAML、JSON 文件或 repository。
-- 按需加载、延迟卸载、全局物理/爆炸覆盖、手动 save/reload/sync 目前没有 v4 API 替代；如扩展插件依赖这些行为，需要调整功能设计。
+- 延迟卸载、全局物理/爆炸覆盖、手动 save/reload/sync 目前没有 v4 API 替代；如扩展插件依赖这些行为，需要调整功能设计。
 
 ## 7. 迁移后的验收
 
@@ -179,3 +179,5 @@ public final class ExampleAddon extends JavaPlugin {
 3. 测试 MapManager 服务尚未注册、注册和撤销三个阶段；缓存服务引用需在撤销时清空。
 4. 测试不存在地图、非 ACTIVE 地图、未授权玩家、公开地图及已加载/未加载目标世界。
 5. 测试角色/设置 API 的操作者授权、`Partial` 结果处理和主线程调用。
+
+LP 投影现为持久化后台队列。角色和生命周期操作可返回 `Partial(PERMISSION_SYNC_PENDING)`：MMC 修改已经生效，LP 失败会自动重试；调用方应显示待同步结果并继续按 MMC 准入判断。生命周期新增 `recover(worldName)`，用于继续已有的完整请求；不能为缺少原始请求的旧 PENDING 记录猜测生成器或所有者。

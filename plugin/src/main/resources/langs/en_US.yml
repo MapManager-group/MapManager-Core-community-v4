@@ -12,6 +12,7 @@ operations:
   IMPORT: Import map
   INITIALIZE: Initialize map
   DELETE: Delete map
+  RECOVER: Recover map operation
   LOAD: Load map
   ADD_MEMBER: Add member
   REMOVE_MEMBER: Remove member
@@ -36,6 +37,7 @@ reasons:
   ACCESS_DENIED: Access to this map was denied
   WORLD_BACKEND_FAILED: World operation failed
   STORAGE_FAILED: Storage operation failed
+  PERMISSION_SYNC_PENDING: MMC changes are effective; permission projection is queued with automatic retries
   PERMISSION_SYNC_FAILED: Permission sync failed
   OPERATION_IN_PROGRESS: An operation is already in progress
   INTERNAL_ERROR: Internal error
@@ -50,16 +52,16 @@ access:
   recovery_failed: '<red>You could not be moved safely to the default world, so your connection was closed.'
 command:
   usage_wtp: 'Usage: /wtp <map>'
-  usage_world: 'Usage: /world <create|import|init|delete|tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: 'Usage: /world <tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
   setting_usage: '<red>Usage: /world <setting> [true|false|info]'
   setting_info: '<aqua>Current map <setting>: <value>'
   setname_usage: '<red>Usage: /world setname <name>'
   setspawn_usage: '<red>Usage: /world setspawn'
-  delete_usage: 'Usage: /world delete <map>, then run /world delete <confirmation code> within 10 seconds'
+  delete_usage: 'Usage: /mapadmin delete <map>, then run /mapadmin delete <confirmation code> within 10 seconds'
   delete_expired: '<red>The deletion code expired. Select the map again.'
   delete_wrong_code: '<red>Incorrect confirmation code. Use the six-character code from the previous step.'
   delete_name_denied: '<red>The map name does not match deletion.allowed-world-name-regex, or the code is invalid.'
-  delete_confirm: '<yellow>Confirm deletion of <world>: run /world delete <code> within 10 seconds'
+  delete_confirm: '<yellow>Confirm deletion of <world>: run /mapadmin delete <code> within 10 seconds'
   kicked: '<gray><operator> removed you from map <world>.'
   public_map: '<green>This map is public; everyone may visit.'
   members_header: '<aqua><role>s directly assigned to <world> (<count>):'
@@ -152,3 +154,23 @@ errors:
   mv_alias_failed: 'Multiverse alias sync failed: <world>'
   bukkit_world_unloaded: 'Bukkit world is not loaded: <world>'
   gamerule_failed: 'Could not set gamerule: <rule>'
+
+maintenance:
+  usage: 'Usage: /mapadmin create|import|init|delete|load|recover <world>; operations; migration dry-run|apply; storage export <filename>'
+  failed: 'Maintenance failed: <error>'
+  no_operations: No pending operations
+  operation_entry: '<id> <world> <operation> stage=<stage> reason=<reason>'
+  dry_run: 'Preflight finished without changing target data. Report: <file>'
+  exported: 'Storage snapshot exported: <file>'
+  report_add: Add
+  report_equal: Unchanged
+  report_conflict: Conflict
+  target_conflict: The target contains data that conflicts with the migration snapshot
+  source_mismatch: The source does not match the backend marker or saved backup
+  queue_invalid: Invalid permission sync journal
+  queue_closed: Permission sync queue is closed
+  queue_save_failed: Could not persist permission sync task
+  queue_retry: 'Permission projection failed and will retry: group=<group>, error=<error>'
+  recovery_save_failed: Could not save or remove lifecycle recovery record
+  recovery_invalid: Recovery record or world directory identity does not match
+  recovery_needed: 'World <world> still needs recovery; inspect /mapadmin operations and world-recovery records'

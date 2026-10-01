@@ -18,11 +18,11 @@
 | `MapAgent.getNodeMap/getGroupMap` | 直接获取可变存储对象 | 不公开；用 `MapService` 的快照查询替代 |
 | `MapAgent.getUniqueID/getPlayer/isPlayerRegister` | 玩家名解析、在线玩家对象和历史注册检查 | `api.service.PlayerGateway.resolveId/isOnline/currentWorld`；不暴露 Bukkit `Player`，也没有独立的注册状态查询；角色等公开服务使用 UUID |
 | `MapAgent.getWorldParentFolder/getWorldFolder` | 世界目录访问 | `api.service.WorldGateway`；目录查询返回 JDK `Path` |
-| `MapAgent.save/reload` | 旧 JSON 文件保存、重载 | repository 自动持久化；没有对应 save/reload 命令，公开 API 不操作文件 |
+| `MapAgent.save/reload` | 旧 JSON 文件保存、重载 | repository 自动持久化并发布缓存；外部文件修改需停服处理后重启，没有对应 save/reload 命令，公开 API 不操作文件 |
 | `MapAgent.setLuckPerms/syncWithLuckPerms` | LP 实例注入与数据同步 | plugin 内部 `WorldBaseProjection`；仅投影 `worldbase` 能力 |
 | `MapAgent.ignoreColor` | 地图显示字符串处理 | plugin 内部展示工具，不作为服务接口 |
 | `DynamicWorld.createWorld/importWorld/initWorld/removeWorld` | MV 世界创建、导入、初始化和删除 | `WorldLifeCycleService` 统一编排；`WorldGateway` 仅负责目录查询 |
-| `DynamicWorld.loadWorld/unloadWorldLater/cancelUnloadTask` | 按需加载和延迟卸载 | v4 尚未实现按需加载和延迟卸载；公开 `WorldLifeCycleService` 当前无 `load` 方法 |
+| `DynamicWorld.loadWorld/unloadWorldLater/cancelUnloadTask` | 按需加载和延迟卸载 | `WorldLifeCycleService.load` 已实现按需加载，传送会自动加载；延迟卸载尚未实现 |
 | `DynamicWorld.hasLoaded/isExist/isExtraLoad` | 查询 MV 世界存在/加载状态及额外加载标记 | 没有等价的公开状态服务；生命周期实现仅在具体操作中查询 MV/Bukkit/目录状态，不维护额外加载或延迟卸载标记 |
 | `DynamicWorld.getCorrectName/getCorrectUnloadedName/getWorlds/getPotentialWorlds` | 名称匹配及补全 | `MapService` 查询与 plugin 命令补全；不公开 MV 世界列表 |
 | `DynamicWorld.getOwnerWorlds/getAccessWorlds` | 管理/可进入地图列表 | `MapAccessService.administratedMaps/accessibleMaps`；MMC 自己判定 |
@@ -39,10 +39,10 @@
 
 | 功能 | v3 实际行为 | v4 实际行为 | 对照结论 |
 |---|---|---|---|
-| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/world create <地图名> [WorldType] [Environment] [选项...]`；WorldType 为 `FLAT/NORMAL/VOID`，Environment 为 `NORMAL/NETHER/THE_END/SIFT`（SIFT 预留且当前不支持）；二者可独立组合；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | v4 将生成器和环境分开；命令 token 与颜色设置方式不兼容；不传 `admin=` 时不创建首位管理员；FLAT 层高按环境限制 |
-| 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/world import <地图名> [WorldType] [Environment] [alias=... group=... admin=...]`；校验根目录 `level.dat`、路径及版本；按生成器和环境配置 MV；不接受生成参数 | 已实现；版本校验保留，已有区块按存档数据保留，所选生成器用于后续新区块；v4 未提供 v3 的 `c:` 显式颜色参数 |
+| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/mapadmin create <地图名> [WorldType] [Environment] [选项...]`；WorldType 为 `FLAT/NORMAL/VOID`，Environment 为 `NORMAL/NETHER/THE_END/SIFT`（SIFT 预留且当前不支持）；二者可独立组合；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | v4 将生成器和环境分开；命令 token 与颜色设置方式不兼容；不传 `admin=` 时不创建首位管理员；FLAT 层高按环境限制 |
+| 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/mapadmin import <地图名> [WorldType] [Environment] [alias=... group=... admin=...]`；校验根目录 `level.dat`、路径及版本；按生成器和环境配置 MV；不接受生成参数 | 已实现；版本校验保留，已有区块按存档数据保留，所选生成器用于后续新区块；v4 未提供 v3 的 `c:` 显式颜色参数 |
 | 初始化设置 | 自动加载、和平、创造、关闭常见生物生成，设置随机刻/火焰/天气/昼夜/生物破坏/生物生成/进度播报规则 | 创建、导入、手动初始化调用同组初始化规则，并校验配置是否成功 | 核心规则基本一致；别名颜色和失败记录策略不同 |
-| 删除地图 | `/delete <地图>` 后 10 秒内 `/delete confirm`；会先将在线玩家送回默认出生点，再卸载并清理 LP/MV 数据 | `/world delete <地图>` 由控制台发起，一次性六位码 10 秒有效；有在线玩家时拒绝，另校验默认世界、路径、符号链接和名称规则 | 已实现但确认交互和在线玩家策略不同；v4 增加删除保护 |
+| 删除地图 | `/delete <地图>` 后 10 秒内 `/delete confirm`；会先将在线玩家送回默认出生点，再卸载并清理 LP/MV 数据 | `/mapadmin delete <地图>` 由控制台发起，一次性六位码 10 秒有效；有在线玩家时拒绝，另校验默认世界、路径、符号链接和名称规则 | 已实现但确认交互和在线玩家策略不同；v4 增加删除保护 |
 | 地图组管理员/建筑者、单图访客 | ADMIN/BUILDER 作用于地图组，VISITOR 作用于单图；名单及权限主要从 LP 节点维护 | MMC UUID 角色为权威；管理员/建筑者仍按组作用，访客按地图作用；建筑权限投影到 LP `worldbase` | 核心角色功能已实现；数据权威从 LP 切换到 MMC，直接修改 LP 不再改变准入结果 |
 | `apply` 共享建筑权限组 | 新地图权限组无上下文继承 `apply`，可共享该组权限 | 地图组继承 `default` 和带世界上下文的 `worldbase`，不继承 `apply` | 未迁移；依赖旧 `apply` 权限的服务器需重新配置建筑权限 |
 | 公开/私有地图 | 通过 `default` LP 组的 `multiverse.access.<world>` 表示公开状态 | 由 MMC `MapSettings.isPublic` 存储；公开地图对任何玩家开放访客准入 | 功能已实现，存储和权威不同；旧 LP 节点不是 v4 的公开状态 |
@@ -52,19 +52,19 @@
 | 敏感命令日志过滤 | Log4j filter 隐藏包含 `/world download`、`/world changepassword`、`/mapadmin.md changepassword` 的服务器命令日志（含 namespaced 命令） | 没有安装对应 Log4j filter；这些命令也不属于 v4 命令 | v3 的日志抑制行为未迁移；若其他插件仍提供这些命令，其服务器命令日志不再被此插件过滤 |
 | 龙蛋传送保护 | 玩家右键龙蛋时取消交互，禁止触发传送 | 没有对应事件处理 | 未实现 |
 | 地图别名和出生点 | `/world setname`（另有 `rename` 别名）与 `/world setspawn`；Multiverse 保存别名/出生点 | `/world setname`、`/world setspawn`；MMC、Bukkit、Multiverse 同步 | 核心功能已实现；v4 无 `rename` 子命令别名，别名颜色跟随公开状态 |
-| 玩家传送与快捷命令 | `/world tp`，独立 `/worldtp`（别名 `/wtp`）；按 LP `multiverse.access.*` 判断 | `/world tp` 和 `/wtp`；按 MMC ACTIVE 状态、角色及公开状态判断，目标须已加载 | 已实现但权限来源不同；旧 `/worldtp` 名称没有注册 |
+| 玩家传送与快捷命令 | `/world tp`，独立 `/worldtp`（别名 `/wtp`）；按 LP `multiverse.access.*` 判断 | `/world tp` 和 `/wtp`；按 MMC ACTIVE 状态、角色及公开状态判断，准入通过后按需加载 ACTIVE 地图 | 已实现但权限来源不同；旧 `/worldtp` 名称没有注册 |
 | 准入事件覆盖 | `PlayerTeleportEvent` 检查目标权限；登录、换世界、重生后的二次校验代码已注释 | 严格模式检查传送目标、实际进入世界、登录、重生和角色撤销后的在线位置 | v4 覆盖更完整；v3 直接设置 `multiverse.access.*` 的插件不会自动赋予 v4 准入 |
 | 踢出地图玩家 | 地图管理员可用 `/world kick` 将玩家送到默认出生点 | 管理员可踢出同图在线玩家，送到 Multiverse 默认世界出生点 | 已实现 |
-| 按需加载/延迟卸载 | API 可加载未加载世界；额外加载世界空闲 12000 tick 后卸载，玩家加入可取消待执行卸载 | 没有公开 load/unload/state 服务；传送只接受已加载世界 | 未实现；依赖按需加载的调用方需改造 |
+| 按需加载/延迟卸载 | API 可加载未加载世界；额外加载世界空闲 12000 tick 后卸载，玩家加入可取消待执行卸载 | 公开 load 已实现，传送会按需加载；无延迟卸载和额外加载标记 | 按需加载已实现；延迟卸载未保留 |
 | 世界版本检查 | `VersionCheck` 读取 `level.dat`，还调用 Multiverse 的目录名校验；导入流程会拒绝不兼容版本 | `WorldVersionService` 读取 `Data.DataVersion` 并与服务器版本比较；导入会校验 | 已实现，校验实现和公开 API 形态不同 |
 | 世界名称和目录安全 | 创建时将名称转成小写；导入经 Multiverse 世界名/目录校验 | 创建/导入限制名称格式、保留名称和配置的拦截正则；删除还检查目标目录边界及符号链接 | v4 校验更严格；旧脚本或不符合新命名规则的地图操作可能需要调整 |
 | 手动保存/重载/同步 | `/mapadmin save\|reload\|sync`；`/write` 输出节点/组数据；`sync` 从 LP 重建缓存数据 | JSON/MySQL repository 自动持久化；无对应管理命令或全量 LP 重同步服务 | 手动运维入口未迁移；`/write` 的调试输出也未迁移 |
 | 对外 API | 其他插件通过旧 `MapManager` 对象取得 Kotlin 服务，接口直接暴露 LP、MV、Bukkit 类型和可变映射 | `MapManager` 通过 Bukkit ServicesManager 注册；公开稳定模型/接口，存储和 LP 实现在 plugin | 已提供新的服务入口，但不是 v3 源码或二进制兼容 API；获取方式见 [API_GUIDE.md](API_GUIDE.md) |
-| 存储后端 | `worlds.json`、`groups.json` 和 YAML，部分变更需手动保存 | JSON 或 MySQL repository 自动保存，含操作阶段记录；尚无启动后自动恢复未完成操作的流程 | 已迁移并扩展；不是旧文件结构的直接兼容读写，v3 JSON 通过迁移流程导入 |
+| 存储后端 | `worlds.json`、`groups.json` 和 YAML，部分变更需手动保存 | JSON 或 MySQL repository 自动保存，含操作阶段记录；完整请求支持启动恢复与手动 recover | 已迁移并扩展；不是旧文件结构的直接兼容读写，v3 JSON 通过迁移流程导入 |
 
 ### 命令和策略差异
 
-- v3 的 `/create`、`/import`、`/init`、`/delete` 是独立命令并按权限节点授权；v4 合并到 `/world`，创建、导入、初始化、删除仅允许控制台执行。
+- v3 的 `/create`、`/import`、`/init`、`/delete` 是独立命令并按权限节点授权；v4 将创建、导入、初始化、删除合并到 `/mapadmin`，仅允许控制台执行；玩家操作使用 `/world`。
 - v3 与 v4 创建/导入未指定生成器时均默认为 `FLAT`；v4 环境默认为 `NORMAL`。v3 未提供 group 时用地图名，v4 也默认地图名。
 - v3 创建/导入未提供 owner 时使用命令发送者；v4 控制台命令未提供 `admin=<玩家>` 时不添加管理员。
 - v3 传送补全及准入读取 LuckPerms 的 `multiverse.access.<world>`；v4 按 MMC ACTIVE 状态、角色和 `isPublic` 判定。

@@ -12,4 +12,6 @@ public interface WorldBaseProjection {
     boolean setBuilderAccess(String groupId, UUID playerId, boolean enabled);
     boolean removeGroup(String groupId);
     boolean removeWorldInheritance(String groupId, String worldName);
+    /** 是否已有持久化等待任务；MMC 修改已生效，LP 会在后台完成。 */
+    default boolean pending() { return false; }
 }

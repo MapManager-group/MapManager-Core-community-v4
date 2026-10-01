@@ -158,14 +158,16 @@ public final class MapTeleportExample extends JavaPlugin {
 
 - `travel().teleport(playerId, mapId)` 检查 MMC 准入后传送到地图出生点；出生点未设置时使用世界默认出生点。
 - `travel().kickFromMap(operatorId, playerId)` 要求操作者是当前地图管理员、两名玩家都在线且位于同一地图；目标传到 Multiverse 默认世界出生点。
-- 这两项操作必须在主线程调用。目标世界必须已加载；当前 API 不会按需加载地图。
+- 这两项操作必须在主线程调用。入图传送在准入通过后，通过生命周期服务按需加载已登记的 ACTIVE 世界；加载会检查目录与版本。
 
 ### 世界生命周期
 
 - `worldLifeCycle().create(CreateMapRequest)` 创建世界并注册地图。
 - `worldLifeCycle().importWorld(ImportMapRequest)` 导入服务端根目录的世界；需要有效 `level.dat` 和不高于服务器的世界数据版本。导入请求不包含生成参数；地图按存档中的区块数据导入，所选生成器用于后续新区块。
+- `worldLifeCycle().load(worldName)` 加载已登记 ACTIVE 地图；目标目录与版本须有效，Multiverse 中须有世界登记。
+- `worldLifeCycle().recover(worldName)` 根据持久请求继续未完成创建、导入或已经确认的删除；缺少请求或地图/目录身份冲突时停止。旧版本没有完整请求的 PENDING 记录不能自动猜测恢复。
 - `worldLifeCycle().initialize(worldName)` 重放已加载 MMC 地图的 Multiverse 属性和 gamerule。
-- `worldLifeCycle().delete(worldName)` 删除地图及世界；受 `deletion.allowed-world-name-regex` 限制，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。六位、10 秒确认码只适用于 `/world delete` 命令；直接调用此 API 不经过命令确认，外部插件仍须自行授权调用者。
+- `worldLifeCycle().delete(worldName)` 删除地图及世界；受 `deletion.allowed-world-name-regex` 限制，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。六位、10 秒确认码只适用于 `/mapadmin delete` 命令；直接调用此 API 不经过命令确认，外部插件仍须自行授权调用者。
 
 生命周期操作必须在主线程调用。创建请求中的 `ownerId` 可为 null；若为空，地图不会自动获得首位管理员。创建/导入的初始设置为物理开启、爆炸关闭、私有。两个请求都通过 `WorldType` 和 `Environment` 独立指定生成器及维度，例如：
 
@@ -176,11 +178,11 @@ new ImportMapRequest("arena-copy", "Arena Copy", "team", ownerId,
         WorldType.NORMAL, Environment.THE_END);
 ```
 
-生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 `FLAT` 生成器：`NORMAL` 环境范围为 2–320，`NETHER`/`THE_END` 为 2–254；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载、操作崩溃恢复和自动补偿目前不属于已实现 API。
+生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 `FLAT` 生成器：`NORMAL` 环境范围为 2–320，`NETHER`/`THE_END` 为 2–254；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载与操作恢复通过 `load` 和 `recover` 调用；恢复继续原步骤，不自动删除创建/导入留下的世界。
 
 ### 世界版本
 
-`worldVersions().serverDataVersion()` 返回当前服务器 dataVersion；`mapDataVersion(Path)` 读取指定目录 `level.dat` 的版本，无法读取时返回空 `OptionalInt`；`isCompatible(Path/String)` 判断地图版本是否不高于服务器版本。该服务不创建、导入或修改地图。
+`worldVersions().serverDataVersion()` 返回当前服务器 dataVersion；`mapDataVersion(Path)` 读取指定目录 `level.dat` 的版本，无法读取时返回空 `OptionalInt`；Paper 26 已存在的维度目录缺少独立 level.dat 时读取根世界共用文件；`isCompatible(Path/String)` 判断地图版本是否不高于服务器版本。该服务不创建、导入或修改地图。
 
 `PlayerGateway` 和 `WorldGateway` 虽然属于 `api` 模块，但当前没有作为 `MapManager` getter 暴露；外部插件应使用 `MapManager` 的业务服务，不应自行获取 plugin 内部适配器。
 
@@ -190,7 +192,7 @@ new ImportMapRequest("arena-copy", "Arena Copy", "team", ownerId,
 
 - `Success<T>`：操作完成；读取 `value()`（`Void` 操作的值为 null）。
 - `Failure<T>`：操作未完成；读取稳定的 `reason()` 失败代码。
-- `Partial<T>`：MMC 数据可能已写入，但 Multiverse 或 LuckPerms 等外部同步未全部完成；应向调用者报告部分成功并记录原因。
+- `Partial<T>`：MMC 数据已处理，但 Multiverse 或 LuckPerms 等外部同步未全部完成；应报告原因。`PERMISSION_SYNC_PENDING` 表示 LP 已入持久队列，地图/角色可按 MMC 状态立即生效，调用方无需重复提交；自动重试没有固定完成期限。
 
 每种结果都包含 `operation()` 和 `operationId()`，可用于日志与故障排查。不要只判断“不是 Failure”就当作完整成功；显式处理 `Partial`。
 
@@ -204,4 +206,15 @@ if (result instanceof OperationResult.Success<?> success) {
 }
 ```
 
-服务方法是同步调用，没有统一的异步结果契约。生命周期、传送、踢出、别名、公开状态和出生点操作要求主线程；从异步任务调用时，应先调度回主线程。组角色变更会等待 LuckPerms 投影完成，可能阻塞调用线程。所有角色或设置写入都由调用方负责校验操作者权限。
+服务方法是同步调用，没有统一的异步结果契约。生命周期、传送、踢出、别名、公开状态和出生点操作要求主线程；从异步任务调用时，应先调度回主线程。组角色变更同步写 MMC，但不等待 LuckPerms 网络操作：投影持久化后返回 `Partial(PERMISSION_SYNC_PENDING)`，失败后台自动重试，重启继续。入队失败返回 `Partial(PERMISSION_SYNC_FAILED)` 或存储原因。角色撤销立即改变 MMC 准入结果。地图/角色查询读取不可变内存索引；存储写入仍同步。所有角色或设置写入都由调用方负责校验操作者权限。
+
+### 加载与恢复示例
+
+```java
+MapManager mmc = Bukkit.getServicesManager().load(MapManager.class);
+if (mmc == null) return; // 尚未就绪或插件已禁用
+OperationResult<MapInstance> loaded = mmc.worldLifeCycle().load("arena");
+OperationResult<MapInstance> recovered = mmc.worldLifeCycle().recover("arena");
+```
+
+两项操作都在主线程调用；`recover` 仅用于已有恢复请求，不替代新的创建/导入参数校验或删除授权。`PlayerGateway.disconnect` 也要求主线程，原因按纯文本处理；该适配器仍没有 `MapManager` getter。

@@ -9,9 +9,9 @@
 | 任意代码或功能任务 | [`CLASS_STATUS.md`](CLASS_STATUS.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
 | API、模型、角色或准入 | [`CLASS_STATUS.md`](CLASS_STATUS.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`API_INVENTORY.md`](API_INVENTORY.md)、[`API_GUIDE.md`](API_GUIDE.md) |
 | v3 外部插件迁移到 v4 | [`V3_TO_V4_API_MIGRATION.md`](V3_TO_V4_API_MIGRATION.md)、[`API_INVENTORY.md`](API_INVENTORY.md)、[`API_GUIDE.md`](API_GUIDE.md) |
-| `/world` 命令、配置或玩家用法 | [`PLUGIN.md`](PLUGIN.md)、[`README.md`](README.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md) |
-| v3 数据迁移 | [`MIGRATION.md`](MIGRATION.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| JSON/MySQL 存储、schema 或后端切换 | [`STORAGE.md`](STORAGE.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
+| `/world`、`/mapadmin` 命令、配置或玩家用法 | [`PLUGIN.md`](PLUGIN.md)、[`README.md`](README.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md) |
+| v3 预检、迁移或中断恢复 | [`MIGRATION.md`](MIGRATION.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| JSON/MySQL 存储、缓存、恢复备份或显式后端切换 | [`STORAGE.md`](STORAGE.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
 | 通知、错误文本或翻译 | [`MESSAGES.md`](MESSAGES.md)、[`PLUGIN.md`](PLUGIN.md) |
 | 仅审阅/文档任务 | 本索引及用户点名的文档；涉及实现现状时再读 `CLASS_STATUS.md` 和 `STRUCTURE.md` |
 | 功能验收/测试设计 | [`TEST_CASES.md`](TEST_CASES.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md)、相关专题文档 |
@@ -25,7 +25,7 @@
 - [`API_GUIDE.md`](API_GUIDE.md)：外部 Paper 插件依赖、获取及调用 v4 API 的指南。
 - [`V3_TO_V4_API_MIGRATION.md`](V3_TO_V4_API_MIGRATION.md)：v3 外部插件迁移到 v4 的依赖、服务获取、调用替换与行为差异。
 - [`README.md`](README.md)：中文用户介绍、安装、权限、命令、配置和开发接入。
-- [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为，包括地图准入、公开状态、显示名、出生点及物理/爆炸设置。
+- [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为，包括准入、设置、控制台 create/import/init/delete、维护命令、按需加载和生命周期恢复。
 - [`MIGRATION.md`](MIGRATION.md)：v3 自动迁移触发、字段映射、保护和限制。
 - [`STORAGE.md`](STORAGE.md)：存储配置、文件/表结构、后端约束。
 - [`MESSAGES.md`](MESSAGES.md)：语言选择、资源位置、MiniMessage 和翻译维护。

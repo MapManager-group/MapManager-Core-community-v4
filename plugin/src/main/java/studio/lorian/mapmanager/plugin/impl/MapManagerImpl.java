@@ -31,7 +31,8 @@ public final class MapManagerImpl implements MapManager {
 
     public MapManagerImpl(MapRepository repository, RoleRepository roleRepository, OperationRepository operations,
                           WorldBaseProjection permissions, PlayerGateway players, Pattern deletionPattern,
-                          Pattern blockedCreationPattern, Logger logger, WorldVersionService worldVersions) {
+                          Pattern blockedCreationPattern, Logger logger, WorldVersionService worldVersions,
+                          java.nio.file.Path dataDirectory) {
         this.maps = new MapServiceImpl(repository);
         this.aliases = new MapAliasServiceImpl(repository);
         this.settings = new MapSettingsServiceImpl(repository, aliases);
@@ -39,7 +40,7 @@ public final class MapManagerImpl implements MapManager {
         this.access = new MapAccessServiceImpl(repository, roles);
         this.worldVersions = worldVersions;
         this.worldLifeCycle = new WorldLifeCycleServiceImpl(repository, roleRepository, operations,
-                permissions, aliases, worldVersions, deletionPattern, blockedCreationPattern, logger);
+                permissions, aliases, worldVersions, deletionPattern, blockedCreationPattern, logger, dataDirectory);
         this.travel = new MapTravelServiceImpl(repository, access, players, worldLifeCycle);
     }
 

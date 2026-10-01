@@ -28,16 +28,28 @@ mvn clean package
 |----------------------------------|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
 | UNIT-API-01 至 UNIT-API-04       | `api/src/test/java/studio/lorian/mapmanager/api/model/ApiModelContractTest.java`                     | 创建/导入请求默认 FLAT+NORMAL、生成器与环境独立指定、参数防御性复制、地图组世界集合不可变                       |
 | UNIT-STO-01 至 UNIT-STO-05       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/JsonStorageTest.java`         | JSON 重启恢复、大小写不敏感查询、角色和操作持久化、非法状态不提交、地图删除访客清理、重复授权及损坏文件拒绝   |
-| UNIT-SVC-01 至 UNIT-SVC-07       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServicesTest.java`                     | 角色组/单图范围、有效角色继承、公开和 ACTIVE 准入、LP 部分失败、物理/爆炸字段隔离、`MapManager` 服务图 getter |
+| UNIT-SVC-01 至 UNIT-SVC-13       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServicesTest.java`                     | 角色组/单图范围、有效成员去重、撤权回退、ACTIVE 准入和列表过滤、LP 部分失败/待同步、访客不投影、物理/爆炸字段隔离、服务 getter |
 | UNIT-WORLD-01 至 UNIT-WORLD-04   | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/WorldGatewayImplTest.java`      | `server.properties` 地图根目录定位、维度目录选择和世界名路径穿越防护                                          |
-| UNIT-NBT-01 至 UNIT-NBT-03       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/LevelDatVersionReaderTest.java` | 压缩 NBT 读取数据版本；文件损坏、字段缺失或类型无效时返回空值                                                 |
+| UNIT-NBT-01 至 UNIT-NBT-04       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/LevelDatVersionReaderTest.java` | 压缩 NBT 与 Paper 26 共用根文件；文件损坏、字段缺失或类型无效时返回空值                                                 |
 | UNIT-ALIAS-01                    | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapAliasServiceImplTest.java`             | legacy、section 与 RGB 颜色代码清理                                                                           |
 | UNIT-MIG-01 至 UNIT-MIG-02       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationSourceTest.java` | v3 地图、组、角色范围和物理/爆炸设置解析；组地图清单不一致时拒绝                                              |
-| UNIT-MSG-01 至 UNIT-MSG-03       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文资源与安全占位符、缺项中文回退、占位参数校验                                                              |
+| UNIT-MSG-01 至 UNIT-MSG-06       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文与安全占位符、中文回退、参数校验、双语键及结果枚举齐全；三种结果通知及玩家/控制台/日志分流                                                              |
 | UNIT-CONFIG-01 至 UNIT-CONFIG-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageConfigTest.java`       | JSON 默认值、MySQL 配置读取与空白裁剪、未知类型及必填项/端口/数据库名校验                                     |
 | UNIT-LIFE-01 至 UNIT-LIFE-06     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | 创建和导入覆盖三种生成器与三种已实现环境的组合；SIFT 保持未支持；校验 FLAT 层高和非 FLAT 的 flat.height 拒绝 |
+| UNIT-TRAVEL-01 至 UNIT-TRAVEL-13 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapTravelServiceImplTest.java` | 传送输入/线程/在线/准入校验、按需加载、Failure/Partial 传播、出生点和朝向、错误世界和传送失败、踢出同图与管理员校验 |
+| UNIT-VERSION-01 至 UNIT-VERSION-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldVersionServiceImplTest.java` | 旧版/同版/未来版本兼容判断、损坏或缺失 NBT、世界名定位及路径逃逸拒绝 |
+| UNIT-FLAT-01 至 UNIT-FLAT-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/FlatChunkGeneratorTest.java` | 生成器 ID 往返、实际层材料/顺序/范围、负最小高度、区块高度截断、出生点和非法设置 |
+| UNIT-LISTENER-01 至 UNIT-LISTENER-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/listener/MapListenersTest.java` | 物理与爆炸设置独立、未登记世界、落沙恢复、其他实体、严格传送准入及关闭整套监听 |
+| UNIT-VALIDATE-01 至 UNIT-VALIDATE-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、删除保护；拒绝时无地图/组/操作记录写入 |
+| UNIT-FAILURE-01 至 UNIT-FAILURE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServiceFailureTest.java` | 角色写入失败返回 Failure、写后读取或 LP 异常返回 Partial、无效角色输入、物理/爆炸读写失败 |
+| UNIT-ADMIN-01 至 UNIT-ADMIN-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapAdminCommandTest.java` | 控制台限制、路由、默认值、非法/重复选项、导入参数拒绝、一次性/过期删除码、身份与状态保护、补全 |
+| UNIT-CMD-01 至 UNIT-CMD-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapWorldCommandTest.java` | world/wtp 共用传送、设置/别名/出生点路由、管理员授权、只读 info、存储错误及补全过滤 |
+| UNIT-RECOVERY-01 至 UNIT-RECOVERY-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/RecoveryJournalTest.java` | 完整请求重启、目录身份变更拒绝、符号链接与路径穿越拒绝 |
+| UNIT-CACHE-01 至 UNIT-CACHE-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageRecoveryTest.java` | 快照恢复和冲突、事件读取隔离、缓存写失败不发布、重命名/换组索引、旧快照不可变、角色清理与删除保护、后端切换标记 |
+| UNIT-QUEUE-01 至 UNIT-QUEUE-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/permission/QueuedWorldBaseProjectionTest.java` | LP 不阻塞调用者、FIFO 撤权顺序、失败重试与重启恢复、损坏任务文件拒绝 |
+| UNIT-MIGREC-01 至 UNIT-MIGREC-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationRecoveryTest.java` | v3 预检、冻结计划中断恢复、源变化和目标冲突保护 |
 
-当前共 40 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。服务注册事件/插件类路径、Bukkit 事件、Multiverse/LuckPerms 实际写入、MySQL 建表及完整启动迁移仍需真实集成环境，不纳入这批单元测试。
+当前共 122 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。上述事件单测直接调用监听器，未启动 Bukkit 事件总线。服务注册/类路径、真实玩家登录/重生/换世界与安全回退、Multiverse/LuckPerms 实际写入、MySQL 建表和完整启动迁移仍需真实集成环境，不纳入普通 Maven 单元门禁。测试替身会在每个测试结束后恢复 Bukkit 静态服务器。
 
 ## 启动、配置与本地化
 
@@ -73,7 +85,7 @@ mvn clean package
 
 | ID      | 前置条件与操作                                                             | 预期结果                                                                                                                 |
 |---------|----------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| LIFE-01 | 控制台执行 `/world create arena flat normal`                               | 以 FLAT 生成器和 NORMAL 环境创建世界、登记地图和组，初始化 MV 配置，地图最终为 ACTIVE，默认组/别名为 `arena`             |
+| LIFE-01 | 控制台执行 `/mapadmin create arena flat normal`                               | 以 FLAT 生成器和 NORMAL 环境创建世界、登记地图和组，初始化 MV 配置，地图最终为 ACTIVE，默认组/别名为 `arena`             |
 | LIFE-02 | 玩家执行 create、import、init 或 delete                                    | 返回无权限结果；世界、地图、存储均未改变                                                                                 |
 | LIFE-03 | 为新地图指定 `group=team admin=AdminA`                                     | 地图进入 `team`；管理员授予保存到组；LP 地图组继承 `worldbase` 并投影 AdminA                                             |
 | LIFE-04 | 在 `arena` 所在组创建 `arena2`                                             | 共用同一组；组的地图列表包含两张图，组管理员/建筑者对两图生效                                                            |
@@ -92,13 +104,13 @@ mvn clean package
 | LIFE-17 | 组 ID 测试长度边界、非法字符、`default`、`worldbase`                       | 合法组 ID 接受；非法字符/长度及 LP 基础组名称拒绝                                                                        |
 | LIFE-18 | 展示名为 null/空、255 字符、256 字符；清理颜色后为空                       | 空值回退地图名；最大长度允许；超长或清理后空白的别名拒绝                                                                 |
 | LIFE-19 | 对 MMC、Bukkit 或 MV 中已存在的世界名再次创建/导入                         | 返回 ALREADY_EXISTS；既有世界和记录不变                                                                                  |
-| LIFE-20 | 在根目录准备有效未注册世界，执行 `/world import arena-copy normal nether` | 以 NORMAL 生成器和 NETHER 环境导入，执行初始化、角色投影和 ACTIVE 登记；现有区块不变 |
+| LIFE-20 | 在根目录准备有效未注册世界，执行 `/mapadmin import arena-copy normal nether` | 以 NORMAL 生成器和 NETHER 环境导入，执行初始化、角色投影和 ACTIVE 登记；现有区块不变 |
 | LIFE-21 | 导入目录不存在、不是目录或缺少 level.dat                                   | 返回 WORLD_NOT_FOUND 或 INVALID_INPUT；不创建 MMC 地图记录                                                               |
 | LIFE-22 | 创建或导入 VOID 生成器但 VoidGen 未启用                                    | 返回世界后端失败；不注册为 ACTIVE                                                                                        |
 | LIFE-23 | 导入目录为符号链接或名称试图逃逸世界根目录                                 | 输入校验或目录检查拒绝，不触碰根目录外文件                                                                               |
-| LIFE-24 | 创建/导入过程中分别令 MV 操作、初始化、存储或 LP 投影失败                  | 返回 Failure/Partial；记录 operation ID 和失败阶段；保留源码定义的 PENDING/失败记录以供检查                              |
+| LIFE-24 | 创建/导入过程中分别令 MV 操作、初始化、存储或 LP 投影失败                  | 后端/存储失败保留完整请求及 PENDING 供恢复；LP 入队后地图 ACTIVE，返回 Partial(PERMISSION_SYNC_PENDING)，后台重试                              |
 | LIFE-25 | 成功创建或导入后检查世界属性                                               | difficulty peaceful、creative、自动加载开启、出生区块常驻关闭；普通生物生成关闭、MISC 开启；规定 gamerule 全部生效并保存 |
-| LIFE-26 | 对已加载且已登记地图执行 `/world init <name>`                              | 控制台重放 MV 与 gamerule 初始化；不重建角色、不改变地图状态；返回成功                                                   |
+| LIFE-26 | 对已加载且已登记地图执行 `/mapadmin init <name>`                              | 控制台重放 MV 与 gamerule 初始化；不重建角色、不改变地图状态；返回成功                                                   |
 | LIFE-27 | init 目标不存在、未登记或未加载                                            | 分别返回 MAP_NOT_FOUND 或 WORLD_NOT_FOUND；不产生其他世界变更                                                            |
 | LIFE-28 | init 名称含非法字符或由玩家执行                                            | 返回 INVALID_INPUT/NO_PERMISSION；不执行 MV 操作                                                                         |
 | LIFE-29 | 在 FLAT+NETHER/THE_END 创建 `flat.height=64` 或自定义 `generator-settings`；检查区块和 Environment | 生成预期平坦层和 biome；选定环境保留；非法方块、非法 JSON 和总层高超过 254 在登记前拒绝 |
@@ -183,7 +195,7 @@ mvn clean package
 | CMD-02 | 为不同角色检查 `/world` 一级补全                          | 仅出现当前发送者可调用的命令；ADMIN 专属子命令对非管理员隐藏                                                                             |
 | CMD-03 | 补全 `/world tp`、`/wtp`                                  | 只建议该玩家可进入的地图                                                                                                                 |
 | CMD-04 | 补全 `/world kick`                                        | 只建议当前同图在线玩家                                                                                                                   |
-| CMD-05 | 控制台补全 init/delete/import/create                      | init 仅提示非 DELETED 地图；delete 仅提示 ACTIVE/DELETING 且命名符合删除正则的图；import 限服务器根目录候选；create/import 分别补全生成器、环境和参数键 |
+| CMD-05 | 控制台补全 `/mapadmin init/delete/import/create`                      | init 提示已登记地图；delete 仅提示 ACTIVE/DELETING 且命名符合删除正则的图；import 限服务器根目录候选；create/import 分别补全生成器、环境和参数键 |
 | CMD-06 | 成员命令补全 add/remove 和成员名                          | 只按准入/ADMIN 权限提供操作；在线玩家、同图目标和已有成员提示正确；无缓存名称时可用 UUID                                                 |
 
 ## 删除与操作记录
@@ -237,7 +249,7 @@ mvn clean package
 | MIG-09 | 有效迁移包含 physical、exploded、公开节点、MV alias、spawn | 地图设置与出生点/展示名映射正确；公开状态从旧 LP 信息读取                  |
 | MIG-10 | 已有 v3 迁移完成标记后再次启动                             | 显示 done_before，不重复导入、不重复添加角色                               |
 | MIG-11 | 源备份失败或完成标记写入失败                               | 迁移失败并禁用插件；日志指出备份/标记失败                                  |
-| MIG-12 | 首次迁移中途目标仓储写入失败后重试                         | 验证当前实现的部分写入冲突保护；人工核查后恢复，不把自动恢复当作已实现能力 |
+| MIG-12 | 首次迁移中途目标仓储写入失败后重试                         | 验证当前实现的冻结计划幂等重试；恢复完整数据，源变化或目标冲突时拒绝 |
 
 ## 玩家、世界目录与通知适配
 
@@ -250,7 +262,7 @@ mvn clean package
 | ADP-05 | online-mode 从已启用 Velocity、Bungee 配置、server.properties、运行时默认逐级取值 | 优先级与配置启用条件正确；无有效配置时采用服务器运行模式            |
 | ADP-06 | 以 finite 坐标传送在线玩家到已加载世界                                            | 主线程传送成功并应用坐标、yaw、pitch                                |
 | ADP-07 | 传送使用 null、NaN/Infinity 坐标、离线玩家、未加载世界或异步线程                  | 返回 false，不执行无效传送                                          |
-| ADP-08 | 调用当前 disconnect 实现                                                          | 返回 false；此项记录为占位行为，不判定为功能通过                    |
+| ADP-08 | 调用当前 disconnect 实现                                                          | 主线程在线玩家收到纯文本踢出原因并返回 true；离线、空值、异步调用返回 false                    |
 | ADP-09 | server.properties 中 level-name 合法且世界存在 dimensions/minecraft               | worldParentDirectory 返回该维度目录                                 |
 | ADP-10 | level-name 目录无 dimensions/minecraft                                            | worldParentDirectory 返回服务端目录                                 |
 | ADP-11 | level-name 缺失、空白、路径穿越、读取错误                                         | 回退 Bukkit 首个已加载世界名；没有已加载世界时抛出明确异常          |
@@ -261,8 +273,64 @@ mvn clean package
 
 ## 目前不列为通过项的能力
 
-以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：按需加载未加载世界、`PlayerGateway.disconnect`、PVP/全局物理或全局爆炸覆盖、JSON 与 MySQL 自动迁移、迁移 dry-run 与自动恢复、未实现的 API 授权入口。实际 Paper 服务注册、插件类路径及服务事件仍需执行 API-01 至 API-07 的集成用例；地图准入监听用例列在 ACCESS-01 至 ACCESS-07。
+以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：延迟卸载、PVP/全局物理或全局爆炸覆盖、SIFT 环境、API 操作者授权入口（调用方负责）。JSON/MySQL 不会静默切换，必须显式指定迁移源。实际 Paper 服务注册、插件类路径及服务事件仍需执行 API-01 至 API-07 的集成用例；地图准入监听用例列在 ACCESS-01 至 ACCESS-07。
 
 ## 执行记录
 
 JUnit 单元用例由 Maven 构建自动执行，具体结果见各模块 `target/surefire-reports/`。逐项执行 Paper/MV/LP 集成用例时记录服务器和插件版本；MySQL 用例记录数据库版本及 schema 初始化结果。本文列出的人工验收场景仍须逐项记录结果、证据、版本、执行人和日期。
+
+## 本轮新增自动用例
+
+| 测试类 | 数量 | 覆盖 |
+|---|---:|---|
+| `StorageRecoveryTest` | 7 | 完整快照、空组、全部操作、幂等重试、全量冲突预检、缓存无底层读取、失败写入不发布、显式切换校验、完成标记中断收尾 |
+| `QueuedWorldBaseProjectionTest` | 4 | 调用线程不等待 LP、授权撤销 FIFO、失败自动重试、重启重放、损坏队列拒绝 |
+| `RecoveryJournalTest` | 3 | 原始 owner/环境/参数持久化、目录替换和 UID 改变拒绝、路径穿越/符号链接拒绝 |
+| `V3MigrationRecoveryTest` | 4 | dry-run 不写目标、部分写入后冻结计划恢复、源改变拒绝、冲突报告不覆盖 |
+| 既有 NBT / Messages 测试扩展 | 2 | Paper 26 共用根 level.dat、双语键及全部操作/原因枚举覆盖 |
+
+## 恢复与维护验收场景
+
+| ID | 操作 | 预期 |
+|---|---|---|
+| REC-01 | 在保存完整创建请求后、保存地图前中断 | 重启恢复原 UUID、owner、组、生成参数与 ACTIVE 状态 |
+| REC-02 | 世界创建/导入成功后、初始化或角色步骤中断 | 使用现有世界继续，不创建第二张图，不丢原 owner |
+| REC-03 | 删除中断于世界仍在、目录已无但 MV 记录仍在、MV 已移除但目录仍在 | 重启分别继续世界删除、移除 MV 记录、按持久身份清理剩余目录，最终清理角色和空组 |
+| REC-04 | 删除中断后用不同目录替换原世界 | 拒绝删除替换目录，保留 DELETING 与失败原因 |
+| REC-05 | 旧 PENDING 无完整请求 | 保留数据并提示人工核查，不猜测 owner 或生成器 |
+| QUE-01 | LP 写入不可用后授予/撤销并重启 | MMC 角色立即生效；Partial 表示待同步；队列落盘并自动重试；不乱序恢复已撤销权限 |
+| MAINT-01 | 控制台 load/recover/operations/export；玩家执行维护命令 | 控制台得到结构化结果与快照；玩家被拒绝 |
+| MIG-13 | v3 dry-run，再 apply，注入半完成写入 | dry-run 只有报告；apply 先备份与冻结计划，重试补齐一致子集；完成才写标记 |
+| SQL-01 | JSON → MySQL → 另一 MySQL → JSON | 空组、地图、出生点、角色、全部操作一致；切换前校验源指纹 |
+| SQL-02 | 目标冲突、源变化、部分写入或标记后归档前中断 | 冲突不覆盖，源变化拒绝，部分写入恢复，标记后归档安全收尾 |
+| PERF-01 | 在事件查询时禁止仓储访问 | 缓存查询仍成功；不表示生产负载性能已验收 |
+
+## 可重复的真实集成测试
+
+先执行 `mvn clean package`，再运行（运行时目录提供 Paper JAR、libraries、versions、cache 以及 LP/MV；脚本复制至临时目录）：
+
+```shell
+python3 plugin/src/test/integration/run.py --runtime server --java-home /Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home
+python3 plugin/src/test/integration/run_mysql.py --mysql-base /private/tmp/mysql-8.4.11-macos15-arm64 --runtime server --java-home /Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home
+```
+
+MySQL 脚本要求预先准备兼容系统的 MySQL 二进制，创建独立临时 datadir 和测试库，只绑定回环地址，结束关闭实例。两组真实集成因依赖运行时/端口/二进制，不属于普通 Maven 单元门禁。
+
+### 2026-10-01 实际结果
+
+- JDK 21 / Maven：60 个 JUnit 用例由打包前 test 阶段执行，最终报告见各模块 Surefire。
+- Paper 26.2 build 129、Multiverse-Core 5.7.2、LuckPerms 5.5.71：三轮启停全部通过。验证外部 API 服务注册/撤销与共用类路径、三种 FLAT 环境与方块层、实际 LP 授权撤销、ACTIVE 加载、删除保护、原 owner 恢复、三类删除中断、替换目录拒绝、v3 dry-run/apply 及导出。报告位于 `/var/folders/hs/bq2njdx955169mcb_b3mf6jw0000gn/T/mmc-v4-todo-zdsji0sd/report.json`，同目录保留各轮日志。
+- MySQL 8.4.11：17 项真实 JDBC 检查通过，包含双向迁移、换目标、部分写入恢复、冲突/源变化拒绝、幂等角色及外键清理；复跑脚本同样通过，报告 `/var/folders/hs/bq2njdx955169mcb_b3mf6jw0000gn/T/mmc-mysql-97e6247i/snapshot/mysql-report.json`。
+- 准入监听通过合成 Bukkit 传送/重生事件验证；真实客户端登录、重生、在线踢出、生产规模性能和数据库升级尚未验收，不能据此标为通过。测试实例已关闭。
+
+## 控制台命令迁移验收（2026-10-01）
+
+create/import/init/delete 从 `/world` 移至 `/mapadmin`，旧入口不再执行或补全这些子命令。`MapAdminCommandTest` 新增 3 个自动用例：创建维度/参数路由、导入参数拒绝与初始化路由；六位一次性删除码及同名地图身份校验；非控制台执行及补全拒绝。该轮 Maven 门禁为 63 个用例；后续单元覆盖补全见下文。删除确认仍为 10 秒有效，直接 `confirm` 无效。
+
+迁移后使用新构建复跑 Paper 26.2/MV 5.7.2/LP 5.5.71 三轮集成测试全部通过；测试脚本使用 `/mapadmin create` 创建四张地图并验证恢复、维护、服务注册与撤销。报告：`/var/folders/hs/bq2njdx955169mcb_b3mf6jw0000gn/T/mmc-v4-todo-jou2f3vy/report.json`；测试服结束已关闭。
+
+## 单元测试覆盖补全（2026-10-01）
+
+以当前工作区为基线，原 63 个用例全部通过；本次新增 59 个用例，合计 122 个（api 4、plugin 118）。补充传送/按需加载、世界版本、实际区块层生成、监听器、角色失败语义、生命周期输入保护、玩家/控制台命令、缓存快照及通知分流。仅修改测试和本清单，不修改业务源码或增加依赖。
+
+验证使用 JDK 21 执行 `mvn -o --no-transfer-progress clean test`，实际 122 个测试全部通过：0 failures、0 errors、0 skipped。未启动 `server` 测试服或连接外部服务；上文历史集成结果不属于本次验证。尚未覆盖为普通单元门禁的运行时路径包括完整 Multiverse 创建/初始化/删除/恢复、LP 适配器实际节点写入、玩家身份解析与 Mojang 网络、登录/重生后的调度复核及安全默认世界回退。这些路径继续使用集成验收，不能将本次单测通过视为全路径或 100% 覆盖率。

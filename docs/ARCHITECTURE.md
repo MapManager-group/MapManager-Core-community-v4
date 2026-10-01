@@ -83,6 +83,8 @@ public interface WorldLifeCycleService {
     OperationResult<MapInstance> importWorld(ImportMapRequest request);
     OperationResult<MapInstance> initialize(String worldName);
     OperationResult<Void> delete(String worldName);
+    OperationResult<MapInstance> load(String worldName);
+    OperationResult<MapInstance> recover(String worldName);
 }
 
 public interface WorldVersionService {
@@ -93,7 +95,7 @@ public interface WorldVersionService {
 }
 ```
 
-以上为当前接口。`WorldVersionService` 使用 Querz NBT 读取 `level.dat` 的 `Data.DataVersion`，并与 Bukkit 当前服务器 dataVersion 比较；NBT 实现留在 plugin。API 尚未暴露按需加载方法；当前 `MapTravelServiceImpl` 也要求目标世界已加载。API 中只出现 MMC 自己的类型和 JDK 类型；不把 Bukkit、LuckPerms 或 Multiverse 的实现对象泄漏给调用方。
+以上为当前接口。`WorldVersionService` 使用 Querz NBT 读取 `level.dat` 的 `Data.DataVersion`，并与 Bukkit 当前服务器 dataVersion 比较；NBT 实现留在 plugin。`WorldLifeCycleService.load` 加载已登记 ACTIVE 地图；`MapTravelServiceImpl` 在准入通过后按需加载。`recover` 读取完整请求继续未完成生命周期。API 中只出现 MMC 自己的类型和 JDK 类型；不把 Bukkit、LuckPerms 或 Multiverse 的实现对象泄漏给调用方。
 
 ## 4. 准入和 LuckPerms
 
@@ -113,7 +115,7 @@ public interface WorldVersionService {
 
 ### LuckPerms 只提供 `worldbase` 能力
 
-插件启动时若 LP 中没有 `worldbase`，则异步创建并使其继承 `default`；已有组保持原样。服主手工维护 `worldbase` 内的权限节点。MMC 为地图角色维护投影：地图组对应的 LP 组按世界上下文继承 `worldbase`，管理员和建筑者成员镜像到地图组，访客不投影。MMC 数据仍是角色和地图访问状态的权威来源；LP 写入目前会同步等待，自动重试队列尚未实现。
+插件启动时若 LP 中没有 `worldbase`，则异步创建并使其继承 `default`；已有组保持原样。服主手工维护 `worldbase` 内的权限节点。MMC 为地图角色维护投影：地图组对应的 LP 组按世界上下文继承 `worldbase`，管理员和建筑者成员镜像到地图组，访客不投影。MMC 数据仍是角色和地图访问状态的权威来源；LP 写入由 `QueuedWorldBaseProjection` 的后台工作线程执行；任务落盘后按 FIFO 顺序执行、失败退避重试，并在重启后继续。历史投影成员账本用于在启动时按 MMC 当前角色补偿撤权。
 
 MMC 不创建或修改 `worldbase` 内的权限节点，不把所有玩家加入 `worldbase`，也不使用 LP 的任何地图访问节点决定是否可入图。对 LP 写入失败应返回可识别的失败结果，并进入重试/重同步队列；不得把数据存储成功伪装成 LP 完全同步成功。
 
@@ -134,13 +136,13 @@ ACTIVE --删除开始--> DELETING --失败--> DELETING
                                 └--成功--> 删除 MMC 地图记录
 ```
 
-`MapStatus.ARCHIVED` 和 `MapStatus.DELETED` 已定义，但当前生命周期服务不会写入这两个状态。创建或导入在保存 `PENDING` 后发生失败时会保留该地图记录；删除在 `DELETING` 状态保存后发生失败时会保留该状态，成功后移除地图记录。当前没有自动回滚或崩溃恢复。通过前置校验并实际进入生命周期持久化步骤的创建、导入、初始化和删除会记录 operation ID 与适用阶段；名称、参数、重复地图或删除安全检查提前拒绝时不会持久化操作记录。删除操作在调用 Multiverse 前检查默认世界、玩家和目录边界。六位、10 秒确认码只由 `/world delete` 命令执行；直接调用 `WorldLifeCycleService.delete` 不经过命令确认，但仍受删除正则和生命周期安全校验约束。
+`MapStatus.ARCHIVED` 和 `MapStatus.DELETED` 已定义，但当前生命周期服务不会写入这两个状态。创建或导入在保存 `PENDING` 后发生失败时会保留该地图记录；删除在 `DELETING` 状态保存后发生失败时会保留该状态，成功后移除地图记录。完整请求在副作用之前原子写入 `world-recovery/`；启动和 `/mapadmin recover` 会继续未完成步骤，保留原始地图 ID、所有者及生成器参数。创建/导入不自动删除已有世界文件。删除恢复同时校验目录 fileKey 与可用的 uid.dat，拒绝目录被替换的情况；旧版本缺少完整请求时保留状态供人工核查。通过前置校验并实际进入生命周期持久化步骤的创建、导入、初始化、加载和删除会记录 operation ID 与适用阶段；名称、参数、重复地图或删除安全检查提前拒绝时不会持久化操作记录。删除操作在调用 Multiverse 前检查默认世界、玩家和目录边界。六位、10 秒确认码只由 `/mapadmin delete` 命令执行；直接调用 `WorldLifeCycleService.delete` 不经过命令确认，但仍受删除正则和生命周期安全校验约束。
 
-所有 Bukkit/Multiverse 世界对象操作在主线程执行；用户名 UUID 解析等可能访问网络的操作异步执行。当前存储访问与部分 LuckPerms 操作仍在调用线程同步等待，后续异步化时需保证 Bukkit 对象操作回到主线程。
+所有 Bukkit/Multiverse 世界对象操作在主线程执行；用户名 UUID 解析等可能访问网络的操作异步执行。地图、组和角色的事件读取使用 `CachedStorage` 的不可变索引，无数据库/文件读取且不等待写锁；持久化写入仍同步执行。LP 网络操作全部在队列工作线程执行，入队期间只保存本地任务文件。队列采用全局 FIFO，某任务持续失败会延后后续组的投影。
 
 ## 6. 内部存储边界
 
-内部存储接口仅放在 plugin 的 `storage` 包中：`MapRepository`、`RoleRepository`、`OperationRepository`。服务层依赖这些接口；JSON 和数据库 adapter 将实现这些接口。它们不加入 `api`，不通过 Bukkit ServicesManager 注册。
+内部存储接口仅放在 plugin 的 `storage` 包中：`MapRepository`、`RoleRepository`、`OperationRepository`。服务层依赖这些接口；JSON 和数据库 adapter 实现这些接口；主类通过 CachedStorage 暴露内存快照和写入后发布行为。它们不加入 `api`，不通过 Bukkit ServicesManager 注册。
 
 配置见 [../plugin/src/main/resources/config.yml](../plugin/src/main/resources/config.yml)。当前支持 JSON 和 MySQL。MySQL 表结构、索引及关联见 [PLUGIN.md](PLUGIN.md)。JSON 使用临时文件原子替换；MySQL 使用外键约束。切换后端需要显式迁移，启动时检查 `storage-backend.txt`，避免静默读取另一套数据。
 
@@ -168,19 +170,17 @@ ACTIVE --删除开始--> DELETING --失败--> DELETING
 | Multiverse alias、出生点 | 读取并保存为地图展示名和出生点；其他 Multiverse 设置不会复制 |
 | v3 的公开 LP `multiverse.access.*` 状态 | 转成 `MapSettings.isPublic` 后不再用该节点准入 |
 
-当前启动迁移在导入前检查地图/组冲突，备份两份源 JSON 到 v4 数据目录的 `v3-source-backup/`，解析所有玩家 UUID 后写入选定仓储，并写入 `v3-migration.done` 标记。无法解析 UUID 或遇到冲突会使迁移失败；dry-run、目标数据库备份及详细差异报告尚未实现。全部写入成功后，完成标记会阻止重复导入；如果写入过程中失败，标记尚未生成，部分已写入的数据可能使重试冲突或重复角色记录，因此迁移失败后需先核查目标仓储。
+启动迁移解析所有 UUID 后生成 `v3-migration-report.json`，包含目标旧值、计划新值与冲突信息。`migration.dry-run: true` 只预检和报告，不写目标或完成标记。正式迁移备份源 JSON 与完整目标快照，冻结 `v3-migration-plan.json`，按幂等步骤写入；中断后使用同一计划重试，源文件改变或目标数据冲突时停止，全部完成后才写 `v3-migration.done`。JSON/MySQL 显式切换由 `StorageBackendMigration` 执行，核对源后端指纹和完整目标后更新 `storage-backend.txt`。详见 [MIGRATION.md](MIGRATION.md) 与 [STORAGE.md](STORAGE.md)。
 
 ## 9. 安全、并发和失败约定
 
 - 以 UUID 为玩家主键，世界名称规范化后唯一；显示名与内部 ID 分离。
 - 对所有命令输入做边界校验；命令入口按 MMC 地图角色授权。公开 API 没有操作者参数，调用方需在自己的入口校验授权，服务不会代替调用方判断。
 - 世界创建/删除对同一世界串行化；跨线程调用 Bukkit 对象要禁止。
-- 进入生命周期持久化步骤的操作会记录 operation ID、适用阶段和失败原因；操作记录尚未用于崩溃恢复，当前也没有 `/mapadmin operations` 命令。
+- 进入生命周期持久化步骤的操作会记录 operation ID、适用阶段和失败原因；恢复流程使用操作阶段与完整请求，`/mapadmin operations` 查询未完成和失败的记录。
 - 数据写入成功但 LP 镜像失败时，地图角色仍按 MMC 数据生效，结果应明确标记部分失败并允许重试同步。
 - 缺失可选依赖时在启动期给出明确诊断；Multiverse-Core 是世界生命周期所需依赖，LuckPerms 连接器只影响 `worldbase` 能力镜像，不影响 MMC 准入判断。
 
-## 10. 尚未完成的工作
+## 10. 验证边界
 
-1. 完成创建、导入和删除失败恢复；让 LP 投影异步执行并支持自动重试；实现玩家断线 API。
-2. 为 v3 自动迁移增加 dry-run、目标备份及详细差异报告；实现 JSON/MySQL 显式后端迁移。
-3. 完成 Maven 打包和 Paper、Multiverse-Core、LuckPerms 集成验证，并验证外部插件通过 Bukkit ServicesManager 获取 `MapManager`。
+本轮生命周期恢复、LP 后台重试、玩家断线、迁移预检/备份和后端切换已有实现。自动化单测与可重复的 Paper 外部插件验收见 [TEST_CASES.md](TEST_CASES.md)。真实玩家完整登录/重生/换世界、Mojang 网络故障及生产性能需在对应环境验证。未知 JSON 格式版本明确拒绝；没有为未定义的未来格式实现推测性升级。

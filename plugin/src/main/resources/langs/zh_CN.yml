@@ -12,6 +12,7 @@ operations:
   IMPORT: 导入地图
   INITIALIZE: 初始化地图
   DELETE: 删除地图
+  RECOVER: 恢复地图操作
   LOAD: 加载地图
   ADD_MEMBER: 添加成员
   REMOVE_MEMBER: 移除成员
@@ -36,6 +37,7 @@ reasons:
   ACCESS_DENIED: 无权进入该地图
   WORLD_BACKEND_FAILED: 世界操作失败
   STORAGE_FAILED: 数据存储失败
+  PERMISSION_SYNC_PENDING: MMC 修改已生效，权限投影正在后台同步，失败将自动重试
   PERMISSION_SYNC_FAILED: 权限同步失败
   OPERATION_IN_PROGRESS: 操作正在进行
   INTERNAL_ERROR: 内部错误
@@ -50,16 +52,16 @@ access:
   recovery_failed: '<red>无法安全返回默认世界，连接已断开。'
 command:
   usage_wtp: '用法：/wtp <地图名>'
-  usage_world: '用法：/world <create|import|init|delete|tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: '用法：/world <tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
   setting_usage: '<red>用法：/world <setting> [true|false|info]'
   setting_info: '<aqua>当前地图 <setting>：<value>'
   setname_usage: '<red>用法：/world setname <名称>'
   setspawn_usage: '<red>用法：/world setspawn'
-  delete_usage: '用法：/world delete <地图名>，然后在 10 秒内执行 /world delete <确认码>'
+  delete_usage: '用法：/mapadmin delete <地图名>，然后在 10 秒内执行 /mapadmin delete <确认码>'
   delete_expired: '<red>删除确认码已过期，请重新指定地图。'
   delete_wrong_code: '<red>确认码不正确；请使用上一步提供的 6 位字符串。'
   delete_name_denied: '<red>地图名不符合 deletion.allowed-world-name-regex，或确认码无效。'
-  delete_confirm: '<yellow>确认删除地图 <world>：请在 10 秒内执行 /world delete <code>'
+  delete_confirm: '<yellow>确认删除地图 <world>：请在 10 秒内执行 /mapadmin delete <code>'
   kicked: '<gray>你已被 <operator> 移出地图 <world>。'
   public_map: '<green>当前地图公开，所有玩家均可参观。'
   members_header: '<aqua><world> 的<role>（<count> 人）：'
@@ -152,3 +154,23 @@ errors:
   mv_alias_failed: 'Multiverse 别名同步失败：<world>'
   bukkit_world_unloaded: 'Bukkit 世界未加载：<world>'
   gamerule_failed: '无法设置 gamerule：<rule>'
+
+maintenance:
+  usage: '用法：/mapadmin create|import|init|delete|load|recover <地图>；operations；migration dry-run|apply；storage export <文件名>'
+  failed: '维护操作失败：<error>'
+  no_operations: 没有待处理操作
+  operation_entry: '<id> <world> <operation> 阶段=<stage> 原因=<reason>'
+  dry_run: '预检完成，未写入目标数据；差异报告：<file>'
+  exported: '存储快照已导出：<file>'
+  report_add: 新增
+  report_equal: 已一致
+  report_conflict: 冲突
+  target_conflict: 目标存储含有与迁移快照不一致的数据，已停止迁移
+  source_mismatch: 迁移源与后端标记或已保存备份不一致，已停止迁移
+  queue_invalid: 权限同步队列格式无效
+  queue_closed: 权限同步队列已关闭
+  queue_save_failed: 无法持久化权限同步任务
+  queue_retry: '权限投影失败，将自动重试：组=<group>，原因=<error>'
+  recovery_save_failed: 无法保存或清理生命周期恢复记录
+  recovery_invalid: 恢复记录或世界目录身份不匹配，已停止操作
+  recovery_needed: '地图 <world> 尚未恢复，请检查 /mapadmin operations 与 world-recovery 恢复记录'

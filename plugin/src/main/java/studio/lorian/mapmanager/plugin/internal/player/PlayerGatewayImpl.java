@@ -121,7 +121,10 @@ public final class PlayerGatewayImpl implements PlayerGateway {
         return player.teleport(new Location(world, point.x(), point.y(), point.z(), point.yaw(), point.pitch()));
     }
     @Override public boolean disconnect(UUID playerId, String reason) {
-        // TODO: 安全落点策略完成时实现。
-        return false;
+        if (!Bukkit.isPrimaryThread() || playerId == null || reason == null) return false;
+        Player player = Bukkit.getPlayer(playerId);
+        if (player == null) return false;
+        player.kick(net.kyori.adventure.text.Component.text(reason));
+        return true;
     }
 }

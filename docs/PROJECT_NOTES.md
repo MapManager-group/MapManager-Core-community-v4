@@ -10,19 +10,19 @@
 
 - MMC 是地图、地图组、角色和**所有入图准入判断**的权威数据源。不能再以 `multiverse.access.<world>` 或 LuckPerms 查询结果决定能否进入地图。
 - `MapRole` 为 `ADMIN`、`BUILDER`、`VISITOR`。管理员和建筑师按地图组共享，访客按单张地图授予；管理员同时具有建筑师能力。公开地图允许访客进入，不授予建造权限。公开状态保存在 `MapSettings.isPublic`，不再作为 `MapInstance` 的独立字段。
-- LuckPerms 仅投影建造能力：启动时缺失 `worldbase` 则自动创建并继承 `default`，服主手工配置其权限节点。地图组继承与成员已投影到 LP；同步失败会明确报告，重复操作可重试，自动重试仍待实现。LP 不能改变 MMC 的准入权威。
-- Multiverse-Core 执行世界创建、导入、初始化、出生点/世界配置和删除。`WorldLifeCycleService` 负责编排元数据与世界操作；按需加载和卸载尚未实现。
+- LuckPerms 仅投影建造能力：启动时缺失 `worldbase` 则自动创建并继承 `default`，服主手工配置其权限节点。地图组继承与成员已投影到 LP；持久队列异步同步、失败自动重试、重启继续，返回待同步结果。LP 不能改变 MMC 的准入权威。
+- Multiverse-Core 执行世界创建、导入、初始化、出生点/世界配置和删除。`WorldLifeCycleService` 负责编排元数据与世界操作；按需加载和完整请求恢复已实现；延迟卸载未实现。
 - 准入实现必须覆盖命令和其他插件触发的传送、登录、重生、实际换世界等路径；事件前置拦截并在进入后复核。
 - 地图设置仅由各地图管理，保留物理、爆炸和 `isPublic`；不提供 `GlobalSettings` 或 PVP 设置。JSON 与数据库存储是可选后端；`MapRepository`、`RoleRepository`、`OperationRepository` 仅属于 `plugin` 内部，不进入公开 API。
 - 修改操作使用 `OperationResult`（`Success`、`Failure`、`Partial`）和统一 `OperationNotifier`；通知通过 MiniMessage 和语言文件本地化，默认语言为 `zh_CN`，API 保留稳定原因码。
-- v3 启动迁移读取 `worlds.json`、`groups.json` 及只读的 Multiverse/LP 状态；有两个源文件时先备份，解析玩家 UUID、检查冲突，再写入所选仓储。dry-run 和详细差异报告仍待实现。
+- v3 启动迁移读取 `worlds.json`、`groups.json` 及只读的 Multiverse/LP 状态；有两个源文件时先备份，解析玩家 UUID、检查冲突，再写入所选仓储。dry-run、详细差异报告、源/目标备份与冻结计划重试已实现。
 
 ## 当前代码状态（2026-09-28）
 
 - `api` 已声明 `MapInstance`、`MapGroup`、`MapRole`、请求/设置/结果类型，以及地图查询、角色、准入、设置、传送、世界生命周期服务接口；公开 JavaDoc 为中文。
 - 创建和导入请求分别接收 `WorldType`（`FLAT/NORMAL/VOID`）与 `Environment`（`NORMAL/NETHER/THE_END`）；`SIFT` 环境为预留值，当前返回不支持结果。导入不接收生成参数，已有区块不变。
 - `plugin` 已有 `MapManagerPlugin` 主类和 `paper-plugin.yml`。当前 Paper API 编译基线为 1.20.1，manifest 的 `api-version` 为 `1.20`；LuckPerms、Multiverse-Core 为必需依赖，VoidGen 为可选依赖。Maven 打包配置会将 `api` 模块包含进插件 JAR。
-- JSON/MySQL 存储、地图查询、地图设置、角色持久化、准入决策、可配置的全路径准入监听、生命周期、MiniMessage 多语言通知及 v3 JSON 启动迁移已有实现。LP `worldbase` 与地图组投影已实现；自动重试仍待补充。
+- JSON/MySQL 存储、地图查询、地图设置、角色持久化、准入决策、可配置的全路径准入监听、生命周期、MiniMessage 多语言通知及 v3 JSON 启动迁移已有实现。LP `worldbase` 与地图组投影已实现；持久化异步队列和自动重试已实现。
 - 主类加载所选存储，注册地图设置和准入监听；检测相邻 `MapManager-Core` 目录中的 `worlds.json` 与 `groups.json`，迁移及 LP `worldbase` 初始化成功后注册 `MapManager` 服务、复核在线玩家并注册 `/world`、`/wtp`；任一初始化失败会禁用插件。
 - `access-control.strict-map-entry` 默认开启，关闭后传送、登录、重生和撤权后的准入检查都停用。默认消息语言为 `zh_CN`，内置 `en_US`；语言文件位于 `plugin/src/main/resources/langs/`，运行时从插件数据目录加载。
 

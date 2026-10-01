@@ -130,6 +130,7 @@ public final class JsonStorage implements MapRepository, RoleRepository, Operati
                 .findFirst().orElse(null);
     }
     @Override public synchronized List<MapInstance> findAll() { return List.copyOf(state.maps.values()); }
+    @Override public synchronized List<MapGroup> allGroups() { return state.groups.stream().map(this::findGroup).toList(); }
     @Override public synchronized MapGroup findGroup(String id) {
         if (!state.groups.contains(id)) return null;
         return new MapGroup(id, state.maps.values().stream().filter(map -> map.groupId().equals(id))
@@ -168,6 +169,7 @@ public final class JsonStorage implements MapRepository, RoleRepository, Operati
         change(next -> { next.grants.removeIf(grant -> grant.scopeId().equals(scopeId) && grant.role() == role); return null; });
     }
     @Override public synchronized OperationRecord find(UUID id) { return state.operations.get(id); }
+    @Override public synchronized List<OperationRecord> allOperations() { return List.copyOf(state.operations.values()); }
     @Override public synchronized List<OperationRecord> unfinished() {
         return state.operations.values().stream().filter(record -> record.stage() != OperationStage.COMPLETED
                 && record.stage() != OperationStage.FAILED).toList();

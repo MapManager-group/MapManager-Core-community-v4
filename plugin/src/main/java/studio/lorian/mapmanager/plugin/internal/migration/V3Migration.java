@@ -11,6 +11,8 @@ import studio.lorian.mapmanager.api.model.SpawnPoint;
 import studio.lorian.mapmanager.api.service.PlayerGateway;
 import studio.lorian.mapmanager.plugin.internal.storage.MapRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
+import studio.lorian.mapmanager.plugin.internal.storage.OperationRepository;
+import studio.lorian.mapmanager.plugin.internal.storage.StorageSnapshot;
 import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.io.IOException;
@@ -30,7 +32,7 @@ public final class V3Migration {
     private final MapRepository maps;
     private final RoleRepository roles;
     private final PlayerGateway players;
-    private final LuckPerms luckPerms;
+    private final java.util.function.UnaryOperator<MapInstance> metadata;
 
     public V3Migration(Path source, Path destination, MapRepository maps, RoleRepository roles,
                        PlayerGateway players, LuckPerms luckPerms) {
@@ -39,11 +41,28 @@ public final class V3Migration {
         this.maps = maps;
         this.roles = roles;
         this.players = players;
-        this.luckPerms = luckPerms;
+        this.metadata = map -> enrich(map, luckPerms);
+    }
+    V3Migration(Path source, Path destination, MapRepository maps, RoleRepository roles,
+                PlayerGateway players, java.util.function.UnaryOperator<MapInstance> metadata) {
+        this.source = source; this.destination = destination; this.maps = maps;
+        this.roles = roles; this.players = players; this.metadata = metadata;
     }
 
     /** 无源文件或已有完成标记时立即结束；错误会使 future 失败。 */
-    public CompletableFuture<String> migrate() {
+    public CompletableFuture<String> migrate() { return migrate(false); }
+
+    private CompletableFuture<String> running;
+
+    /** 预检只生成报告，不备份源文件、不写入目标仓储或完成标记。 */
+    public synchronized CompletableFuture<String> migrate(boolean dryRun) {
+        if (running != null && !running.isDone()) return CompletableFuture.failedFuture(
+                new IllegalStateException(Messages.text("reasons.OPERATION_IN_PROGRESS")));
+        running = prepareAndApply(dryRun);
+        return running;
+    }
+
+    private CompletableFuture<String> prepareAndApply(boolean dryRun) {
         Path marker = destination.resolve("v3-migration.done");
         if (Files.exists(marker)) return CompletableFuture.completedFuture(Messages.text("migration.done_before"));
         boolean worlds = Files.isRegularFile(source.resolve("worlds.json"));
@@ -52,27 +71,18 @@ public final class V3Migration {
         if (!worlds || !groups) return CompletableFuture.failedFuture(
                 new IllegalStateException(Messages.text("migration.files_missing")));
 
+        Path plan = destination.resolve("v3-migration-plan.json");
+        if (Files.exists(plan)) return CompletableFuture.supplyAsync(() -> {
+            backup(); // 校验源文件仍与首次执行时相同。
+            try { return apply(StorageSnapshot.read(plan), dryRun); }
+            catch (IOException error) { throw new IllegalStateException(Messages.text("migration.read_failed", "file", plan), error); }
+        });
+
         LegacySnapshot snapshot;
         try { snapshot = new V3MigrationSourceImpl(source).read(); }
         catch (RuntimeException ex) { return CompletableFuture.failedFuture(ex); }
 
-        var defaultGroup = luckPerms.getGroupManager().getGroup("default");
-        if (defaultGroup == null && !snapshot.maps().isEmpty()) return CompletableFuture.failedFuture(
-                new IllegalStateException(Messages.text("migration.default_group_missing")));
-        List<MapInstance> imported = snapshot.maps().stream().map(map -> {
-            String node = "multiverse.access." + map.worldName().toLowerCase(Locale.ROOT);
-            boolean isPublic = defaultGroup.getNodes().stream().anyMatch(value -> value.getKey().equals(node) && value.getValue());
-            var mvWorld = MultiverseCoreApi.get().getWorldManager().getWorld(map.worldName()).getOrNull();
-            String alias = mvWorld == null ? null : mvWorld.getColourlessAlias();
-            String displayName = alias == null || alias.isBlank() ? map.worldName() : alias;
-            Location location = mvWorld == null ? null : mvWorld.getSpawnLocation();
-            SpawnPoint spawn = location == null || location.getWorld() == null
-                    || !location.getWorld().getName().equals(map.worldName()) ? null
-                    : new SpawnPoint(map.worldName(), location.getX(), location.getY(), location.getZ(),
-                            location.getYaw(), location.getPitch());
-            return new MapInstance(map.id(), map.worldName(), map.groupId(), displayName,
-                    new MapSettings(map.settings().physical(), map.settings().explosion(), isPublic), map.status(), spawn);
-        }).toList();
+        List<MapInstance> imported = snapshot.maps().stream().map(metadata).toList();
         Map<String, CompletableFuture<UUID>> identities = new HashMap<>();
         for (LegacyRoleGrant grant : snapshot.roles())
             identities.computeIfAbsent(grant.playerName().toLowerCase(Locale.ROOT), ignored -> players.resolveId(grant.playerName()));
@@ -81,38 +91,71 @@ public final class V3Migration {
                 .thenApplyAsync(ignored -> {
                     for (var entry : identities.entrySet()) if (entry.getValue().join() == null)
                         throw new IllegalStateException(Messages.text("migration.uuid_missing", "player", entry.getKey()));
-                    preflight(imported, snapshot);
-                    backup();
-                    for (String group : snapshot.groups()) maps.saveGroup(new MapGroup(group, java.util.Set.of()));
-                    for (MapInstance map : imported) if (maps.findById(map.id()) == null) maps.save(map);
-                    for (LegacyRoleGrant grant : snapshot.roles()) {
+                    List<StorageSnapshot.Grant> grants = snapshot.roles().stream().map(grant -> {
                         String scope = grant.role() == MapRole.VISITOR
                                 ? imported.stream().filter(map -> map.worldName().equals(grant.worldName()))
                                     .findFirst().orElseThrow().id().toString() : grant.worldName();
-                        roles.add(scope, grant.role(), identities.get(grant.playerName().toLowerCase(Locale.ROOT)).join());
+                        return new StorageSnapshot.Grant(scope, grant.role(),
+                                identities.get(grant.playerName().toLowerCase(Locale.ROOT)).join());
+                    }).toList();
+                    StorageSnapshot prepared = new StorageSnapshot(1, List.copyOf(snapshot.groups()), imported, grants, List.of());
+                    prepared.validate();
+                    report(prepared);
+                    prepared.preflight(maps, roles, (OperationRepository) maps, false);
+                    if (!dryRun) {
+                        backup();
+                        try {
+                            StorageSnapshot.capture(maps, roles, (OperationRepository) maps)
+                                    .write(destination.resolve("v3-target-backup.json"));
+                            prepared.write(plan);
+                        } catch (IOException error) { throw new IllegalStateException(Messages.text("migration.backup_failed"), error); }
                     }
-                    try { Files.writeString(marker, "v3 migration completed\n"); }
-                    catch (IOException ex) { throw new IllegalStateException(Messages.text("migration.marker_failed"), ex); }
-                    return Messages.text("migration.done", "maps", imported.size(), "groups", snapshot.groups().size(),
-                            "roles", snapshot.roles().size());
+                    return apply(prepared, dryRun);
                 });
     }
 
-    private void preflight(List<MapInstance> imported, LegacySnapshot snapshot) {
-        for (String group : snapshot.groups()) {
-            MapGroup existingGroup = maps.findGroup(group);
-            if (existingGroup != null && existingGroup.worldNames().stream().anyMatch(world -> imported.stream()
-                    .noneMatch(map -> map.worldName().equals(world) && map.groupId().equals(group))))
-                throw new IllegalStateException(Messages.text("migration.group_conflict", "group", group));
-        }
-        for (MapInstance map : imported) {
+    private static MapInstance enrich(MapInstance map, LuckPerms luckPerms) {
+        var defaultGroup = luckPerms.getGroupManager().getGroup("default");
+        if (defaultGroup == null) throw new IllegalStateException(Messages.text("migration.default_group_missing"));
+        String node = "multiverse.access." + map.worldName().toLowerCase(Locale.ROOT);
+        boolean isPublic = defaultGroup.getNodes().stream().anyMatch(value -> value.getKey().equals(node) && value.getValue());
+        var mvWorld = MultiverseCoreApi.get().getWorldManager().getWorld(map.worldName()).getOrNull();
+        String alias = mvWorld == null ? null : mvWorld.getColourlessAlias();
+        String displayName = alias == null || alias.isBlank() ? map.worldName() : alias;
+        Location location = mvWorld == null ? null : mvWorld.getSpawnLocation();
+        SpawnPoint spawn = location == null || location.getWorld() == null
+                || !location.getWorld().getName().equals(map.worldName()) ? null
+                : new SpawnPoint(map.worldName(), location.getX(), location.getY(), location.getZ(),
+                    location.getYaw(), location.getPitch());
+        return new MapInstance(map.id(), map.worldName(), map.groupId(), displayName,
+                new MapSettings(map.settings().physical(), map.settings().explosion(), isPublic), map.status(), spawn);
+    }
+
+    private String apply(StorageSnapshot prepared, boolean dryRun) {
+        report(prepared);
+        prepared.preflight(maps, roles, (OperationRepository) maps, false);
+        if (dryRun) return Messages.text("maintenance.dry_run", "file", destination.resolve("v3-migration-report.json"));
+        prepared.apply(maps, roles, (OperationRepository) maps, false);
+        try { StorageSnapshot.writeJson(destination.resolve("v3-migration.done"), "v3 migration completed\n"); }
+        catch (IOException error) { throw new IllegalStateException(Messages.text("migration.marker_failed"), error); }
+        return Messages.text("migration.done", "maps", prepared.maps().size(), "groups", prepared.groups().size(),
+                "roles", prepared.grants().size());
+    }
+
+    private void report(StorageSnapshot prepared) {
+        var report = new java.util.LinkedHashMap<String, Object>();
+        report.put("maps", prepared.maps().stream().map(map -> {
+            var row = new java.util.LinkedHashMap<String, Object>();
             MapInstance existing = maps.findByWorldName(map.worldName());
-            if (existing != null && !existing.equals(map))
-                throw new IllegalStateException(Messages.text("migration.map_conflict", "world", map.worldName()));
-            existing = maps.findById(map.id());
-            if (existing != null && !existing.equals(map))
-                throw new IllegalStateException(Messages.text("migration.id_conflict", "world", map.worldName()));
-        }
+            row.put("world", map.worldName()); row.put("before", existing); row.put("after", map);
+            row.put("action", Messages.text(existing == null ? "maintenance.report_add"
+                    : existing.equals(map) ? "maintenance.report_equal" : "maintenance.report_conflict"));
+            return row;
+        }).toList());
+        report.put("groups", prepared.groups()); report.put("grants", prepared.grants());
+        report.put("before", StorageSnapshot.capture(maps, roles, (OperationRepository) maps));
+        try { StorageSnapshot.writeJson(destination.resolve("v3-migration-report.json"), new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(report)); }
+        catch (IOException error) { throw new IllegalStateException(Messages.text("migration.backup_failed"), error); }
     }
 
     private void backup() {

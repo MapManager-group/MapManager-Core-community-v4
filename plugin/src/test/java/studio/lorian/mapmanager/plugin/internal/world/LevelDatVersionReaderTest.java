@@ -18,6 +18,18 @@ class LevelDatVersionReaderTest {
     Path temporaryDirectory;
 
     @Test
+    void dimensionFoldersReadSharedLevelDatWithoutTreatingMissingFoldersAsWorlds() throws IOException {
+        CompoundTag root = new CompoundTag(), data = new CompoundTag();
+        data.putInt("DataVersion", 4903); root.put("Data", data);
+        NBTUtil.write(root, temporaryDirectory.resolve("level.dat").toFile());
+        Path dimension = temporaryDirectory.resolve("dimensions/minecraft/arena"); Files.createDirectories(dimension);
+        assertEquals(OptionalInt.of(4903), LevelDatVersionReader.read(dimension));
+        assertEquals(OptionalInt.empty(), LevelDatVersionReader.read(dimension.resolveSibling("missing")));
+        Path link = dimension.resolveSibling("linked"); Files.createSymbolicLink(link, dimension);
+        assertEquals(OptionalInt.empty(), LevelDatVersionReader.read(link));
+    }
+
+    @Test
     void readsDataVersionFromCompressedLevelDat() throws IOException {
         CompoundTag root = new CompoundTag();
         CompoundTag data = new CompoundTag();

@@ -43,7 +43,11 @@ public final class MapRoleServiceImpl implements MapRoleService {
         return Set.copyOf(result);
     }
     @Override public boolean hasRole(UUID mapId, UUID playerId, MapRole role) {
-        return playerId != null && members(mapId, role).contains(playerId);
+        MapInstance map = maps.findById(mapId);
+        if (map == null || playerId == null || role == null) return false;
+        if (roles.members(map.groupId(), MapRole.ADMIN).contains(playerId)) return true;
+        if (role != MapRole.ADMIN && roles.members(map.groupId(), MapRole.BUILDER).contains(playerId)) return true;
+        return role == MapRole.VISITOR && roles.members(map.id().toString(), MapRole.VISITOR).contains(playerId);
     }
     private synchronized OperationResult<Void> change(UUID mapId, UUID playerId, MapRole role, boolean add) {
         OperationName operation = add ? OperationName.ADD_MEMBER : OperationName.REMOVE_MEMBER;
@@ -71,12 +75,16 @@ public final class MapRoleServiceImpl implements MapRoleService {
                 }
                 // 两种组角色共用同一个 LP 地图组；撤销其中一种时保留另一种的建造权限。
                 try {
-                    permissions.ensureGroupInheritance(scope, worldNames).join();
+                    var sync = permissions.ensureGroupInheritance(scope, worldNames);
+                    if (sync.isDone() && !sync.join())
+                        return new OperationResult.Partial<>(operation, id, null, FailureReason.PERMISSION_SYNC_FAILED);
                     if (!permissions.setBuilderAccess(scope, playerId, enabled))
                         return new OperationResult.Partial<>(operation, id, null, FailureReason.PERMISSION_SYNC_FAILED);
                 } catch (RuntimeException exception) {
                     return new OperationResult.Partial<>(operation, id, null, FailureReason.PERMISSION_SYNC_FAILED);
                 }
+                if (permissions.pending())
+                    return new OperationResult.Partial<>(operation, id, null, FailureReason.PERMISSION_SYNC_PENDING);
             }
             return new OperationResult.Success<>(operation, id, null);
         } catch (StorageException ex) {

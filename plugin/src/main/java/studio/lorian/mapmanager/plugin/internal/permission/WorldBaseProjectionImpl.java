@@ -23,7 +23,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
 
     @Override
     public synchronized CompletableFuture<Boolean> ensureWorldBase() {
-        if (worldBaseFuture != null) return worldBaseFuture;
+        if (worldBaseFuture != null && !worldBaseFuture.isCompletedExceptionally()) return worldBaseFuture;
         GroupManager manager = luckPerms.getGroupManager();
         worldBaseFuture = manager.loadGroup(WORLD_BASE).thenCompose(existing -> {
             if (existing.isPresent()) return CompletableFuture.completedFuture(false);
@@ -81,7 +81,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
         if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE)) return false;
         GroupManager manager = luckPerms.getGroupManager();
         var group = manager.loadGroup(groupId).join();
-        if (group.isEmpty()) return false;
+        if (group.isEmpty()) return true;
         group.get().data().remove(InheritanceNode.builder(WORLD_BASE)
                 .withContext(DefaultContextKeys.WORLD_KEY, worldName).build());
         manager.saveGroup(group.get()).join();

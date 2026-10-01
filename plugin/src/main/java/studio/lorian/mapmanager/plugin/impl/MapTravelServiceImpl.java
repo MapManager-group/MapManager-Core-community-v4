@@ -63,8 +63,15 @@ public final class MapTravelServiceImpl implements MapTravelService {
                     decision.denialReason() == null ? FailureReason.ACCESS_DENIED : decision.denialReason());
 
         World world = Bukkit.getWorld(map.worldName());
-        if (world == null)
-            return new OperationResult.Failure<>(OperationName.TELEPORT, operationId, FailureReason.WORLD_NOT_FOUND);
+        if (world == null) {
+            OperationResult<MapInstance> result = lifeCycle.load(map.worldName());
+            if (!(result instanceof OperationResult.Success<?>))
+                return new OperationResult.Failure<>(OperationName.TELEPORT, operationId,
+                        result instanceof OperationResult.Failure<?> failure ? failure.reason()
+                                : result instanceof OperationResult.Partial<?> partial ? partial.reason() : FailureReason.WORLD_BACKEND_FAILED);
+            world = Bukkit.getWorld(map.worldName());
+            if (world == null) return new OperationResult.Failure<>(OperationName.TELEPORT, operationId, FailureReason.WORLD_NOT_FOUND);
+        }
         SpawnPoint spawn = map.spawn();
         if (spawn == null) {
             var location = world.getSpawnLocation();

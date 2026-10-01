@@ -36,6 +36,8 @@ public final class WorldVersionServiceImpl implements WorldVersionService {
     public boolean isCompatible(String worldName) {
         if (worldName == null || worldName.isBlank()) return false;
         Path folder = worldContainer.resolve(worldName).normalize();
-        return folder.startsWith(worldContainer) && isCompatible(folder);
+        if (folder.startsWith(worldContainer) && isCompatible(folder)) return true;
+        if (!worldName.matches("[A-Za-z0-9_-]{1,100}")) return false;
+        return isCompatible(new studio.lorian.mapmanager.plugin.internal.world.WorldGatewayImpl().worldDirectory(worldName));
     }
 }

@@ -28,6 +28,8 @@ public enum FailureReason {
     STORAGE_FAILED,
     /** LuckPerms 角色或权限投影同步失败。 */
     PERMISSION_SYNC_FAILED,
+    /** MMC 修改已持久化；LuckPerms 投影已入持久队列，正在后台同步或等待重试。 */
+    PERMISSION_SYNC_PENDING,
     /** 同一资源上已有其他操作正在执行。 */
     OPERATION_IN_PROGRESS,
     /** 发生未预期的错误。 */

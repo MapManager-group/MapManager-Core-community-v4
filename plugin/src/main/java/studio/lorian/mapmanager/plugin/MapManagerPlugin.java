@@ -14,6 +14,7 @@ import studio.lorian.mapmanager.api.MapManager;
 import studio.lorian.mapmanager.plugin.impl.MapManagerImpl;
 import studio.lorian.mapmanager.plugin.impl.WorldVersionServiceImpl;
 import studio.lorian.mapmanager.plugin.internal.command.MapWorldCommand;
+import studio.lorian.mapmanager.plugin.internal.command.MapAdminCommand;
 import studio.lorian.mapmanager.plugin.internal.listener.MapAccessListener;
 import studio.lorian.mapmanager.plugin.internal.listener.MapSettingsListener;
 import studio.lorian.mapmanager.plugin.internal.migration.V3Migration;
@@ -21,6 +22,8 @@ import studio.lorian.mapmanager.plugin.internal.notification.OperationNotifierIm
 import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 import studio.lorian.mapmanager.plugin.internal.player.PlayerGatewayImpl;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjectionImpl;
+import studio.lorian.mapmanager.plugin.internal.permission.QueuedWorldBaseProjection;
+import studio.lorian.mapmanager.plugin.internal.storage.StorageBackendMigration;
 import studio.lorian.mapmanager.plugin.internal.storage.JsonStorage;
 import studio.lorian.mapmanager.plugin.internal.storage.MySqlStorage;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageConfig;
@@ -35,6 +38,7 @@ import java.util.regex.Pattern;
 /** Paper 插件入口；加载配置和选定的持久化后端。 */
 public final class MapManagerPlugin extends JavaPlugin {
     private MapManagerImpl api;
+    private QueuedWorldBaseProjection projection;
 
     @Override
     public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
@@ -60,29 +64,41 @@ public final class MapManagerPlugin extends JavaPlugin {
                     "creation.blocked-world-name-regex", ".*_bak$"));
             Path directory = getDataFolder().toPath();
             Files.createDirectories(directory);
-            Path marker = directory.resolve("storage-backend.txt");
-            String selected = config.type() == StorageConfig.Type.JSON ? "JSON"
-                    : "MYSQL:" + config.host() + ":" + config.port() + "/" + config.database();
-            if (Files.exists(marker) && !Files.readString(marker, StandardCharsets.UTF_8).trim().equals(selected)) {
-                throw new IllegalStateException(Messages.text("startup.backend_changed"));
-            }
-            var repository = config.type() == StorageConfig.Type.JSON
-                    ? new JsonStorage(directory.resolve("maps.json")) : new MySqlStorage(config);
-            if (!Files.exists(marker)) Files.writeString(marker, selected + "\n", StandardCharsets.UTF_8);
+            String selected = StorageBackendMigration.identity(config);
+            var repository = StorageBackendMigration.openAndMigrate(getConfig(), directory);
             LuckPerms luckPerms = getServer().getServicesManager().load(LuckPerms.class);
             if (luckPerms == null) throw new IllegalStateException(Messages.text("startup.luckperms_unavailable"));
-            var projection = new WorldBaseProjectionImpl(luckPerms);
+            projection = new QueuedWorldBaseProjection(new WorldBaseProjectionImpl(luckPerms),
+                    directory.resolve("permission-sync.json"), getLogger());
             var players = new PlayerGatewayImpl(this);
             var notifier = new OperationNotifierImpl();
             var worldVersions = new WorldVersionServiceImpl(getServer().getWorldContainer().toPath());
             api = new MapManagerImpl(repository, repository, repository, projection, players,
-                    deletionPattern, blockedCreationPattern, getLogger(), worldVersions);
+                    deletionPattern, blockedCreationPattern, getLogger(), worldVersions, directory);
             MapAccessListener accessListener = new MapAccessListener(this, api.maps(), api.access(),
                     getConfig().getBoolean("access-control.strict-map-entry", true));
             getServer().getPluginManager().registerEvents(accessListener, this);
             getServer().getPluginManager().registerEvents(new MapSettingsListener(repository), this);
             getLogger().info(Messages.text("startup.storage_loaded", "backend", selected));
             Path oldDirectory = getDataFolder().getParentFile().toPath().resolve("MapManager-Core");
+            var migrator = new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms);
+            Runnable refresh = () -> {
+                ((studio.lorian.mapmanager.plugin.impl.WorldLifeCycleServiceImpl) api.worldLifeCycle()).recoverAll();
+                var history = projection.knownMembers();
+                var groups = new java.util.HashSet<>(history.keySet());
+                repository.allGroups().forEach(group -> groups.add(group.id()));
+                for (String groupId : groups) {
+                    var group = repository.findGroup(groupId);
+                    var members = new java.util.HashSet<>(repository.members(groupId, studio.lorian.mapmanager.api.model.MapRole.ADMIN));
+                    members.addAll(repository.members(groupId, studio.lorian.mapmanager.api.model.MapRole.BUILDER));
+                    if (group != null) projection.ensureGroupInheritance(groupId, group.worldNames());
+                    var tracked = new java.util.HashSet<>(history.getOrDefault(groupId, java.util.Set.of()));
+                    tracked.addAll(members);
+                    for (var member : tracked) projection.setBuilderAccess(groupId, member, group != null && members.contains(member));
+                    if (group == null) projection.removeGroup(groupId);
+                }
+                accessListener.checkOnlinePlayers();
+            };
             CompletableFuture<String> migration = new CompletableFuture<>();
             CompletableFuture<Boolean> worldBase = projection.ensureWorldBase();
             migration.whenComplete((message, error) -> {
@@ -107,8 +123,7 @@ public final class MapManagerPlugin extends JavaPlugin {
             });
             whenPluginEnabled("Multiverse-Core", () -> {
                 try {
-                    new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms)
-                            .migrate().whenComplete((message, error) -> {
+                    migrator.migrate(getConfig().getBoolean("migration.dry-run", false)).whenComplete((message, error) -> {
                                 if (error != null) migration.completeExceptionally(error);
                                 else migration.complete(message);
                             });
@@ -120,18 +135,24 @@ public final class MapManagerPlugin extends JavaPlugin {
                 if (error != null || !isEnabled()) return;
                 getServer().getScheduler().runTask(this, () -> {
                     if (!isEnabled()) return;
+                    try {
                     getLogger().info(migration.join());
-                    accessListener.checkOnlinePlayers();
+                    refresh.run();
                     Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
-                            api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
-                            notifier, deletionPattern, accessListener));
+                            api.maps(), api.roles(), api.access(), api.settings(), api.travel(), players,
+                            notifier, accessListener));
                     Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
-                            api.maps(), api.roles(), api.access(), api.settings(), api.travel(), api.worldLifeCycle(), players,
-                            notifier, deletionPattern, accessListener));
+                            api.maps(), api.roles(), api.access(), api.settings(), api.travel(), players,
+                            notifier, accessListener));
                     Bukkit.getServicesManager().register(MapManager.class, api, this, ServicePriority.Normal);
+                    Bukkit.getCommandMap().register("mapmanager", new MapAdminCommand(this, repository,
+                            api.worldLifeCycle(), migrator, notifier, refresh, players, deletionPattern));
+                    } catch (RuntimeException exception) {
+                        getLogger().severe(Messages.text("startup.failed", "error", exception.getMessage()));
+                        getServer().getPluginManager().disablePlugin(this);
+                    }
                 });
             });
-            getLogger().warning(Messages.text("startup.incomplete"));
         } catch (Exception ex) {
             getLogger().severe(Messages.text("startup.failed", "error", ex.getMessage()));
             getServer().getPluginManager().disablePlugin(this);
@@ -141,6 +162,8 @@ public final class MapManagerPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (api != null) Bukkit.getServicesManager().unregister(MapManager.class, api);
+        if (projection != null) projection.close();
+        projection = null;
         api = null;
     }
 

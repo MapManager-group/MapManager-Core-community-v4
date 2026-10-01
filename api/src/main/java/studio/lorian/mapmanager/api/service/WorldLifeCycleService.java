@@ -6,7 +6,7 @@ import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.result.OperationResult;
 
 /** 编排地图元数据与世界后端操作，统一管理世界生命周期。 */
-public interface    WorldLifeCycleService {
+public interface WorldLifeCycleService {
     /**
      * 创建世界并将其注册为 MMC 地图。
      *
@@ -38,4 +38,16 @@ public interface    WorldLifeCycleService {
      * @return 操作结果
      */
     OperationResult<Void> delete(String worldName);
+
+    /** 加载已登记且 ACTIVE 的世界；仅主线程调用，目录必须存在。
+     * @param worldName 已登记的世界名称
+     * @return 已加载地图或失败结果
+     */
+    OperationResult<MapInstance> load(String worldName);
+
+    /** 按持久请求恢复创建/导入或已确认的删除；仅主线程调用。
+     * @param worldName 有完整恢复请求的世界名称
+     * @return 恢复后的地图；删除完成时值为 null
+     */
+    OperationResult<MapInstance> recover(String worldName);
 }

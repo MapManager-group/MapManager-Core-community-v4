@@ -9,5 +9,6 @@ import java.util.UUID;
 public interface OperationRepository {
     OperationRecord find(UUID operationId);
     List<OperationRecord> unfinished();
+    default List<OperationRecord> allOperations() { return unfinished(); }
     void save(OperationRecord record);
 }

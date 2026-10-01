@@ -58,7 +58,7 @@ public interface MapManager {
     MapTravelService travel();
 
     /**
-     * 返回世界创建、导入、初始化和删除服务。
+     * 返回世界创建、导入、初始化、删除、按需加载和恢复服务。
      *
      * @return 世界生命周期服务
      */

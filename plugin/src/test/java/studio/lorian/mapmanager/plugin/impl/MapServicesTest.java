@@ -149,7 +149,7 @@ class MapServicesTest {
         var manager = new MapManagerImpl(storage, storage, storage, permissions,
                 new NoopPlayerGateway(), java.util.regex.Pattern.compile(".*_bak$"),
                 java.util.regex.Pattern.compile(".*_bak$"), java.util.logging.Logger.getLogger("test"),
-                new NoopWorldVersionService());
+                new NoopWorldVersionService(), temporaryDirectory);
 
         assertNotNull(manager.maps());
         assertNotNull(manager.roles());
@@ -162,6 +162,81 @@ class MapServicesTest {
         assertEquals(4, manager.maps().listMaps().size());
     }
 
+    @Test
+    void effectiveMemberListsDeduplicateAndKeepDirectGrantsSeparate() {
+        UUID admin = UUID.randomUUID(), builder = UUID.randomUUID(), visitor = UUID.randomUUID();
+        roles.addMember(arena.id(), admin, MapRole.ADMIN);
+        roles.addMember(arena.id(), admin, MapRole.BUILDER);
+        roles.addMember(arena.id(), builder, MapRole.BUILDER);
+        roles.addMember(arena.id(), visitor, MapRole.VISITOR);
+        assertEquals(Set.of(admin, builder, visitor), roles.members(arena.id(), MapRole.VISITOR));
+        assertEquals(Set.of(admin, builder), roles.members(arena2.id(), MapRole.VISITOR));
+        assertEquals(Set.of(visitor), roles.assignedMembers(arena.id(), MapRole.VISITOR));
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,
+                () -> roles.members(arena.id(), MapRole.ADMIN).clear());
+    }
+
+    @Test
+    void revokedGroupRolesFallBackToMapVisitorAndPublicAccess() {
+        UUID player = UUID.randomUUID();
+        roles.addMember(arena.id(), player, MapRole.BUILDER);
+        roles.addMember(arena.id(), player, MapRole.VISITOR);
+        roles.removeMember(arena.id(), player, MapRole.BUILDER);
+        assertEquals(MapRole.VISITOR, access.decide(player, arena.id()).effectiveRole());
+        assertFalse(access.decide(player, arena2.id()).allowed());
+        roles.removeMember(arena.id(), player, MapRole.VISITOR);
+        assertFalse(access.decide(player, arena.id()).allowed());
+        assertTrue(access.decide(player, publicMap.id()).allowed());
+    }
+
+    @Test
+    void accessListsExcludeInactiveMapsEvenForAdministrators() {
+        UUID player = UUID.randomUUID();
+        roles.addMember(publicMap.id(), player, MapRole.ADMIN);
+        assertEquals(Set.of(publicMap), Set.copyOf(access.accessibleMaps(player)));
+        assertEquals(java.util.List.of(publicMap), access.administratedMaps(player));
+        assertTrue(access.accessibleMaps(null).isEmpty());
+        assertTrue(access.administratedMaps(UUID.randomUUID()).isEmpty());
+    }
+
+    @Test
+    void allInactiveStatusesRejectRoleChangesWithoutWriting() {
+        UUID player = UUID.randomUUID();
+        for (MapStatus status : MapStatus.values()) {
+            if (status == MapStatus.ACTIVE) continue;
+            MapInstance inactive = new MapInstance(arena.id(), arena.worldName(), arena.groupId(), arena.displayName(),
+                    arena.settings(), status, arena.spawn());
+            storage.save(inactive);
+            assertEquals(FailureReason.ACCESS_DENIED, assertInstanceOf(OperationResult.Failure.class,
+                    roles.addMember(arena.id(), player, MapRole.ADMIN)).reason());
+            assertEquals(FailureReason.ACCESS_DENIED, assertInstanceOf(OperationResult.Failure.class,
+                    roles.removeMember(arena.id(), player, MapRole.ADMIN)).reason());
+            assertTrue(roles.assignedMembers(arena.id(), MapRole.ADMIN).isEmpty());
+        }
+    }
+
+    @Test
+    void groupProjectionFailureAndPendingQueuePreserveMmcGrant() {
+        UUID player = UUID.randomUUID();
+        permissions.inheritanceResult = false;
+        assertEquals(FailureReason.PERMISSION_SYNC_FAILED, assertInstanceOf(OperationResult.Partial.class,
+                roles.addMember(arena.id(), player, MapRole.ADMIN)).reason());
+        assertTrue(roles.hasRole(arena.id(), player, MapRole.ADMIN));
+        permissions.inheritanceResult = true; permissions.pending = true;
+        assertEquals(FailureReason.PERMISSION_SYNC_PENDING, assertInstanceOf(OperationResult.Partial.class,
+                roles.removeMember(arena.id(), player, MapRole.ADMIN)).reason());
+        assertFalse(roles.hasRole(arena.id(), player, MapRole.ADMIN));
+    }
+
+    @Test
+    void visitorChangesNeverCallPermissionProjection() {
+        permissions.inheritanceResult = false; permissions.builderAccessResult = false; permissions.pending = true;
+        UUID player = UUID.randomUUID();
+        assertInstanceOf(OperationResult.Success.class, roles.addMember(arena.id(), player, MapRole.VISITOR));
+        assertInstanceOf(OperationResult.Success.class, roles.removeMember(arena.id(), player, MapRole.VISITOR));
+        assertFalse(roles.hasRole(arena.id(), player, MapRole.VISITOR));
+    }
+
     private static MapInstance map(String worldName, String groupId, MapSettings settings, MapStatus status) {
         return new MapInstance(UUID.randomUUID(), worldName, groupId, worldName, settings, status,
                 new SpawnPoint(worldName, 0, 64, 0, 0, 0));
@@ -170,6 +245,9 @@ class MapServicesTest {
     private static final class FakeWorldBaseProjection implements WorldBaseProjection {
         private boolean builderAccessResult = true;
         private boolean lastBuilderAccess;
+        private boolean inheritanceResult = true;
+        private boolean pending;
+        @Override public boolean pending() { return pending; }
 
         @Override
         public CompletableFuture<Boolean> ensureWorldBase() {
@@ -178,7 +256,7 @@ class MapServicesTest {
 
         @Override
         public CompletableFuture<Boolean> ensureGroupInheritance(String groupId, Set<String> worldNames) {
-            return CompletableFuture.completedFuture(false);
+            return CompletableFuture.completedFuture(inheritanceResult);
         }
 
         @Override

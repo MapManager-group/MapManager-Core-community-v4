@@ -17,6 +17,8 @@ import org.mvplugins.multiverse.core.world.LoadedMultiverseWorld;
 import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
 import org.mvplugins.multiverse.core.world.options.ImportWorldOptions;
 import org.mvplugins.multiverse.core.world.options.DeleteWorldOptions;
+import org.mvplugins.multiverse.core.world.options.LoadWorldOptions;
+import org.mvplugins.multiverse.core.world.options.RemoveWorldOptions;
 import studio.lorian.mapmanager.api.model.CreateMapRequest;
 import studio.lorian.mapmanager.api.model.Environment;
 import studio.lorian.mapmanager.api.model.ImportMapRequest;
@@ -42,6 +44,7 @@ import studio.lorian.mapmanager.plugin.internal.storage.OperationRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.OperationStage;
 import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.StorageException;
+import studio.lorian.mapmanager.plugin.internal.storage.RecoveryJournal;
 import studio.lorian.mapmanager.plugin.internal.world.WorldGatewayImpl;
 import studio.lorian.mapmanager.plugin.internal.world.FlatChunkGenerator;
 
@@ -74,11 +77,12 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     private final Pattern deletionPattern;
     private final Pattern blockedCreationPattern;
     private final Logger logger;
+    private final RecoveryJournal journal;
 
     public WorldLifeCycleServiceImpl(MapRepository maps, RoleRepository roles, OperationRepository operations,
                                      WorldBaseProjection permissions, MapAliasService aliases,
                                      WorldVersionService worldVersions, Pattern deletionPattern,
-                                     Pattern blockedCreationPattern, Logger logger) {
+                                     Pattern blockedCreationPattern, Logger logger, Path dataDirectory) {
         this.maps = maps;
         this.roles = roles;
         this.operations = operations;
@@ -89,6 +93,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         this.deletionPattern = deletionPattern;
         this.blockedCreationPattern = blockedCreationPattern;
         this.logger = logger;
+        this.journal = new RecoveryJournal(dataDirectory.resolve("world-recovery"));
     }
 
     @Override
@@ -113,7 +118,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         }
         // 世界生成方式只属于创建流程；其余注册步骤与导入共用。
         return registerWorld(OperationName.CREATE, operationId, request.worldName(), request.groupId(),
-                request.displayName(), request.ownerId(), () -> {
+                request.displayName(), request.ownerId(), request, null, () -> {
                     var result = MultiverseCoreApi.get().getWorldManager().createWorld(options);
                     if (result.isFailure())
                         logger.warning(Messages.text("world.create_failed", "world", request.worldName(),
@@ -339,7 +344,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.WORLD_BACKEND_FAILED);
         ImportWorldOptions options = importOptions(request);
         return registerWorld(OperationName.IMPORT, operationId, name, request.groupId(), request.displayName(),
-                request.ownerId(), () -> {
+                request.ownerId(), null, request, () -> {
                     var result = MultiverseCoreApi.get().getWorldManager().importWorld(options);
                     if (result.isFailure()) logger.warning(Messages.text("world.import_failed", "world", name,
                             "reason", result.getFailureReason()));
@@ -370,6 +375,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
      */
     private OperationResult<MapInstance> registerWorld(OperationName operation, UUID operationId, String name,
                                                        String requestedGroup, String requestedAlias, UUID ownerId,
+                                                       CreateMapRequest createRequest, ImportMapRequest importRequest,
                                                        Supplier<LoadedMultiverseWorld> worldAction) {
         String groupId = blank(requestedGroup) ? name : requestedGroup;
         String alias = blank(requestedAlias) ? name : MapAliasServiceImpl.stripColor(requestedAlias);
@@ -383,7 +389,9 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             if (maps.findByWorldName(name) != null || Bukkit.getWorld(name) != null || worldManager.isWorld(name))
                 return new OperationResult.Failure<>(operation, operationId, FailureReason.ALREADY_EXISTS);
 
-            // 先保存操作、地图组和 PENDING 地图，再调用 Multiverse 改动世界。
+            // 完整请求先落盘；在任何外部副作用前可确定性恢复初始所有者和生成器。
+            journal.save(new RecoveryJournal.Plan(operationId, operation, pending, createRequest, importRequest,
+                    null, null, null, null, null, Set.of()));
             operations.save(new OperationRecord(operationId, operation, name, OperationStage.STARTED, null));
             if (maps.findGroup(groupId) == null) maps.saveGroup(new MapGroup(groupId, Set.of()));
             maps.save(pending);
@@ -409,14 +417,17 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             operations.save(new OperationRecord(operationId, operation, name, OperationStage.DATA_SAVED, null));
 
             // 地图组在对应世界继承 worldbase；首位管理员继承地图组。
-            if (!permissions.ensureGroupInheritance(groupId, Set.of(name)).join()
+            var sync = permissions.ensureGroupInheritance(groupId, maps.findGroup(groupId).worldNames());
+            if ((sync.isDone() && !sync.join())
                     || (ownerId != null && !permissions.setBuilderAccess(groupId, ownerId, true)))
                 return failed(operationId, name, FailureReason.PERMISSION_SYNC_FAILED, operation);
 
-            // MMC 数据与 LP 投影均完成后，地图才允许转为 ACTIVE。
+            // MMC 是准入权威；LP 已入持久队列，不阻塞主线程等待投影。
             MapInstance active = new MapInstance(pending.id(), name, groupId, alias, pending.settings(), MapStatus.ACTIVE, spawn);
             maps.save(active);
             operations.save(new OperationRecord(operationId, operation, name, OperationStage.COMPLETED, null));
+            journal.remove(name);
+            if (permissions.pending()) return new OperationResult.Partial<>(operation, operationId, active, FailureReason.PERMISSION_SYNC_PENDING);
             return new OperationResult.Success<>(operation, operationId, active);
         } catch (StorageException exception) {
             logger.severe(Messages.text("world.storage_failed", "operation", Messages.text("operations." + operation),
@@ -461,6 +472,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         setRule(bukkitWorld, GameRule.DO_MOB_SPAWNING, false);
         setRule(bukkitWorld, GameRule.ANNOUNCE_ADVANCEMENTS, false);
         MultiverseCoreApi.get().getWorldManager().saveWorldsConfig().get();
+        // 将初始化后的世界和 gamerule 落盘；现代 Paper 维度共用主世界 level.dat。
+        bukkitWorld.save();
     }
 
     /**
@@ -533,16 +546,31 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             boolean worldExists = manager.isWorld(map.worldName());
             boolean folderExists = Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS);
             if (map.status() == MapStatus.ACTIVE && (!worldExists || !folderExists
-                    || !Files.isRegularFile(folder.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS)))
+                    || !worldVersions.isCompatible(folder)))
                 return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.WORLD_NOT_FOUND);
-            if (map.status() == MapStatus.DELETING && (worldExists != folderExists))
-                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.WORLD_BACKEND_FAILED);
-
+            RecoveryJournal.Plan plan = journal.read(worldName);
+            if (plan != null && (!plan.map().id().equals(map.id()) || plan.operation() != OperationName.DELETE))
+                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.OPERATION_IN_PROGRESS);
+            if (plan == null) {
+                var mv = manager.getWorld(worldName).getOrNull();
+                Set<UUID> members = new java.util.HashSet<>(roles.members(map.groupId(), MapRole.ADMIN));
+                members.addAll(roles.members(map.groupId(), MapRole.BUILDER));
+                plan = new RecoveryJournal.Plan(id, OperationName.DELETE, map, null, null,
+                        mv == null ? null : mv.getEnvironment().name(), mv == null ? null : mv.getGenerator(),
+                        mv == null ? null : mv.getGeneratorSettings(), RecoveryJournal.identity(folder),
+                        RecoveryJournal.directoryIdentity(folder), Set.copyOf(members));
+                journal.save(plan);
+            }
+            if (folderExists) verifyFolder(plan, folder);
             operations.save(new OperationRecord(id, OperationName.DELETE, map.worldName(), OperationStage.STARTED, null));
             if (map.status() != MapStatus.DELETING)
                 maps.save(new MapInstance(map.id(), map.worldName(), map.groupId(), map.displayName(),
                         map.settings(), MapStatus.DELETING, map.spawn()));
-            if (worldExists) {
+            if (worldExists && !folderExists) {
+                var world = manager.getWorld(map.worldName()).getOrNull();
+                if (world == null || manager.removeWorld(RemoveWorldOptions.world(world)).isFailure())
+                    return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
+            } else if (worldExists) {
                 var world = manager.getWorld(map.worldName()).getOrNull();
                 if (world == null) return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
                 var result = manager.deleteWorld(DeleteWorldOptions.world(world));
@@ -552,11 +580,15 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
                 }
             }
+            if (!manager.isWorld(map.worldName()) && Files.exists(folder, LinkOption.NOFOLLOW_LINKS)) {
+                verifyFolder(plan, folder);
+                deleteRemainder(folder);
+            }
             if (manager.isWorld(map.worldName()) || Files.exists(folder, LinkOption.NOFOLLOW_LINKS))
                 return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
             operations.save(new OperationRecord(id, OperationName.DELETE, map.worldName(), OperationStage.WORLD_CHANGED, null));
 
-            // 先清除 LP 投影，再清除 MMC 数据；任一步失败都保留 DELETING 以供重试。
+            // 清理任务先落持久队列，再移除 MMC 数据；LP 在后台完成。
             boolean lastMap = maps.findAll().stream().noneMatch(other -> !other.id().equals(map.id())
                     && other.groupId().equals(map.groupId()));
             try {
@@ -584,6 +616,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             maps.delete(map.id());
             if (lastMap) maps.deleteGroup(map.groupId());
             operations.save(new OperationRecord(id, OperationName.DELETE, map.worldName(), OperationStage.COMPLETED, null));
+            completePlan(plan);
+            if (permissions.pending()) return new OperationResult.Partial<>(OperationName.DELETE, id, null, FailureReason.PERMISSION_SYNC_PENDING);
             return new OperationResult.Success<>(OperationName.DELETE, id, null);
         } catch (StorageException exception) {
             logger.severe(Messages.text("world.delete_storage_failed", "world", worldName, "error", exception.getMessage()));
@@ -592,6 +626,174 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             logger.warning(Messages.text("world.delete_operation_failed", "world", worldName, "error", exception.getMessage()));
             return deleteFailed(id, FailureReason.WORLD_BACKEND_FAILED);
         }
+    }
+
+    @Override
+    public synchronized OperationResult<MapInstance> load(String worldName) {
+        UUID id = UUID.randomUUID();
+        if (!Bukkit.isPrimaryThread() || worldName == null || !worldName.matches("[A-Za-z0-9_-]{1,100}"))
+            return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.INVALID_INPUT);
+        try {
+            MapInstance map = maps.findByWorldName(worldName);
+            if (map == null) return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.MAP_NOT_FOUND);
+            if (map.status() != MapStatus.ACTIVE) return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.ACCESS_DENIED);
+            Path folder = worldGateway.worldDirectory(worldName);
+            if (Files.isSymbolicLink(folder) || !Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS))
+                return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.WORLD_NOT_FOUND);
+            if (!worldVersions.isCompatible(folder))
+                return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.WORLD_VERSION_INCOMPATIBLE);
+            var manager = MultiverseCoreApi.get().getWorldManager();
+            var world = manager.getWorld(worldName).getOrNull();
+            if (world == null) return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.WORLD_NOT_FOUND);
+            operations.save(new OperationRecord(id, OperationName.LOAD, worldName, OperationStage.STARTED, null));
+            var loaded = manager.getLoadedWorld(worldName).getOrNull();
+            if (loaded == null) loaded = manager.loadWorld(LoadWorldOptions.world(world).doFolderCheck(true)).getOrNull();
+            if (loaded == null) return failed(id, worldName, FailureReason.WORLD_BACKEND_FAILED, OperationName.LOAD);
+            operations.save(new OperationRecord(id, OperationName.LOAD, worldName, OperationStage.COMPLETED, null));
+            return new OperationResult.Success<>(OperationName.LOAD, id, map);
+        } catch (StorageException error) { return failed(id, worldName, FailureReason.STORAGE_FAILED, OperationName.LOAD); }
+        catch (RuntimeException error) { return failed(id, worldName, FailureReason.WORLD_BACKEND_FAILED, OperationName.LOAD); }
+    }
+
+    @Override
+    public synchronized OperationResult<MapInstance> recover(String worldName) {
+        UUID id = UUID.randomUUID();
+        if (!Bukkit.isPrimaryThread() || worldName == null || !worldName.matches("[A-Za-z0-9_-]{1,100}"))
+            return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.INVALID_INPUT);
+        try {
+            RecoveryJournal.Plan plan = journal.read(worldName);
+            if (plan == null) return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.INVALID_INPUT);
+            MapInstance map = maps.findByWorldName(worldName);
+            id = plan.operationId();
+            if (map != null && !map.id().equals(plan.map().id()))
+                return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.ALREADY_EXISTS);
+            if (plan.operation() == OperationName.DELETE) {
+                if (map != null) {
+                    OperationResult<Void> result = delete(worldName);
+                    if (result instanceof OperationResult.Failure<?> failure)
+                        return new OperationResult.Failure<>(OperationName.RECOVER, result.operationId(), failure.reason());
+                    if (result instanceof OperationResult.Partial<?> partial)
+                        return new OperationResult.Partial<>(OperationName.RECOVER, result.operationId(), null, partial.reason());
+                    return new OperationResult.Success<>(OperationName.RECOVER, result.operationId(), null);
+                }
+                // MMC 地图已移除但空组/操作记录未完成的断点。
+                if (MultiverseCoreApi.get().getWorldManager().isWorld(worldName)
+                        || Files.exists(worldGateway.worldDirectory(worldName), LinkOption.NOFOLLOW_LINKS))
+                    return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.WORLD_BACKEND_FAILED);
+                if (maps.findAll().stream().noneMatch(m -> m.groupId().equals(plan.map().groupId()))) {
+                    for (UUID member : plan.members()) permissions.setBuilderAccess(plan.map().groupId(), member, false);
+                    permissions.removeGroup(plan.map().groupId());
+                    roles.removeScope(plan.map().groupId(), MapRole.ADMIN);
+                    roles.removeScope(plan.map().groupId(), MapRole.BUILDER);
+                    maps.deleteGroup(plan.map().groupId());
+                } else permissions.removeWorldInheritance(plan.map().groupId(), worldName);
+                completePlan(plan);
+                return new OperationResult.Success<>(OperationName.RECOVER, id, null);
+            }
+            if (plan.operation() != OperationName.CREATE && plan.operation() != OperationName.IMPORT)
+                return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.INVALID_INPUT);
+            if (map != null && map.status() == MapStatus.ACTIVE) {
+                completePlan(plan); return new OperationResult.Success<>(OperationName.RECOVER, id, map);
+            }
+            if (map != null && map.status() != MapStatus.PENDING)
+                return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.OPERATION_IN_PROGRESS);
+            if (maps.findGroup(plan.map().groupId()) == null) maps.saveGroup(new MapGroup(plan.map().groupId(), Set.of()));
+            if (map == null) { map = plan.map(); maps.save(map); }
+            var manager = MultiverseCoreApi.get().getWorldManager();
+            var world = manager.getLoadedWorld(worldName).getOrNull();
+            if (world == null && manager.isWorld(worldName))
+                world = manager.loadWorld(LoadWorldOptions.world(manager.getWorld(worldName).get())).getOrNull();
+            if (world == null && !manager.isWorld(worldName)) {
+                Path folder = worldGateway.worldDirectory(worldName);
+                if (plan.imported() != null && !Files.exists(folder, LinkOption.NOFOLLOW_LINKS))
+                    folder = Path.of("").toAbsolutePath().normalize().resolve(worldName);
+                if (Files.isSymbolicLink(folder)) throw new IllegalArgumentException(Messages.text("maintenance.recovery_invalid"));
+                if (Files.exists(folder)) {
+                    if (!worldVersions.isCompatible(folder))
+                        return failed(plan.operationId(), worldName, FailureReason.WORLD_VERSION_INCOMPATIBLE, plan.operation());
+                    ImportWorldOptions options;
+                    if (plan.create() != null) {
+                        var created = options(plan.create());
+                        options = ImportWorldOptions.worldName(worldName).environment(created.environment())
+                                .generator(created.generator()).generatorSettings(created.generatorSettings()).biome(created.biome());
+                    } else if (plan.imported() != null) options = importOptions(plan.imported());
+                    else throw new IllegalArgumentException(Messages.text("maintenance.recovery_invalid"));
+                    world = manager.importWorld(options).getOrNull();
+                } else if (plan.create() != null) world = manager.createWorld(options(plan.create())).getOrNull();
+            }
+            if (world == null) return failed(plan.operationId(), worldName, FailureReason.WORLD_BACKEND_FAILED, plan.operation());
+            initializeWorld(world, map.id(), map.displayName());
+            UUID owner = plan.create() != null ? plan.create().ownerId() : plan.imported() != null ? plan.imported().ownerId() : null;
+            if (owner != null) roles.add(map.groupId(), MapRole.ADMIN, owner);
+            var location = world.getSpawnLocation();
+            SpawnPoint spawn = location == null ? null : new SpawnPoint(worldName, location.getX(), location.getY(),
+                    location.getZ(), location.getYaw(), location.getPitch());
+            var sync = permissions.ensureGroupInheritance(map.groupId(), maps.findGroup(map.groupId()).worldNames());
+            if (sync.isDone() && !sync.join()) return failed(plan.operationId(), worldName, FailureReason.PERMISSION_SYNC_FAILED, plan.operation());
+            Set<UUID> builders = new java.util.HashSet<>(roles.members(map.groupId(), MapRole.ADMIN));
+            builders.addAll(roles.members(map.groupId(), MapRole.BUILDER));
+            for (UUID builder : builders) if (!permissions.setBuilderAccess(map.groupId(), builder, true))
+                return failed(plan.operationId(), worldName, FailureReason.PERMISSION_SYNC_FAILED, plan.operation());
+            MapInstance active = new MapInstance(map.id(), worldName, map.groupId(), map.displayName(), map.settings(), MapStatus.ACTIVE, spawn);
+            maps.save(active); completePlan(plan);
+            return permissions.pending() ? new OperationResult.Partial<>(OperationName.RECOVER, id, active, FailureReason.PERMISSION_SYNC_PENDING)
+                    : new OperationResult.Success<>(OperationName.RECOVER, id, active);
+        } catch (StorageException error) { return failed(id, worldName, FailureReason.STORAGE_FAILED, OperationName.RECOVER); }
+        catch (RuntimeException error) {
+            logger.warning(Messages.text("world.operation_failed", "operation", Messages.text("operations.RECOVER"),
+                    "world", worldName, "error", error.getMessage()));
+            return failed(id, worldName, FailureReason.WORLD_BACKEND_FAILED, OperationName.RECOVER);
+        }
+    }
+
+    public void recoverAll() {
+        for (RecoveryJournal.Plan plan : journal.all()) {
+            OperationResult<MapInstance> result = recover(plan.map().worldName());
+            if (result instanceof OperationResult.Failure<?> || result instanceof OperationResult.Partial<?> partial
+                    && partial.reason() != FailureReason.PERMISSION_SYNC_PENDING)
+                logger.warning(Messages.text("maintenance.recovery_needed", "world", plan.map().worldName()));
+        }
+        for (OperationRecord record : operations.unfinished()) {
+            if (record.name() == OperationName.INITIALIZE || record.name() == OperationName.LOAD) {
+                OperationResult<MapInstance> result = record.name() == OperationName.INITIALIZE
+                        ? initialize(record.worldName()) : load(record.worldName());
+                FailureReason reason = result instanceof OperationResult.Failure<?> failure ? failure.reason()
+                        : result instanceof OperationResult.Partial<?> partial ? partial.reason() : null;
+                operations.save(new OperationRecord(record.id(), record.name(), record.worldName(),
+                        reason == null ? OperationStage.COMPLETED : OperationStage.FAILED, reason));
+            }
+            else if (journal.read(record.worldName()) != null) continue;
+            else if (record.name() == OperationName.CREATE || record.name() == OperationName.IMPORT || record.name() == OperationName.DELETE) {
+                MapInstance map = maps.findByWorldName(record.worldName());
+                if ((map == null && record.name() == OperationName.DELETE) || (map != null && map.status() == MapStatus.ACTIVE && record.name() != OperationName.DELETE))
+                    operations.save(new OperationRecord(record.id(), record.name(), record.worldName(), OperationStage.COMPLETED, null));
+                else logger.warning(Messages.text("maintenance.recovery_needed", "world", record.worldName()));
+            }
+        }
+    }
+    private void completePlan(RecoveryJournal.Plan plan) {
+        operations.save(new OperationRecord(plan.operationId(), plan.operation(), plan.map().worldName(), OperationStage.COMPLETED, null));
+        journal.remove(plan.map().worldName());
+    }
+    static void verifyFolder(RecoveryJournal.Plan plan, Path folder) {
+        String directoryId = RecoveryJournal.directoryIdentity(folder), worldId = RecoveryJournal.identity(folder);
+        if (Files.isSymbolicLink(folder) || (plan.directoryIdentity() == null && plan.worldIdentity() == null)
+                || (plan.directoryIdentity() != null && !plan.directoryIdentity().equals(directoryId))
+                || (plan.worldIdentity() != null && worldId != null && !plan.worldIdentity().equals(worldId)))
+            throw new IllegalArgumentException(Messages.text("maintenance.recovery_invalid"));
+    }
+    private static void deleteRemainder(Path folder) {
+        try {
+            Files.walkFileTree(folder, new java.nio.file.SimpleFileVisitor<>() {
+                @Override public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                    Files.delete(file); return java.nio.file.FileVisitResult.CONTINUE;
+                }
+                @Override public java.nio.file.FileVisitResult postVisitDirectory(Path directory, java.io.IOException error) throws java.io.IOException {
+                    if (error != null) throw error;
+                    Files.delete(directory); return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (java.io.IOException error) { throw new StorageException(Messages.text("maintenance.recovery_save_failed"), error); }
     }
 
     private OperationResult<Void> deleteFailed(UUID id, FailureReason reason) {

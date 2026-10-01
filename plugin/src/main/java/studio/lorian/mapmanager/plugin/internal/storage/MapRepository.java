@@ -11,6 +11,9 @@ public interface MapRepository {
     MapInstance findById(UUID mapId);
     MapInstance findByWorldName(String worldName);
     List<MapInstance> findAll();
+    default List<MapGroup> allGroups() {
+        return findAll().stream().map(MapInstance::groupId).distinct().map(this::findGroup).toList();
+    }
     MapGroup findGroup(String groupId);
     void save(MapInstance map);
     void delete(UUID mapId);
