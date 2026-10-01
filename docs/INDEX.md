@@ -32,6 +32,10 @@
 - [`PROJECT_NOTES.md`](PROJECT_NOTES.md)：长期项目约定和阶段记录；可能随源码演进，执行前核对源码。
 - [`TEST_CASES.md`](TEST_CASES.md)：自动化单元测试映射，以及需 Paper/依赖服务的启动、命令、API、存储和迁移验收用例。
 
+## HTTP 测试环境验收
+
+- [2026-10-01 MMW / Tuff HTTP 测试报告](HTTP_TEST_REPORT_2026-10-01.md)：32 个 HTTP 操作的实际覆盖、已发现问题、恢复结果与未完成流程；[脱敏请求证据](HTTP_TEST_EVIDENCE_2026-10-01.jsonl)。
+
 ## 文档维护约定
 
 - 所有项目 Markdown 放在本目录；根目录 `AGENTS.md` 是唯一例外，用于强制任务入口。
