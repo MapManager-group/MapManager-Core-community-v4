@@ -26,7 +26,7 @@ MapManager-v4/
 │     │     ├─ permission/                    LuckPerms worldbase 投影
 │     │     ├─ player/                        Paper 玩家适配
 │     │     ├─ storage/                       内部仓储接口、JSON/MySQL 实现
-│     │     └─ world/                         世界目录查询、版本检查及特殊环境平坦区块生成器
+│     │     └─ world/                         世界目录查询（`worldDirectories()` 公开实际存档路径）、版本检查及特殊环境平坦区块生成器
 │     └─ resources/                           config.yml、paper-plugin.yml、langs/*.yml
 │  ├─ src/test/integration/                    真实 Paper 外部插件验收脚本
 │  └─ src/test/java/                           API 契约、生命周期选项、服务规则、存储和适配器单元测试

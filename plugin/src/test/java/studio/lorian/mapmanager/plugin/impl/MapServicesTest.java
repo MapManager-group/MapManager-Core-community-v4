@@ -159,7 +159,35 @@ class MapServicesTest {
         assertNotNull(manager.travel());
         assertNotNull(manager.worldLifeCycle());
         assertNotNull(manager.worldVersions());
+        assertNotNull(manager.worldDirectories());
         assertEquals(4, manager.maps().listMaps().size());
+    }
+
+    @Test
+    void publicDirectoryQueryUsesActualLoadedFolderAndDoesNotCreateUnloadedFolders() throws Exception {
+        Path actual = temporaryDirectory.resolve("actual-save-location");
+        var world = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(org.bukkit.World.class,
+                (o, m, a) -> switch (m.getName()) {
+                    case "getName" -> "world";
+                    case "getWorldFolder" -> actual.toFile();
+                    default -> throw new AssertionError(m);
+                });
+        try (var server = new studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer((o, m, a) -> switch (m.getName()) {
+            case "getWorlds" -> java.util.List.of(world);
+            case "getWorld" -> "arena".equals(a[0]) ? world : null;
+            default -> throw new AssertionError(m);
+        })) {
+            var manager = new MapManagerImpl(storage, storage, storage, permissions, new NoopPlayerGateway(),
+                    java.util.regex.Pattern.compile(".*_bak$"), java.util.logging.Logger.getLogger("test"),
+                    new NoopWorldVersionService(), temporaryDirectory);
+            assertEquals(actual, manager.worldDirectories().worldDirectory("arena"));
+            String unloaded = "directory-probe-" + UUID.randomUUID();
+            Path expected = new studio.lorian.mapmanager.plugin.internal.world.WorldGatewayImpl().worldDirectory(unloaded);
+            assertEquals(expected, manager.worldDirectories().worldDirectory(unloaded));
+            assertFalse(java.nio.file.Files.exists(expected));
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> manager.worldDirectories().worldDirectory("../escape"));
+        }
     }
 
     @Test

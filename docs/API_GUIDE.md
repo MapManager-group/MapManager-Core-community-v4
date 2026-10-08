@@ -184,7 +184,11 @@ new ImportMapRequest("arena-copy", "Arena Copy", "team", ownerId,
 
 `worldVersions().serverDataVersion()` 返回当前服务器 dataVersion；`mapDataVersion(Path)` 读取指定目录 `level.dat` 的版本，无法读取时返回空 `OptionalInt`；Paper 26 已存在的维度目录缺少独立 level.dat 时读取根世界共用文件；`isCompatible(Path/String)` 判断地图版本是否不高于服务器版本。该服务不创建、导入或修改地图。
 
-`PlayerGateway` 和 `WorldGateway` 虽然属于 `api` 模块，但当前没有作为 `MapManager` getter 暴露；外部插件应使用 `MapManager` 的业务服务，不应自行获取 plugin 内部适配器。
+### 地图实际目录
+
+`worldDirectories().worldDirectory(worldName)` 返回地图实际目录：已加载世界使用服务器实际存档目录，未加载世界使用 MMC 当前版本的目录规则；`worldParentDirectory()` 返回 MMC 地图父目录。只读查询，不创建或加载世界。在主线程调用并缓存结果；不要在扩展插件中再次拼接服务器目录或复制 Minecraft 版本判断。需要包含未加载地图时先用 `maps().listMaps()` 枚举登记地图。
+
+`PlayerGateway` 尚未通过 `MapManager` getter 暴露。目录入口在本次 `4.0.0-SNAPSHOT` 源码中新增，扩展插件须使用同步更新的 MMC 插件/API。
 
 ## 返回值、线程和权限
 

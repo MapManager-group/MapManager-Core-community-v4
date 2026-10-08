@@ -50,7 +50,7 @@ plugin/src/main/java/studio/lorian/mapmanager/plugin/
   notification/统一通知路由与消息格式
 ```
 
-`api` 是调用方编译依赖，`plugin` 有 Paper 入口和实际业务实现。主类在 `onEnable` 装配服务时注册 `MapSettingsListener` 和 `MapAccessListener`；存储迁移与 LP `worldbase` 初始化均成功后，再在主线程复核在线玩家、注册 `/world` 和 `/wtp` 命令，并通过 Bukkit ServicesManager 发布 `MapManager`。外部插件依赖和服务获取方式见 [API_GUIDE.md](API_GUIDE.md)。`PlayerGateway`、`WorldGateway` 和 `WorldVersionService` 接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 仅查询目录并返回 JDK `Path`，地图版本服务公开版本读取和兼容性判断，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
+`api` 是调用方编译依赖，`plugin` 有 Paper 入口和实际业务实现。主类在 `onEnable` 装配服务时注册 `MapSettingsListener` 和 `MapAccessListener`；存储迁移与 LP `worldbase` 初始化均成功后，再在主线程复核在线玩家、注册 `/world` 和 `/wtp` 命令，并通过 Bukkit ServicesManager 发布 `MapManager`。外部插件依赖和服务获取方式见 [API_GUIDE.md](API_GUIDE.md)。`PlayerGateway`、`WorldGateway` 和 `WorldVersionService` 接口位于 `api.service`，实现位于 `plugin`；`WorldGateway` 通过 `MapManager.worldDirectories()` 提供主线程只读实际目录查询并返回 JDK `Path`，不改变内部生命周期目录边界，地图版本服务公开版本读取和兼容性判断，创建和导入等操作统一由 `WorldLifeCycleService` 定义。API 不暴露 repository、DAO、存储配置类、数据库连接或 JSON/SQL 实体。v3 接口分类见 [API_INVENTORY.md](API_INVENTORY.md)。
 
 ## 3. API 核心类型
 

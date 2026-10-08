@@ -15,6 +15,10 @@ import studio.lorian.mapmanager.plugin.internal.storage.RoleRepository;
 import studio.lorian.mapmanager.plugin.internal.storage.OperationRepository;
 import studio.lorian.mapmanager.plugin.internal.permission.WorldBaseProjection;
 
+import org.bukkit.Bukkit;
+import java.nio.file.Path;
+import studio.lorian.mapmanager.api.service.WorldGateway;
+import studio.lorian.mapmanager.plugin.internal.world.WorldGatewayImpl;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -28,6 +32,20 @@ public final class MapManagerImpl implements MapManager {
     private final MapTravelService travel;
     private final WorldLifeCycleService worldLifeCycle;
     private final WorldVersionService worldVersions;
+    private final WorldGateway worldDirectories = new WorldGateway() {
+        private final WorldGateway delegate = new WorldGatewayImpl();
+
+        @Override public Path worldParentDirectory() {
+            return delegate.worldParentDirectory();
+        }
+
+        @Override public Path worldDirectory(String worldName) {
+            // 先复用名称校验；仅此对外查询优先实际路径，生命周期内部目录边界保持不变。
+            Path expected = delegate.worldDirectory(worldName);
+            var loaded = Bukkit.getServer() == null ? null : Bukkit.getWorld(worldName);
+            return loaded == null ? expected : loaded.getWorldFolder().toPath().toAbsolutePath().normalize();
+        }
+    };
 
     public MapManagerImpl(MapRepository repository, RoleRepository roleRepository, OperationRepository operations,
                           WorldBaseProjection permissions, PlayerGateway players,
@@ -83,4 +101,10 @@ public final class MapManagerImpl implements MapManager {
     public WorldVersionService worldVersions() {
         return worldVersions;
     }
+
+    @Override
+    public WorldGateway worldDirectories() {
+        return worldDirectories;
+    }
+
 }

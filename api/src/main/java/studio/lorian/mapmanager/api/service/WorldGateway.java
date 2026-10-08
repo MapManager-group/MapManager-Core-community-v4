@@ -13,7 +13,8 @@ public interface WorldGateway {
     Path worldParentDirectory();
 
     /**
-     * 返回指定地图的存储目录，不创建目录。
+     * 返回指定地图的存储目录，不创建目录。通过 {@link studio.lorian.mapmanager.api.MapManager#worldDirectories()}
+     * 获取的查询入口优先返回已加载世界实际存档路径；未加载世界按父目录规则定位。
      *
      * @param worldName 安全的单个世界目录名
      * @return 地图目录的绝对路径

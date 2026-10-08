@@ -8,6 +8,7 @@ import studio.lorian.mapmanager.api.service.MapSettingsService;
 import studio.lorian.mapmanager.api.service.MapTravelService;
 import studio.lorian.mapmanager.api.service.WorldLifeCycleService;
 import studio.lorian.mapmanager.api.service.WorldVersionService;
+import studio.lorian.mapmanager.api.service.WorldGateway;
 
 /**
  * MapManager 对外公开 API 的统一入口。
@@ -70,4 +71,13 @@ public interface MapManager {
      * @return 地图版本服务
      */
     WorldVersionService worldVersions();
+
+    /**
+     * 返回只读地图目录查询。已加载地图使用实际存档目录，未加载地图使用 MMC 目录规则。
+     * 调用方应在主线程查询并缓存路径；不会创建、加载或修改世界。
+     *
+     * @return 地图目录查询服务
+     */
+    WorldGateway worldDirectories();
+
 }

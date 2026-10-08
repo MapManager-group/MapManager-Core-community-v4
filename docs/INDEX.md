@@ -22,7 +22,7 @@
 - [`ARCHITECTURE.md`](ARCHITECTURE.md)：架构边界、设计原则和未完成事项。
 - [`STRUCTURE.md`](STRUCTURE.md)：目录、入口、关键调用关系。
 - [`API_INVENTORY.md`](API_INVENTORY.md)：v3 能力到 v4 API/实现的对照。
-- [`API_GUIDE.md`](API_GUIDE.md)：外部 Paper 插件依赖、获取及调用 v4 API 的指南，包括命令专用删除正则与 API 安全校验的区别。
+- [`API_GUIDE.md`](API_GUIDE.md)：外部 Paper 插件依赖、获取及调用 v4 API（含实际地图目录）的指南，包括命令专用删除正则与 API 安全校验的区别。
 - [`V3_TO_V4_API_MIGRATION.md`](V3_TO_V4_API_MIGRATION.md)：v3 外部插件迁移到 v4 的依赖、服务获取、调用替换与行为差异。
 - [`README.md`](README.md)：中文用户介绍、安装、权限、命令、配置和开发接入。
 - [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为，包括准入、设置、控制台 create/import/init/delete、维护命令、按需加载和生命周期恢复。

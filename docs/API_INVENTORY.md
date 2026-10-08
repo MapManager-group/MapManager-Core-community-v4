@@ -17,7 +17,7 @@
 | `MapAgent.containsWorld/getWorlds` | 托管地图查询 | `MapService.findByWorldName/listMaps` |
 | `MapAgent.getNodeMap/getGroupMap` | 直接获取可变存储对象 | 不公开；用 `MapService` 的快照查询替代 |
 | `MapAgent.getUniqueID/getPlayer/isPlayerRegister` | 玩家名解析、在线玩家对象和历史注册检查 | `api.service.PlayerGateway.resolveId/isOnline/currentWorld`；不暴露 Bukkit `Player`，也没有独立的注册状态查询；角色等公开服务使用 UUID |
-| `MapAgent.getWorldParentFolder/getWorldFolder` | 世界目录访问 | `api.service.WorldGateway`；目录查询返回 JDK `Path` |
+| `MapAgent.getWorldParentFolder/getWorldFolder` | 世界目录访问 | `MapManager.worldDirectories()` / `api.service.WorldGateway`；目录查询返回实际 JDK `Path` |
 | `MapAgent.save/reload` | 旧 JSON 文件保存、重载 | repository 自动持久化并发布缓存；外部文件修改需停服处理后重启，没有对应 save/reload 命令，公开 API 不操作文件 |
 | `MapAgent.setLuckPerms/syncWithLuckPerms` | LP 实例注入与数据同步 | plugin 内部 `WorldBaseProjection`；仅投影 `worldbase` 能力 |
 | `MapAgent.ignoreColor` | 地图显示字符串处理 | plugin 内部展示工具，不作为服务接口 |

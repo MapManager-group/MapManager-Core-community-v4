@@ -122,7 +122,7 @@ public final class ExampleAddon extends JavaPlugin implements Listener {
 | `getMainYaml()`、`save()`、`reload()` | 暂无对外替代 | 扩展插件配置由扩展插件自己管理；MMC 服务修改会自动持久化。 |
 | `getNodeMap/getGroupMap` | `maps().listMaps()`、`maps().findGroup/listGroupMaps()` | v4 不暴露可变 repository/map；调用方改为读取快照并调用服务写入。 |
 | `getPlayer/getUniqueID/isPlayerRegister` | 使用扩展插件自己的 Bukkit 玩家/UUID/首次加入管理 | `PlayerGateway` 虽在 API 模块声明，但当前没有通过 `MapManager` getter 暴露；v4 没有独立的历史注册状态查询。 |
-| `getWorldParentFolder/getWorldFolder` | 无 `MapManager` 对外 getter | 世界目录适配器不对外提供；优先使用 Bukkit 对已加载世界的 API，不要依赖 plugin 内部目录实现。 |
+| `getWorldParentFolder/getWorldFolder` | `worldDirectories().worldParentDirectory/worldDirectory` | 主线程只读查询实际目录，兼容已加载与未加载地图；不要复制版本目录规则。需要本次更新的 MMC v4 插件/API。 |
 | `getMVWorld/getMVWorldManager/getLoadedWorld` | 使用 Bukkit API 处理 Bukkit 世界对象 | v4 API 不暴露 Multiverse 对象，避免调用方依赖后端实现。 |
 
 完整的 v3 功能保留、行为变化和缺失项见 [API_INVENTORY.md](API_INVENTORY.md)。
