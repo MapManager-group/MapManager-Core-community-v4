@@ -115,7 +115,7 @@ public final class ExampleAddon extends JavaPlugin implements Listener {
 | `createWorld/newWorld` | `worldLifeCycle().create(new CreateMapRequest(..., WorldType, Environment, parameters))` | 生成器和环境独立指定；所有者 ID 使用 UUID，`ownerId == null` 时不会自动分配首位管理员。 |
 | `importWorld` | `worldLifeCycle().importWorld(new ImportMapRequest(..., WorldType, Environment))` | 只从服务端根目录导入，要求有效 `level.dat` 且版本兼容；不含生成参数，保留已有区块并为后续生成配置生成器和环境。 |
 | `initWorld` | `worldLifeCycle().initialize(worldName)` | 需要已加载且已登记的地图。 |
-| `deleteWorld/removeWorld` | `worldLifeCycle().delete(worldName)` | 受配置中的删除名称正则、在线玩家、默认世界及目录安全检查限制。 |
+| `deleteWorld/removeWorld` | `worldLifeCycle().delete(worldName)` | 不受命令删除名称正则限制；仍受名称格式、在线玩家、默认世界及目录安全检查限制。 |
 | `getVersionCheck()` | `worldVersions()` | 读取地图 dataVersion 并与服务器版本比较。 |
 | `getDynamicWorld().loadWorld/unloadWorldLater` | `worldLifeCycle().load(worldName)` | v4 支持 ACTIVE 地图按需加载，`travel().teleport` 会先准入再加载；没有延迟卸载。 |
 | `getLuckPerms()` / `syncWithLuckPerms()` | 暂无对外替代 | LuckPerms 由 v4 plugin 内部用于投影 `worldbase` 建造权限；不要直接用 LP 同步 MMC 角色或判断进图权限。 |

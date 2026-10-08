@@ -22,13 +22,13 @@
 - [`ARCHITECTURE.md`](ARCHITECTURE.md)：架构边界、设计原则和未完成事项。
 - [`STRUCTURE.md`](STRUCTURE.md)：目录、入口、关键调用关系。
 - [`API_INVENTORY.md`](API_INVENTORY.md)：v3 能力到 v4 API/实现的对照。
-- [`API_GUIDE.md`](API_GUIDE.md)：外部 Paper 插件依赖、获取及调用 v4 API 的指南。
+- [`API_GUIDE.md`](API_GUIDE.md)：外部 Paper 插件依赖、获取及调用 v4 API 的指南，包括命令专用删除正则与 API 安全校验的区别。
 - [`V3_TO_V4_API_MIGRATION.md`](V3_TO_V4_API_MIGRATION.md)：v3 外部插件迁移到 v4 的依赖、服务获取、调用替换与行为差异。
 - [`README.md`](README.md)：中文用户介绍、安装、权限、命令、配置和开发接入。
 - [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为，包括准入、设置、控制台 create/import/init/delete、维护命令、按需加载和生命周期恢复。
 - [`MIGRATION.md`](MIGRATION.md)：v3 自动迁移触发、字段映射、保护和限制。
 - [`STORAGE.md`](STORAGE.md)：存储配置、文件/表结构、后端约束。
-- [`MESSAGES.md`](MESSAGES.md)：语言选择、资源位置、MiniMessage 和翻译维护。
+- [`MESSAGES.md`](MESSAGES.md)：语言选择、资源位置、MiniMessage、玩家结果隐藏操作 ID 与控制台记录、翻译维护。
 - [`PROJECT_NOTES.md`](PROJECT_NOTES.md)：长期项目约定和阶段记录；可能随源码演进，执行前核对源码。
 - [`TEST_CASES.md`](TEST_CASES.md)：自动化单元测试映射，以及需 Paper/依赖服务的启动、命令、API、存储和迁移验收用例。
 

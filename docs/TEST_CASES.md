@@ -33,17 +33,17 @@ mvn clean package
 | UNIT-NBT-01 至 UNIT-NBT-04       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/LevelDatVersionReaderTest.java` | 压缩 NBT 与 Paper 26 共用根文件；文件损坏、字段缺失或类型无效时返回空值                                                 |
 | UNIT-ALIAS-01                    | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapAliasServiceImplTest.java`             | legacy、section 与 RGB 颜色代码清理                                                                           |
 | UNIT-MIG-01 至 UNIT-MIG-02       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationSourceTest.java` | v3 地图、组、角色范围和物理/爆炸设置解析；组地图清单不一致时拒绝                                              |
-| UNIT-MSG-01 至 UNIT-MSG-06       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文与安全占位符、中文回退、参数校验、双语键及结果枚举齐全；三种结果通知及玩家/控制台/日志分流                                                              |
+| UNIT-MSG-01 至 UNIT-MSG-07       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文与安全占位符、中文回退、参数校验、双语键及结果枚举齐全；三种结果通知及玩家/控制台/日志分流；双语玩家隐藏 ID、控制台保留 ID                                                              |
 | UNIT-CONFIG-01 至 UNIT-CONFIG-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageConfigTest.java`       | JSON 默认值、MySQL 配置读取与空白裁剪、未知类型及必填项/端口/数据库名校验                                     |
 | UNIT-LIFE-01 至 UNIT-LIFE-06     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | 创建和导入覆盖三种生成器与三种已实现环境的组合；SIFT 保持未支持；校验 FLAT 层高和非 FLAT 的 flat.height 拒绝 |
 | UNIT-TRAVEL-01 至 UNIT-TRAVEL-13 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapTravelServiceImplTest.java` | 传送输入/线程/在线/准入校验、按需加载、Failure/Partial 传播、出生点和朝向、错误世界和传送失败、踢出同图与管理员校验 |
 | UNIT-VERSION-01 至 UNIT-VERSION-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldVersionServiceImplTest.java` | 旧版/同版/未来版本兼容判断、损坏或缺失 NBT、世界名定位及路径逃逸拒绝 |
 | UNIT-FLAT-01 至 UNIT-FLAT-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/FlatChunkGeneratorTest.java` | 生成器 ID 往返、实际层材料/顺序/范围、负最小高度、区块高度截断、出生点和非法设置 |
 | UNIT-LISTENER-01 至 UNIT-LISTENER-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/listener/MapListenersTest.java` | 物理与爆炸设置独立、未登记世界、落沙恢复、其他实体、严格传送准入及关闭整套监听 |
-| UNIT-VALIDATE-01 至 UNIT-VALIDATE-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、删除保护；拒绝时无地图/组/操作记录写入 |
+| UNIT-VALIDATE-01 至 UNIT-VALIDATE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、API 删除不要求 _bak 后缀且仍校验地图状态；拒绝时不新增地图/组/操作记录 |
 | UNIT-FAILURE-01 至 UNIT-FAILURE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServiceFailureTest.java` | 角色写入失败返回 Failure、写后读取或 LP 异常返回 Partial、无效角色输入、物理/爆炸读写失败 |
 | UNIT-ADMIN-01 至 UNIT-ADMIN-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapAdminCommandTest.java` | 控制台限制、路由、默认值、非法/重复选项、导入参数拒绝、一次性/过期删除码、身份与状态保护、补全 |
-| UNIT-CMD-01 至 UNIT-CMD-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapWorldCommandTest.java` | world/wtp 共用传送、设置/别名/出生点路由、管理员授权、只读 info、存储错误及补全过滤 |
+| UNIT-CMD-01 至 UNIT-CMD-07 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapWorldCommandTest.java` | world/wtp 共用传送、设置/别名/出生点路由、管理员授权、只读 info、角色 info 名单/准入、存储错误及补全过滤 |
 | UNIT-RECOVERY-01 至 UNIT-RECOVERY-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/RecoveryJournalTest.java` | 完整请求重启、目录身份变更拒绝、符号链接与路径穿越拒绝 |
 | UNIT-CACHE-01 至 UNIT-CACHE-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageRecoveryTest.java` | 快照恢复和冲突、事件读取隔离、缓存写失败不发布、重命名/换组索引、旧快照不可变、角色清理与删除保护、后端切换标记 |
 | UNIT-QUEUE-01 至 UNIT-QUEUE-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/permission/QueuedWorldBaseProjectionTest.java` | LP 不阻塞调用者、FIFO 撤权顺序、失败重试与重启恢复、损坏任务文件拒绝 |
@@ -154,7 +154,7 @@ mvn clean package
 | ROLE-08 | 对 PENDING/DELETING 等非 ACTIVE 地图修改成员                        | 返回 ACCESS_DENIED；授权不变                                                      |
 | ROLE-09 | 成员修改使用 null map/player/role 或无效地图 ID                     | 返回 INVALID_INPUT 或 MAP_NOT_FOUND；存储不变                                     |
 | ROLE-10 | MMC 角色存储失败；MMC 成功但 LP 写入失败                            | 前者返回 STORAGE_FAILED；后者返回 Partial，并保留 MMC 权威角色记录                |
-| ROLE-11 | `/world admins\|builders\|visitors` 由可进入当前地图玩家执行       | 输出直接授予该角色的玩家，不把继承角色错误列为直接授予                               |
+| ROLE-11 | `/world admin\|builder\|visitor info` 由可进入当前地图玩家执行       | 输出直接授予该角色的玩家，不把继承角色错误列为直接授予                               |
 | ROLE-12 | 无准入权限玩家执行名单命令                                          | 返回 ACCESS_DENIED；不泄露成员名单                                                |
 | ROLE-13 | 管理员执行 admin/builder/visitor add/remove，目标用用户名及 UUID    | 名称解析到正确 UUID；UUID 可直接使用；添加/撤销结果与查询一致                     |
 | ROLE-14 | 非管理员执行成员变更；玩家在未登记地图执行                          | 返回 NO_PERMISSION/MAP_NOT_FOUND，授权不变                                        |
@@ -186,7 +186,7 @@ mvn clean package
 | TRV-03 | 访客进入私有图但无授权；目标地图非 ACTIVE                 | 分别拒绝 ACCESS_DENIED；玩家位置不变                                                                                                     |
 | TRV-04 | 目标地图记录不存在、世界未加载、spawn 属于错误世界        | 返回 MAP_NOT_FOUND、WORLD_NOT_FOUND、WORLD_BACKEND_FAILED；不传送                                                                        |
 | TRV-05 | 玩家离线、UUID 无效或在非主线程调用传送服务               | 返回 PLAYER_NOT_FOUND 或 INVALID_INPUT；不触碰 Bukkit 传送                                                                               |
-| TRV-06 | teleport 玩家传送失败                                     | 返回 WORLD_BACKEND_FAILED，通知包含操作 ID                                                                                               |
+| TRV-06 | teleport 玩家传送失败                                     | 返回 WORLD_BACKEND_FAILED，玩家通知不含操作 ID，控制台保留 ID                                                                                               |
 | TRV-07 | 管理员在同一地图执行 `/world kick <online-player>`        | 目标到 MV 默认世界出生点；操作者收到结果，目标收到被踢提示                                                                               |
 | TRV-08 | 操作者不是 ADMIN，目标离线或目标不在同一世界              | 分别返回 NO_PERMISSION、PLAYER_NOT_FOUND、PLAYER_NOT_IN_MAP；不传送                                                                      |
 | TRV-09 | 在未登记地图执行 kick；尝试踢出 MV 默认地图中的玩家       | 返回 MAP_NOT_FOUND 或 WORLD_BACKEND_FAILED；世界状态不变                                                                                 |
@@ -203,7 +203,7 @@ mvn clean package
 | ID     | 前置条件与操作                                       | 预期结果                                                                                   |
 |--------|------------------------------------------------------|--------------------------------------------------------------------------------------------|
 | DEL-01 | 默认配置对 `arena_bak` 执行两步删除                  | 第一步产生 6 位确认码并绑定地图 ID；10 秒内输入后删除世界及 MMC/LP 关联                    |
-| DEL-02 | 尝试删除不符合 `.*_bak$` 的地图                      | 命令/API 均拒绝；世界和地图数据保持                                                        |
+| DEL-02 | 命令及 API 分别删除不符合 `.*_bak$` 的地图                      | 命令拒绝且数据保持；API 不因正则拒绝，继续其他安全校验                                                        |
 | DEL-03 | 玩家执行 delete                                      | 返回 NO_PERMISSION；不产生确认码或删除操作                                                 |
 | DEL-04 | 对错误码、过期码、已消费码、另一地图确认码执行第二步 | 分别拒绝；只有匹配且未过期的一次性码能确认对应地图                                         |
 | DEL-05 | 删除 MV 默认世界或 Bukkit 首个加载世界               | 拒绝 ACCESS_DENIED；文件、地图和玩家不变                                                   |
@@ -215,7 +215,7 @@ mvn clean package
 | DEL-11 | 删除组中最后一张地图                                 | 清除该组 LP 成员/组继承，移除组角色、地图和空组                                            |
 | DEL-12 | MV 删除、LP 清理或存储删除中途失败                   | 保留 DELETING 与失败 operation 阶段；修复原因后可重新走确认并安全重试                      |
 | DEL-13 | 检查成功生命周期操作记录                             | operation ID 唯一，阶段依次包含 STARTED、WORLD_CHANGED、DATA_SAVED（创建/导入）、COMPLETED |
-| DEL-14 | 检查生命周期失败操作记录                             | 阶段记录 FAILED 和对应 FailureReason；通知 operation ID 与仓储记录一致                     |
+| DEL-14 | 检查生命周期失败操作记录                             | 阶段记录 FAILED 和对应 FailureReason；控制台通知 operation ID 与仓储记录一致，玩家通知不含 ID                     |
 
 ## JSON/MySQL 存储与数据校验
 
@@ -268,7 +268,7 @@ mvn clean package
 | ADP-11 | level-name 缺失、空白、路径穿越、读取错误                                         | 回退 Bukkit 首个已加载世界名；没有已加载世界时抛出明确异常          |
 | ADP-12 | worldDirectory 使用合法名称、null、路径分隔符或非法字符                           | 合法名解析至父目录子目录；非法名抛出参数错误；不创建目录            |
 | MSG-01 | 分别以玩家、控制台、LOG_ONLY 发送字符串、Component、操作结果                      | 目标收到格式正确消息；LOG_ONLY 只写纯文本日志                       |
-| MSG-02 | 发送 Success、Failure、Partial 操作结果                                           | 分别显示本地化操作名、原因和 operation ID；Partial 明确提示部分完成 |
+| MSG-02 | 发送 Success、Failure、Partial 操作结果                                           | 玩家显示本地化操作名及适用原因，不含 operation ID；控制台保留 ID；Partial 明确提示部分完成 |
 | MSG-03 | 比较 zh_CN/en_US 的新增物理、爆炸及命令键                                         | 两种资源键齐全且 YAML 可解析；自定义语言缺项按中文回退              |
 
 ## 目前不列为通过项的能力

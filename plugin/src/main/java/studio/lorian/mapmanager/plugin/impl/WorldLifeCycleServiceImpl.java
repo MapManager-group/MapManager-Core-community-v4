@@ -74,14 +74,13 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     private final MapAliasService aliases;
     private final WorldVersionService worldVersions;
     private final WorldGateway worldGateway;
-    private final Pattern deletionPattern;
     private final Pattern blockedCreationPattern;
     private final Logger logger;
     private final RecoveryJournal journal;
 
     public WorldLifeCycleServiceImpl(MapRepository maps, RoleRepository roles, OperationRepository operations,
                                      WorldBaseProjection permissions, MapAliasService aliases,
-                                     WorldVersionService worldVersions, Pattern deletionPattern,
+                                     WorldVersionService worldVersions,
                                      Pattern blockedCreationPattern, Logger logger, Path dataDirectory) {
         this.maps = maps;
         this.roles = roles;
@@ -90,7 +89,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         this.aliases = aliases;
         this.worldVersions = worldVersions;
         this.worldGateway = new WorldGatewayImpl();
-        this.deletionPattern = deletionPattern;
         this.blockedCreationPattern = blockedCreationPattern;
         this.logger = logger;
         this.journal = new RecoveryJournal(dataDirectory.resolve("world-recovery"));
@@ -521,8 +519,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         UUID id = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || worldName == null || !worldName.matches("[a-z0-9_-]{4,16}"))
             return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.INVALID_INPUT);
-        if (!deletionPattern.matcher(worldName).matches())
-            return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.ACCESS_DENIED);
         try {
             MapInstance map = maps.findByWorldName(worldName);
             if (map == null) return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.MAP_NOT_FOUND);

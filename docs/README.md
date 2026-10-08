@@ -65,8 +65,8 @@ access-control:
 - `storage.type` 默认为 `json`，文件为 `plugins/MapManager-Core/maps.json`。选择 `mysql` 时，数据库和账户需提前创建，插件只创建表。
 - 存储后端及 MySQL 目标不会自动迁移数据。安装后若需要切换，请先使用专门的数据迁移方案；直接修改配置会被插件拒绝，以免误连空库。详见 [STORAGE.md](STORAGE.md)。
 - `access-control.strict-map-entry` 默认为 `true`。设为 `false` 会停用外部传送、登录、重生及撤销角色后的自动准入检查；`/world tp` 仍执行 MMC 权限检查。
-- 两个名称正则都匹配完整地图名。默认情况下，创建/导入会拒绝 `_bak` 结尾名称，删除则只允许 `_bak` 结尾地图。内置保留名称及名称格式限制始终生效。修改删除正则前请确认目标范围。
-- 如需取消 `_bak` 后缀限制，可将 `deletion.allowed-world-name-regex` 改为 `'.*'`。默认世界、首个 Bukkit 世界、在线玩家和目录边界检查仍然生效。
+- 两个名称正则都匹配完整地图名。默认情况下，创建/导入会拒绝 `_bak` 结尾名称，`/mapadmin delete` 命令只允许 `_bak` 结尾地图，生命周期 API 不受删除正则限制。内置保留名称及名称格式限制始终生效。修改删除正则前请确认目标范围。
+- 如需取消命令删除的 `_bak` 后缀限制，可将 `deletion.allowed-world-name-regex` 改为 `'.*'`。默认世界、首个 Bukkit 世界、在线玩家和目录边界检查仍然生效。
 
 ## 权限说明
 
@@ -132,7 +132,7 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 | `/world admin add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图组管理员 |
 | `/world builder add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图组建筑者 |
 | `/world visitor add\|remove <玩家名或UUID>` | 当前地图管理员 | 授予或移除当前地图访客 |
-| `/world admins`、`/world builders`、`/world visitors` | 可进入当前地图的玩家 | 查看当前地图直接授予的各角色成员 |
+| `/world admin info`、`/world builder info`、`/world visitor info` | 可进入当前地图的玩家 | 查看当前地图直接授予的各角色成员 |
 | `/world public [true\|false\|info]` | 当前地图管理员 | 修改或查看地图公开状态 |
 | `/world physics [true\|false\|info]` | 当前地图管理员 | 修改或查看方块物理设置；关闭后阻止方块物理和落沙 |
 | `/world explosion [true\|false\|info]` | 当前地图管理员 | 修改或查看方块及实体爆炸破坏设置 |

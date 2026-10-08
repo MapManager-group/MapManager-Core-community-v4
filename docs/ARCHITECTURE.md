@@ -136,7 +136,7 @@ ACTIVE --删除开始--> DELETING --失败--> DELETING
                                 └--成功--> 删除 MMC 地图记录
 ```
 
-`MapStatus.ARCHIVED` 和 `MapStatus.DELETED` 已定义，但当前生命周期服务不会写入这两个状态。创建或导入在保存 `PENDING` 后发生失败时会保留该地图记录；删除在 `DELETING` 状态保存后发生失败时会保留该状态，成功后移除地图记录。完整请求在副作用之前原子写入 `world-recovery/`；启动和 `/mapadmin recover` 会继续未完成步骤，保留原始地图 ID、所有者及生成器参数。创建/导入不自动删除已有世界文件。删除恢复同时校验目录 fileKey 与可用的 uid.dat，拒绝目录被替换的情况；旧版本缺少完整请求时保留状态供人工核查。通过前置校验并实际进入生命周期持久化步骤的创建、导入、初始化、加载和删除会记录 operation ID 与适用阶段；名称、参数、重复地图或删除安全检查提前拒绝时不会持久化操作记录。删除操作在调用 Multiverse 前检查默认世界、玩家和目录边界。六位、10 秒确认码只由 `/mapadmin delete` 命令执行；直接调用 `WorldLifeCycleService.delete` 不经过命令确认，但仍受删除正则和生命周期安全校验约束。
+`MapStatus.ARCHIVED` 和 `MapStatus.DELETED` 已定义，但当前生命周期服务不会写入这两个状态。创建或导入在保存 `PENDING` 后发生失败时会保留该地图记录；删除在 `DELETING` 状态保存后发生失败时会保留该状态，成功后移除地图记录。完整请求在副作用之前原子写入 `world-recovery/`；启动和 `/mapadmin recover` 会继续未完成步骤，保留原始地图 ID、所有者及生成器参数。创建/导入不自动删除已有世界文件。删除恢复同时校验目录 fileKey 与可用的 uid.dat，拒绝目录被替换的情况；旧版本缺少完整请求时保留状态供人工核查。通过前置校验并实际进入生命周期持久化步骤的创建、导入、初始化、加载和删除会记录 operation ID 与适用阶段；名称、参数、重复地图或删除安全检查提前拒绝时不会持久化操作记录。删除操作在调用 Multiverse 前检查默认世界、玩家和目录边界。删除名称正则和六位、10 秒确认码只由 `/mapadmin delete` 命令执行；直接调用 `WorldLifeCycleService.delete` 不受命令正则和确认码限制，仍执行名称格式及生命周期安全校验。
 
 所有 Bukkit/Multiverse 世界对象操作在主线程执行；用户名 UUID 解析等可能访问网络的操作异步执行。地图、组和角色的事件读取使用 `CachedStorage` 的不可变索引，无数据库/文件读取且不等待写锁；持久化写入仍同步执行。LP 网络操作全部在队列工作线程执行，入队期间只保存本地任务文件。队列采用全局 FIFO，某任务持续失败会延后后续组的投影。
 
@@ -152,7 +152,7 @@ ACTIVE --删除开始--> DELETING --失败--> DELETING
 
 `OperationResult` 声明为 `Success`、`Failure`、`Partial` 三种结果；每个结果都包含 `OperationName` 和 UUID 类型的 operation ID。`Partial` 表示 MMC 状态已成功写入，但 LuckPerms 等外部投影仍待同步。具体签名见 `api/src/main/java/studio/lorian/mapmanager/api/result/OperationResult.java`。
 
-`FailureReason` 使用稳定代码，展示文本通过插件数据目录中的 `langs/<语言代码>.yml` 本地化，默认语言为 `zh_CN`；缺失翻译项回退到内置中文资源。通知和内部启动/存储诊断使用 `Messages`；部分底层库异常详情及 Java 插件框架自身产生的报错仍由依赖原样提供，未经过语言文件转换。`OperationNotifier` 将操作名和失败原因渲染为 MiniMessage Component，发送给命令调用者；日志使用相同模板的纯文本。API 结果继续保留原因代码、operation ID 和操作名称，供调用方处理。
+`FailureReason` 使用稳定代码，展示文本通过插件数据目录中的 `langs/<语言代码>.yml` 本地化，默认语言为 `zh_CN`；缺失翻译项回退到内置中文资源。通知和内部启动/存储诊断使用 `Messages`；部分底层库异常详情及 Java 插件框架自身产生的报错仍由依赖原样提供，未经过语言文件转换。`OperationNotifier` 将操作名和失败原因渲染为 MiniMessage Component，发送给命令调用者；玩家结果通知不含 operation ID，完整结果同时写入控制台；控制台与日志保留 operation ID，日志使用纯文本。API 结果继续保留原因代码、operation ID 和操作名称，供调用方处理。
 
 命令层解析参数并检查发送者上下文及 MMC 地图角色，再调用应用服务并交给 notifier；这里不使用 Bukkit 权限节点。公开 API 的角色和设置写方法没有操作者参数，外部插件必须自行授权调用者。Tab 补全也使用同一个准入/可见性规则，不根据 LP `multiverse.access.*` 单独过滤。
 

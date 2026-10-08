@@ -33,6 +33,8 @@ public interface WorldLifeCycleService {
 
     /**
      * 删除受管理的地图，并请求世界后端删除对应世界。
+     * 命令删除名称正则不限制此 API；仍执行名称格式、默认世界、在线玩家及目录安全校验。
+     * 调用方须自行校验操作者权限。
      *
      * @param worldName 服务器世界名称
      * @return 操作结果

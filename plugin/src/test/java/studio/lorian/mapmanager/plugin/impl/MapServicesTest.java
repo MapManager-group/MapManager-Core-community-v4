@@ -147,7 +147,7 @@ class MapServicesTest {
     @Test
     void mapManagerPublishesEveryApiService() {
         var manager = new MapManagerImpl(storage, storage, storage, permissions,
-                new NoopPlayerGateway(), java.util.regex.Pattern.compile(".*_bak$"),
+                new NoopPlayerGateway(),
                 java.util.regex.Pattern.compile(".*_bak$"), java.util.logging.Logger.getLogger("test"),
                 new NoopWorldVersionService(), temporaryDirectory);
 

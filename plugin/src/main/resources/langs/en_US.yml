@@ -1,4 +1,7 @@
 result:
+  player_success: '<green><operation> succeeded.'
+  player_failure: '<red><operation> failed: <reason>.'
+  player_partial: '<yellow><operation> partially completed: <reason>.'
   success: '<green><operation> succeeded. Operation ID: <operation_id>'
   failure: '<red><operation> failed: <reason>. Operation ID: <operation_id>'
   partial: '<yellow><operation> partially completed: <reason>. Pending operation ID: <operation_id>'
@@ -52,7 +55,7 @@ access:
   recovery_failed: '<red>You could not be moved safely to the default world, so your connection was closed.'
 command:
   usage_wtp: 'Usage: /wtp <map>'
-  usage_world: 'Usage: /world <tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: 'Usage: /world <tp|kick|physics|explosion|public|setname|setspawn|admin|builder|visitor> ...'
   setting_usage: '<red>Usage: /world <setting> [true|false|info]'
   setting_info: '<aqua>Current map <setting>: <value>'
   setname_usage: '<red>Usage: /world setname <name>'

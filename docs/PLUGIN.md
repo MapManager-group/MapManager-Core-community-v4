@@ -26,9 +26,9 @@ MySQL 自动创建五张 InnoDB 表：
 
 `settings_json` 和 `spawn_json` 在 `mm_maps` 中各占一个 JSON 字段，出生点可为 `NULL`。删除地图时访客授权级联删除；仍有地图引用的组不能删除。JSON 后端以相同的逻辑关系写入单文件，每次写入使用临时文件和原子替换。
 
-地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admins|builders|visitors` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名或 UUID>`、`/world kick`、`/world public`、`/world setname` 和 `/world setspawn` 仅由 MMC 当前地图组管理员执行；`/world tp` 与 `/wtp` 可进入玩家有地图角色或公开的已加载地图，补全使用相同准入结果。玩家命令不检查 Bukkit 权限节点。组角色持久化后立即改变 MMC 准入；LP 入队返回 `Partial(PERMISSION_SYNC_PENDING)`，失败自动重试和重启重放。启动时会检查相邻插件目录 `MapManager-Core`；其中同时存在 `worlds.json` 和 `groups.json` 时，插件备份旧文件并迁移地图、组和角色数据到所选仓储。严格准入监听已实现并默认开启；LP 由持久队列异步执行和自动重试。存储迁移和 LP `worldbase` 初始化成功后，`MapManager` 会注册到 Bukkit ServicesManager，外部插件依赖与调用方法见 [API_GUIDE.md](API_GUIDE.md)。
+地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admin|builder|visitor info` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名或 UUID>`、`/world kick`、`/world public`、`/world setname` 和 `/world setspawn` 仅由 MMC 当前地图组管理员执行；`/world tp` 与 `/wtp` 可进入玩家有地图角色或公开的已加载地图，补全使用相同准入结果。玩家命令不检查 Bukkit 权限节点。组角色持久化后立即改变 MMC 准入；LP 入队返回 `Partial(PERMISSION_SYNC_PENDING)`，失败自动重试和重启重放。启动时会检查相邻插件目录 `MapManager-Core`；其中同时存在 `worlds.json` 和 `groups.json` 时，插件备份旧文件并迁移地图、组和角色数据到所选仓储。严格准入监听已实现并默认开启；LP 由持久队列异步执行和自动重试。存储迁移和 LP `worldbase` 初始化成功后，`MapManager` 会注册到 Bukkit ServicesManager，外部插件依赖与调用方法见 [API_GUIDE.md](API_GUIDE.md)。
 
-控制台先执行 `/mapadmin delete <地图名>`，然后在 10 秒内执行 `/mapadmin delete <6 位随机字符串>`；玩家不能执行。`config.yml` 的 `deletion.allowed-world-name-regex` 使用 Java 正则匹配整个地图名，默认 `.*_bak$`；命令和生命周期 API 均执行该限制。删除检查默认世界、玩家、目录和版本；先保存完整请求及目录身份，再变更世界。世界删除成功后将 LP 清理任务持久化，再清理 MMC 地图、角色和空组；LP 等待同步时返回 Partial。
+控制台先执行 `/mapadmin delete <地图名>`，然后在 10 秒内执行 `/mapadmin delete <6 位随机字符串>`；玩家不能执行。`config.yml` 的 `deletion.allowed-world-name-regex` 使用 Java 正则匹配整个地图名，默认 `.*_bak$`；仅 `/mapadmin delete` 命令执行该正则限制，生命周期 API 不受此正则限制。删除检查默认世界、玩家、目录和版本；先保存完整请求及目录身份，再变更世界。世界删除成功后将 LP 清理任务持久化，再清理 MMC 地图、角色和空组；LP 等待同步时返回 Partial。
 
 ## 维护与恢复
 

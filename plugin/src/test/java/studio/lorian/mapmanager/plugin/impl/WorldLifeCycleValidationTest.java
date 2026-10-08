@@ -24,7 +24,7 @@ class WorldLifeCycleValidationTest {
             assertEquals("isPrimaryThread", m.getName()); return primary;
         });
         lifecycle = new WorldLifeCycleServiceImpl(storage, storage, storage, null, null, null,
-                Pattern.compile(".*_bak$"), Pattern.compile("(?:.*_bak|lobby|temp.*)"), Logger.getLogger("validation"), directory);
+                Pattern.compile("(?:.*_bak|lobby|temp.*)"), Logger.getLogger("validation"), directory);
     }
     @AfterEach void tearDown() throws Exception { server.close(); }
     private void failure(OperationResult<?> result, OperationName operation, FailureReason reason) {
@@ -59,6 +59,16 @@ class WorldLifeCycleValidationTest {
         failure(lifecycle.importWorld(new ImportMapRequest("arena", null, null, null, WorldType.NORMAL, Environment.SIFT)),
                 OperationName.IMPORT, FailureReason.UNSUPPORTED_ENVIRONMENT);
     }
+    @Test void apiDeleteWithoutBackupSuffixStillChecksMapStatus() throws Exception {
+        storage.saveGroup(new MapGroup("team", Set.of()));
+        var map = new MapInstance(UUID.randomUUID(), "test0107", "team", "Test",
+                new MapSettings(true, false, false), MapStatus.PENDING, null);
+        storage.save(map);
+        var result = assertInstanceOf(OperationResult.Failure.class, lifecycle.delete("test0107"));
+        assertEquals(FailureReason.OPERATION_IN_PROGRESS, result.reason());
+        assertEquals(map, storage.findById(map.id()));
+        assertTrue(storage.allOperations().isEmpty());
+    }
     @Test void offThreadLifecycleCallsAndUnsafeDeleteAreRejected() {
         primary = false;
         failure(lifecycle.create(new CreateMapRequest("arena", null, null, null)), OperationName.CREATE, FailureReason.INVALID_INPUT);
@@ -68,7 +78,7 @@ class WorldLifeCycleValidationTest {
         failure(lifecycle.load("arena"), OperationName.LOAD, FailureReason.INVALID_INPUT);
         failure(lifecycle.recover("arena"), OperationName.RECOVER, FailureReason.INVALID_INPUT);
         primary = true;
-        failure(lifecycle.delete("arena"), OperationName.DELETE, FailureReason.ACCESS_DENIED);
+        failure(lifecycle.delete("arena"), OperationName.DELETE, FailureReason.MAP_NOT_FOUND);
         failure(lifecycle.delete("missing_bak"), OperationName.DELETE, FailureReason.MAP_NOT_FOUND);
         failure(lifecycle.recover("arena"), OperationName.RECOVER, FailureReason.INVALID_INPUT);
         failure(lifecycle.initialize("arena"), OperationName.INITIALIZE, FailureReason.MAP_NOT_FOUND);

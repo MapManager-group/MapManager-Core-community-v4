@@ -128,6 +128,48 @@ class MessagesTest {
         }
     }
 
+    @Test
+    void playerResultsHideIdsAndCopyFullResultsToConsoleInBothLanguages() throws Exception {
+        java.util.List<Component> sent = new java.util.ArrayList<>();
+        java.util.List<Component> consoleMessages = new java.util.ArrayList<>();
+        var player = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(org.bukkit.entity.Player.class,
+                (o, m, a) -> { sent.add((Component) a[0]); return null; });
+        var console = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(org.bukkit.command.ConsoleCommandSender.class,
+                (o, m, a) -> { consoleMessages.add((Component) a[0]); return null; });
+        try (var server = new studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer((o, m, a) -> switch (m.getName()) {
+            case "getPlayerExact" -> player;
+            case "getConsoleSender" -> console;
+            default -> throw new AssertionError(m);
+        })) {
+            var id = java.util.UUID.randomUUID();
+            var operation = studio.lorian.mapmanager.api.result.OperationName.CREATE;
+            var reason = studio.lorian.mapmanager.api.result.FailureReason.STORAGE_FAILED;
+            var results = java.util.List.of(
+                    new studio.lorian.mapmanager.api.result.OperationResult.Success<>(operation, id, null),
+                    new studio.lorian.mapmanager.api.result.OperationResult.Failure<>(operation, id, reason),
+                    new studio.lorian.mapmanager.api.result.OperationResult.Partial<>(operation, id, null, reason));
+            for (var language : java.util.List.of(english, load("/langs/zh_CN.yml"))) {
+                field("selected").set(null, language);
+                sent.clear(); consoleMessages.clear();
+                for (var result : results) new OperationNotifierImpl().notify(NotificationTarget.player("Online"), result);
+                assertEquals(3, sent.size()); assertEquals(3, consoleMessages.size());
+                for (int i = 0; i < sent.size(); i++) {
+                    assertTrue(!plain(sent.get(i)).contains(id.toString()));
+                    assertTrue(!plain(sent.get(i)).contains("operation_id"));
+                    assertTrue(plain(consoleMessages.get(i)).contains(id.toString()));
+                    assertTrue(plain(sent.get(i)).contains(Messages.text("operations." + operation)));
+                }
+                assertTrue(plain(sent.get(1)).contains(Messages.text("reasons." + reason)));
+                assertTrue(plain(sent.get(2)).contains(Messages.text("reasons." + reason)));
+            }
+            english.set("result.player_success", null);
+            field("selected").set(null, english);
+            new OperationNotifierImpl().notify(NotificationTarget.player("Online"), results.get(0));
+            assertTrue(plain(sent.getLast()).contains("成功"));
+            assertTrue(!plain(sent.getLast()).contains(id.toString()));
+        }
+    }
+
     private static YamlConfiguration load(String resource) throws Exception {
         try (InputStream stream = MessagesTest.class.getResourceAsStream(resource)) {
             if (stream == null) throw new IllegalStateException("Missing test resource " + resource);

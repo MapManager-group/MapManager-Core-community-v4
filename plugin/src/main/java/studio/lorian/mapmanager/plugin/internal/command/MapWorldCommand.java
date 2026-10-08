@@ -80,12 +80,6 @@ public final class MapWorldCommand extends Command {
                 Map.entry("public", new Subcommand(OperationName.SET_PUBLIC, this::changePublic)),
                 Map.entry("setname", new Subcommand(OperationName.SET_ALIAS, this::setName)),
                 Map.entry("setspawn", new Subcommand(OperationName.SET_SPAWN, this::setSpawn)),
-                Map.entry("admins", new Subcommand(OperationName.LIST_MEMBERS,
-                        (sender, target, args) -> listMembers(sender, target, args, MapRole.ADMIN))),
-                Map.entry("builders", new Subcommand(OperationName.LIST_MEMBERS,
-                        (sender, target, args) -> listMembers(sender, target, args, MapRole.BUILDER))),
-                Map.entry("visitors", new Subcommand(OperationName.LIST_MEMBERS,
-                        (sender, target, args) -> listMembers(sender, target, args, MapRole.VISITOR))),
                 Map.entry("admin", new Subcommand(OperationName.ADD_MEMBER,
                         (sender, target, args) -> changeMember(sender, target, args, MapRole.ADMIN))),
                 Map.entry("builder", new Subcommand(OperationName.ADD_MEMBER,
@@ -118,8 +112,10 @@ public final class MapWorldCommand extends Command {
         NotificationTarget target = sender instanceof Player player
                 ? NotificationTarget.player(player.getName()) : NotificationTarget.console();
         OperationName operation = subcommand.operation;
-        if (operation == OperationName.ADD_MEMBER && args.length > 1 && args[1].equalsIgnoreCase("remove"))
-            operation = OperationName.REMOVE_MEMBER;
+        if (operation == OperationName.ADD_MEMBER && args.length > 1) {
+            if (args[1].equalsIgnoreCase("remove")) operation = OperationName.REMOVE_MEMBER;
+            else if (args[1].equalsIgnoreCase("info")) operation = OperationName.LIST_MEMBERS;
+        }
         if (!(sender instanceof Player)) {
             fail(target, operation, FailureReason.INVALID_INPUT);
             return true;
@@ -144,9 +140,9 @@ public final class MapWorldCommand extends Command {
                 boolean admin = canEnter && decision.effectiveRole() == MapRole.ADMIN;
                 return suggestions(args[0], subcommands.entrySet().stream()
                         .filter(entry -> sender instanceof Player)
-                        .filter(entry -> !Set.of("admin", "builder", "visitor", "kick", "physics", "explosion",
+                        .filter(entry -> !Set.of("kick", "physics", "explosion",
                                 "public", "setname", "setspawn").contains(entry.getKey()) || admin)
-                        .filter(entry -> !Set.of("admins", "builders", "visitors").contains(entry.getKey()) || canEnter)
+                        .filter(entry -> !Set.of("admin", "builder", "visitor").contains(entry.getKey()) || canEnter)
                         .map(Map.Entry::getKey).toList());
             }
             String command = args[0].toLowerCase(Locale.ROOT);
@@ -186,9 +182,12 @@ public final class MapWorldCommand extends Command {
     private List<String> roleSuggestions(Player sender, String command, String[] args) {
         if (args.length > 3) return List.of();
         MapInstance map = maps.findByWorldName(sender.getWorld().getName());
-        if (map == null || access.decide(sender.getUniqueId(), map.id()).effectiveRole() != MapRole.ADMIN)
-            return List.of();
-        if (args.length == 2) return suggestions(args[1], List.of("add", "remove"));
+        if (map == null) return List.of();
+        AccessDecision decision = access.decide(sender.getUniqueId(), map.id());
+        if (!decision.allowed()) return List.of();
+        boolean admin = decision.effectiveRole() == MapRole.ADMIN;
+        if (args.length == 2) return suggestions(args[1], admin ? List.of("add", "remove", "info") : List.of("info"));
+        if (!admin) return List.of();
         MapRole role = MapRole.valueOf(command.toUpperCase(Locale.ROOT));
         if (args[1].equalsIgnoreCase("add"))
             return suggestions(args[2], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
@@ -252,7 +251,7 @@ public final class MapWorldCommand extends Command {
      * 当前地图决定角色作用范围；名单只显示直接授予的成员。
      */
     private void listMembers(CommandSender sender, NotificationTarget target, String[] args, MapRole role) {
-        if (args.length != 1) {
+        if (args.length != 2) {
             fail(target, OperationName.LIST_MEMBERS, FailureReason.INVALID_INPUT);
             return;
         }
@@ -288,6 +287,10 @@ public final class MapWorldCommand extends Command {
      * 先验证当前地图管理员，再异步解析用户名，最后在主线程重新验证并修改角色。
      */
     private void changeMember(CommandSender sender, NotificationTarget target, String[] args, MapRole role) {
+        if (args.length > 1 && args[1].equalsIgnoreCase("info")) {
+            listMembers(sender, target, args, role);
+            return;
+        }
         OperationName operation = args.length > 1 && args[1].equalsIgnoreCase("remove")
                 ? OperationName.REMOVE_MEMBER : OperationName.ADD_MEMBER;
         if (args.length != 3 || (!args[1].equalsIgnoreCase("add") && !args[1].equalsIgnoreCase("remove"))) {

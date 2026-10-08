@@ -74,7 +74,7 @@ public final class MapManagerPlugin extends JavaPlugin {
             var notifier = new OperationNotifierImpl();
             var worldVersions = new WorldVersionServiceImpl(getServer().getWorldContainer().toPath());
             api = new MapManagerImpl(repository, repository, repository, projection, players,
-                    deletionPattern, blockedCreationPattern, getLogger(), worldVersions, directory);
+                    blockedCreationPattern, getLogger(), worldVersions, directory);
             MapAccessListener accessListener = new MapAccessListener(this, api.maps(), api.access(),
                     getConfig().getBoolean("access-control.strict-map-entry", true));
             getServer().getPluginManager().registerEvents(accessListener, this);

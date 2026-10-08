@@ -18,6 +18,8 @@ class MapWorldCommandTest {
     private MapInstance map = new MapInstance(UUID.randomUUID(), "arena", "team", "Arena", new MapSettings(true, false, false), MapStatus.ACTIVE, null);
     private MapRole role = MapRole.ADMIN;
     private boolean failRead;
+    private boolean allowed = true;
+    private final List<MapRole> listedRoles = new ArrayList<>();
     private final List<String> calls = new ArrayList<>();
     private final List<Object> values = new ArrayList<>();
     private OperationResult<?> result;
@@ -37,7 +39,7 @@ class MapWorldCommandTest {
             if (failRead) throw new StorageException("injected", null); return map;
         });
         MapAccessService access = proxy(MapAccessService.class, (o, m, a) ->
-                m.getName().equals("accessibleMaps") ? List.of(map) : new AccessDecision(true, role, null));
+                m.getName().equals("accessibleMaps") ? List.of(map) : new AccessDecision(allowed, role, allowed ? null : FailureReason.NO_PERMISSION));
         MapSettingsService settings = proxy(MapSettingsService.class, (o, m, a) -> {
             calls.add(m.getName()); assertEquals(map.id(), a[0]); values.add(a[1]);
             return new OperationResult.Success<>(OperationName.SET_PHYSICAL, UUID.randomUUID(), null);
@@ -51,7 +53,11 @@ class MapWorldCommandTest {
             else if (a[1] instanceof OperationResult<?> operationResult) result = operationResult;
             return null;
         });
-        worldCommand = new MapWorldCommand(null, maps, null, access, settings, travel, null, notifier, null);
+        MapRoleService roles = proxy(MapRoleService.class, (o, m, a) -> {
+            assertEquals("assignedMembers", m.getName());
+            assertEquals(map.id(), a[0]); listedRoles.add((MapRole) a[1]); return Set.of();
+        });
+        worldCommand = new MapWorldCommand(null, maps, roles, access, settings, travel, null, notifier, null);
         wtp = new MapWorldCommand("wtp", null, maps, null, access, settings, travel, null, notifier, null);
     }
     @AfterEach void tearDown() throws Exception { server.close(); }
@@ -96,11 +102,36 @@ class MapWorldCommandTest {
     }
     @Test void completionFiltersManagementCommandsByRole() {
         role = MapRole.VISITOR;
-        assertTrue(worldCommand.tabComplete(player, "world", new String[]{""}).containsAll(List.of("tp", "admins", "builders", "visitors")));
+        assertTrue(worldCommand.tabComplete(player, "world", new String[]{""}).containsAll(List.of("tp", "admin", "builder", "visitor")));
         assertFalse(worldCommand.tabComplete(player, "world", new String[]{""}).contains("setspawn"));
         assertTrue(worldCommand.tabComplete(player, "world", new String[]{"physics", ""}).isEmpty());
         assertEquals(List.of("arena"), wtp.tabComplete(player, "wtp", new String[]{"ar"}));
-        role = MapRole.ADMIN; assertTrue(worldCommand.tabComplete(player, "world", new String[]{""}).contains("setspawn"));
+        for (String command : List.of("admin", "builder", "visitor")) {
+            assertEquals(List.of("info"), worldCommand.tabComplete(player, "world", new String[]{command, ""}));
+            assertTrue(worldCommand.tabComplete(player, "world", new String[]{command, "remove", ""}).isEmpty());
+            assertTrue(worldCommand.tabComplete(player, "world", new String[]{command, "info", ""}).isEmpty());
+        }
+        assertFalse(worldCommand.tabComplete(player, "world", new String[]{""}).contains("admins"));
+        role = MapRole.ADMIN;
+        assertEquals(List.of("add", "info", "remove"), worldCommand.tabComplete(player, "world", new String[]{"admin", ""}));
+        assertTrue(worldCommand.tabComplete(player, "world", new String[]{""}).contains("setspawn"));
         assertEquals(List.of("false", "info", "true"), worldCommand.tabComplete(player, "world", new String[]{"physics", ""}));
+    }
+    @Test void roleInfoListsDirectMembersForVisitorsAndValidatesAccessAndArguments() {
+        role = MapRole.VISITOR;
+        for (String command : List.of("admin", "builder", "visitor")) {
+            worldCommand.execute(player, "world", new String[]{command, "INFO"});
+            assertEquals("command.members_empty", key);
+        }
+        assertEquals(List.of(MapRole.ADMIN, MapRole.BUILDER, MapRole.VISITOR), listedRoles);
+        worldCommand.execute(player, "world", new String[]{"admin", "info", "extra"});
+        assertEquals(OperationName.LIST_MEMBERS, result.operation());
+        assertEquals(FailureReason.INVALID_INPUT, assertInstanceOf(OperationResult.Failure.class, result).reason());
+        allowed = false;
+        worldCommand.execute(player, "world", new String[]{"builder", "info"});
+        assertEquals(FailureReason.NO_PERMISSION, assertInstanceOf(OperationResult.Failure.class, result).reason());
+        assertEquals(3, listedRoles.size());
+        assertTrue(worldCommand.tabComplete(player, "world", new String[]{"visitor", ""}).isEmpty());
+        assertFalse(worldCommand.tabComplete(player, "world", new String[]{""}).contains("visitor"));
     }
 }

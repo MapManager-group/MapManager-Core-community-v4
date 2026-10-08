@@ -1,4 +1,7 @@
 result:
+  player_success: '<green><operation>成功。'
+  player_failure: '<red><operation>失败：<reason>。'
+  player_partial: '<yellow><operation>部分完成：<reason>。'
   success: '<green><operation>成功。操作 ID：<operation_id>'
   failure: '<red><operation>失败：<reason>。操作 ID：<operation_id>'
   partial: '<yellow><operation>部分完成：<reason>。待处理操作 ID：<operation_id>'
@@ -52,7 +55,7 @@ access:
   recovery_failed: '<red>无法安全返回默认世界，连接已断开。'
 command:
   usage_wtp: '用法：/wtp <地图名>'
-  usage_world: '用法：/world <tp|kick|physics|explosion|public|setname|setspawn|admins|builders|visitors|admin|builder|visitor> ...'
+  usage_world: '用法：/world <tp|kick|physics|explosion|public|setname|setspawn|admin|builder|visitor> ...'
   setting_usage: '<red>用法：/world <setting> [true|false|info]'
   setting_info: '<aqua>当前地图 <setting>：<value>'
   setname_usage: '<red>用法：/world setname <名称>'

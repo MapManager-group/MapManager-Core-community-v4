@@ -9,18 +9,24 @@ import studio.lorian.mapmanager.api.result.OperationResult;
 public final class OperationNotifierImpl implements OperationNotifier {
     @Override
     public void notify(NotificationTarget target, OperationResult<?> result) {
-        Component message;
-        if (result instanceof OperationResult.Success<?> success) {
-            message = Messages.component("result.success", "operation", Messages.text("operations." + success.operation()),
-                    "operation_id", success.operationId());
+        String key;
+        String reason = "";
+        if (result instanceof OperationResult.Success<?>) {
+            key = "success";
         } else if (result instanceof OperationResult.Failure<?> failure) {
-            message = Messages.component("result.failure", "reason", Messages.text("reasons." + failure.reason()),
-                    "operation", Messages.text("operations." + failure.operation()), "operation_id", failure.operationId());
+            key = "failure";
+            reason = Messages.text("reasons." + failure.reason());
         } else if (result instanceof OperationResult.Partial<?> partial) {
-            message = Messages.component("result.partial", "reason", Messages.text("reasons." + partial.reason()),
-                    "operation", Messages.text("operations." + partial.operation()), "operation_id", partial.operationId());
+            key = "partial";
+            reason = Messages.text("reasons." + partial.reason());
         } else return;
-        notify(target, message);
+        String operation = Messages.text("operations." + result.operation());
+        Component consoleMessage = Messages.component("result." + key,
+                "operation", operation, "reason", reason, "operation_id", result.operationId());
+        if (target.kind() == NotificationTarget.Kind.PLAYER) {
+            notify(NotificationTarget.console(), consoleMessage);
+            notify(target, Messages.component("result.player_" + key, "operation", operation, "reason", reason));
+        } else notify(target, consoleMessage);
     }
 
     @Override
