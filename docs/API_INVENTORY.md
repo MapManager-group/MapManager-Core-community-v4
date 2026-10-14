@@ -1,5 +1,9 @@
 # v3 接口盘点与 v4 分类
 
+默认世界以启动时 Multiverse-Core 的默认世界为准（Multiverse 启用前暂用服务器首个已加载世界）。它始终允许玩家进入，即使存在旧 MMC 私有地图或非 ACTIVE 记录；MMC 不赋予该世界有效角色、不应用单地图方块物理/爆炸设置（坐垫、画、展示框的实体支撑保护为全局规则，默认世界也生效），也不允许修改其别名、出生点、设置或执行生命周期管理。已有地图/角色记录保留用于追溯，但在默认世界上不生效。默认世界变更后需重启 MMC 以刷新识别。
+
+默认世界不投影 `worldbase` 建造权限：启动后的地图组同步会异步移除已有的默认世界上下文继承，后续同步也不会重建；同组其他地图仍正常投影。实际放置/破坏限制由现有保护插件和 LuckPerms 配置执行；MMC 不新增方块破坏/放置拦截，也不撤销管理员另行配置的全局或其他插件权限。
+
 本清单依据 v3 `MapManager-API/src/main/kotlin` 中的全部接口和模型，并对照 `MapManager-Core` 的命令调用。v3 文件只用于识别能力，v4 不直接复制暴露存储状态的旧签名。v4 接口使用 Java 编写。
 
 外部插件开发者可从 [v3→v4 API 迁移指南](V3_TO_V4_API_MIGRATION.md) 查看依赖、服务获取和调用替换步骤；v4 服务的完整调用示例见 [API_GUIDE.md](API_GUIDE.md)，公开类型的 HTML Javadoc 在 [导出包](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
@@ -47,7 +51,7 @@
 | `apply` 共享建筑权限组 | 新地图权限组无上下文继承 `apply`，可共享该组权限 | 地图组继承 `default` 和带世界上下文的 `worldbase`，不继承 `apply` | 未迁移；依赖旧 `apply` 权限的服务器需重新配置建筑权限 |
 | 公开/私有地图 | 通过 `default` LP 组的 `multiverse.access.<world>` 表示公开状态 | 由 MMC `MapSettings.isPublic` 存储；公开地图对任何玩家开放访客准入 | 功能已实现，存储和权威不同；旧 LP 节点不是 v4 的公开状态 |
 | PVP 开关 | `/world pvp` 查询/修改并保存 Multiverse PVP | 地图设置模型、设置服务、命令及迁移均没有 PVP 字段 | 未实现；迁移不会保留 v3 的自定义 PVP 值 |
-| 物理/爆炸开关 | 单地图默认 `physical=true`、`exploded=false`；`/world blockupdate\|physics\|physical`、`/world explosion\|exploded` 控制开关；监听方块物理、落沙、方块爆炸和实体爆炸 | 单地图默认 `physical=true`、`explosion=false`；命令为 `/world physics`、`/world explosion`，对应监听事件已接通 | 对已登记地图的默认值和开关效果一致；旧命令别名未全部保留；未登记世界行为不同：v3 默认取消，v4 不干预 |
+| 物理/爆炸开关 | 单地图默认 `physical=true`、`exploded=false`；`/world blockupdate\|physics\|physical`、`/world explosion\|exploded` 控制开关；监听方块物理、落沙、方块爆炸和实体爆炸 | 单地图默认 `physical=true`、`explosion=false`；命令为 `/world physics`、`/world explosion`，对应监听事件已接通 | 对已登记地图的默认值和开关效果一致；旧命令别名未全部保留；未登记世界的普通方块物理/爆炸行为不同：v3 默认取消，v4 不干预；v4 装饰实体的支撑破坏固定全局禁止 |
 | 全局物理/爆炸设置 | 有 `/mapadmin physics\|explosion` 和 YAML 字段；但 v3 监听实际读取地图节点，不读取全局值 | 不提供全局设置命令或字段，只提供单地图开关 | 管理入口未保留；按当前 v3 事件实现，全局开关本身没有生效的事件覆盖效果 |
 | 敏感命令日志过滤 | Log4j filter 隐藏包含 `/world download`、`/world changepassword`、`/mapadmin.md changepassword` 的服务器命令日志（含 namespaced 命令） | 没有安装对应 Log4j filter；这些命令也不属于 v4 命令 | v3 的日志抑制行为未迁移；若其他插件仍提供这些命令，其服务器命令日志不再被此插件过滤 |
 | 龙蛋传送保护 | 玩家右键龙蛋时取消交互，禁止触发传送 | 没有对应事件处理 | 未实现 |

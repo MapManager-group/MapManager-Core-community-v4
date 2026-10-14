@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import java.util.function.Predicate;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -67,6 +69,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     private static final Pattern RESERVED_NAME_PATTERN = Pattern.compile(
             "(?:cache|config|world|log|test|overworld|default|worldbase|apply|public|private|"
                     + "(?:plugin|version|admin|mapmanager|builder|visitor|lib|mmc).*)");
+    private final Predicate<String> defaultWorld;
     private final MapRepository maps;
     private final RoleRepository roles;
     private final OperationRepository operations;
@@ -82,6 +85,14 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                                      WorldBaseProjection permissions, MapAliasService aliases,
                                      WorldVersionService worldVersions,
                                      Pattern blockedCreationPattern, Logger logger, Path dataDirectory) {
+        this(maps, roles, operations, permissions, aliases, worldVersions, blockedCreationPattern, logger, dataDirectory, world -> false);
+    }
+
+    public WorldLifeCycleServiceImpl(MapRepository maps, RoleRepository roles, OperationRepository operations,
+                                     WorldBaseProjection permissions, MapAliasService aliases,
+                                     WorldVersionService worldVersions,
+                                     Pattern blockedCreationPattern, Logger logger, Path dataDirectory, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
         this.maps = maps;
         this.roles = roles;
         this.operations = operations;
@@ -156,7 +167,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
      * 创建和导入共用的地图名、组名与显示名限制。
      */
     private boolean validMapInput(String worldName, String groupId, String displayName) {
-        return worldName != null && worldName.matches("[a-z0-9_-]{4,16}")
+        return worldName != null && !defaultWorld.test(worldName) && worldName.matches("[a-z0-9_-]{4,16}")
                 && !blockedWorldName(worldName)
                 && (blank(groupId) || groupId.matches("[a-z0-9_-]{1,16}"))
                 && !Set.of("default", "worldbase").contains(blank(groupId) ? worldName : groupId)
@@ -487,6 +498,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         UUID operationId = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || worldName == null || !worldName.matches("[A-Za-z0-9_-]{1,100}"))
             return new OperationResult.Failure<>(OperationName.INITIALIZE, operationId, FailureReason.INVALID_INPUT);
+        if (defaultWorld.test(worldName))
+            return new OperationResult.Failure<>(OperationName.INITIALIZE, operationId, FailureReason.ACCESS_DENIED);
         MapInstance map;
         try {
             map = maps.findByWorldName(worldName);
@@ -519,6 +532,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         UUID id = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || worldName == null || !worldName.matches("[a-z0-9_-]{4,16}"))
             return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.INVALID_INPUT);
+        if (defaultWorld.test(worldName))
+            return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.ACCESS_DENIED);
         try {
             MapInstance map = maps.findByWorldName(worldName);
             if (map == null) return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.MAP_NOT_FOUND);
@@ -629,6 +644,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         UUID id = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || worldName == null || !worldName.matches("[A-Za-z0-9_-]{1,100}"))
             return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.INVALID_INPUT);
+        if (defaultWorld.test(worldName))
+            return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.ACCESS_DENIED);
         try {
             MapInstance map = maps.findByWorldName(worldName);
             if (map == null) return new OperationResult.Failure<>(OperationName.LOAD, id, FailureReason.MAP_NOT_FOUND);
@@ -656,6 +673,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         UUID id = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || worldName == null || !worldName.matches("[A-Za-z0-9_-]{1,100}"))
             return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.INVALID_INPUT);
+        if (defaultWorld.test(worldName))
+            return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.ACCESS_DENIED);
         try {
             RecoveryJournal.Plan plan = journal.read(worldName);
             if (plan == null) return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.INVALID_INPUT);
@@ -744,12 +763,14 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
 
     public void recoverAll() {
         for (RecoveryJournal.Plan plan : journal.all()) {
+            if (defaultWorld.test(plan.map().worldName())) continue;
             OperationResult<MapInstance> result = recover(plan.map().worldName());
             if (result instanceof OperationResult.Failure<?> || result instanceof OperationResult.Partial<?> partial
                     && partial.reason() != FailureReason.PERMISSION_SYNC_PENDING)
                 logger.warning(Messages.text("maintenance.recovery_needed", "world", plan.map().worldName()));
         }
         for (OperationRecord record : operations.unfinished()) {
+            if (defaultWorld.test(record.worldName())) continue;
             if (record.name() == OperationName.INITIALIZE || record.name() == OperationName.LOAD) {
                 OperationResult<MapInstance> result = record.name() == OperationName.INITIALIZE
                         ? initialize(record.worldName()) : load(record.worldName());

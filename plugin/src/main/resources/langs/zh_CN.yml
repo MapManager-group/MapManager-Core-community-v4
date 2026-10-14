@@ -28,7 +28,7 @@ operations:
   TELEPORT: 传送地图
   KICK: 移出地图
 reasons:
-  MAP_NOT_FOUND: 地图不存在
+  MAP_NOT_FOUND: 地图不存在，请检查是否处于正确的子服
   WORLD_NOT_FOUND: 世界不存在
   WORLD_VERSION_INCOMPATIBLE: 地图版本高于服务器版本或版本信息无效
   ALREADY_EXISTS: 地图或世界已存在
@@ -109,6 +109,7 @@ migration:
   default_group_missing: 无法读取 LP default 组，不能判断 v3 地图公开状态
   uuid_missing: '无法解析 v3 玩家 UUID：<player>'
   marker_failed: 迁移完成标记写入失败
+  config_cleanup_failed: '迁移完成，但清理 v3 配置失败：<file>'
   group_conflict: 'v4 地图组已包含其他地图：<group>'
   map_conflict: 'v4 地图已存在且与 v3 数据冲突：<world>'
   id_conflict: 'v4 地图 ID 冲突：<world>'

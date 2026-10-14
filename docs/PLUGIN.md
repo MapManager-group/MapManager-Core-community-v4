@@ -1,10 +1,14 @@
 # plugin 模块
 
-Paper 入口会读取 `config.yml` 并初始化 JSON 或 MySQL 存储。默认使用 `plugins/MapManager-Core/maps.json`；MySQL 需要先创建数据库及授权账户，插件只自动创建表。选择的后端保存在 `storage-backend.txt`，更改后端或 MySQL 目标前须显式迁移数据。启动读取失败会禁用插件；不会用空数据库覆盖原数据。
+默认世界以启动时 Multiverse-Core 的默认世界为准（Multiverse 启用前暂用服务器首个已加载世界）。它始终允许玩家进入，即使存在旧 MMC 私有地图或非 ACTIVE 记录；MMC 不赋予该世界有效角色、不应用单地图方块物理/爆炸设置（坐垫、画、展示框的实体支撑保护为全局规则，默认世界也生效），也不允许修改其别名、出生点、设置或执行生命周期管理。已有地图/角色记录保留用于追溯，但在默认世界上不生效。默认世界变更后需重启 MMC 以刷新识别。 此前已写入 Multiverse 配置或 gamerule 的值不会猜测恢复，需按服务端配置调整。
+
+默认世界不投影 `worldbase` 建造权限：启动后的地图组同步会异步移除已有的默认世界上下文继承，后续同步也不会重建；同组其他地图仍正常投影。实际放置/破坏限制由现有保护插件和 LuckPerms 配置执行；MMC 不新增方块破坏/放置拦截，也不撤销管理员另行配置的全局或其他插件权限。
+
+Paper 入口会在读取业务配置前按 v4 内置资源补齐 `config.yml` 中缺少的节点，保留已有值和注释；执行 v3 正式迁移并成功写入完成标记后，会删除旧版 `global` 配置。没有变更时不重写文件；无效 YAML 或配置节点类型冲突会阻止启动并保留原文件。默认使用 `plugins/MapManager-Core/maps.json`；MySQL 需要先创建数据库及授权账户，插件只自动创建表。选择的后端保存在 `storage-backend.txt`，更改后端或 MySQL 目标前须显式迁移数据。启动读取失败会禁用插件；不会用空数据库覆盖原数据。
 
 启动时通过 LuckPerms API 异步检查 `worldbase`：已存在时不修改；缺失时创建、继承 `default` 并保存。权限节点仍由管理员手动添加。初始化失败会记录错误并禁用插件。创建/导入地图及修改组角色时会维护地图组继承和成员投影。
 
-地图准入监听由 `access-control.strict-map-entry` 控制，默认 `true`。开启时，插件会在传送前校验目标地图，并在传送后复核实际世界；玩家加入服务器、重生或失去当前地图最后一项有效进入权限时也会检查。未获准的玩家会返回 Multiverse 默认世界出生点；默认世界不可用、玩家也无权进入默认地图或传送失败时会断开连接。设为 `false` 会同时停用传送、登录、重生及撤权后的监听检查。`/world tp` 和 `/wtp` 仍按 MMC 准入结果判断是否允许传送。
+地图准入监听由 `access-control.strict-map-entry` 控制，默认 `true`。开启时，插件会在传送前校验目标地图，并在传送后复核实际世界；玩家加入服务器、重生或失去当前地图最后一项有效进入权限时也会检查。未获准的玩家会返回 Multiverse 默认世界出生点；默认世界不可用或传送失败时会断开连接；默认世界始终放行准入。设为 `false` 会同时停用传送、登录、重生及撤权后的监听检查。`/world tp` 和 `/wtp` 仍按 MMC 准入结果判断是否允许传送。
 
 `/mapadmin create <地图名> [生成器类型] [环境]` 和 `/mapadmin import <地图名> [生成器类型] [环境]` 使用独立的生成器类型与维度环境；默认分别为 `flat` 和 `normal`。生成器类型为 `flat`、`normal`、`void`，环境为 `normal`、`nether`、`the_end`、`sift`。`normal` 使用原版标准地形生成器，`flat` 使用平坦生成器，`void` 使用 VoidGen；环境分别映射主世界、下界和末地。`sift` 是预留环境，当前请求会返回 `UNSUPPORTED_ENVIRONMENT`，不会创建或导入地图。
 
@@ -12,7 +16,7 @@ Paper 入口会读取 `config.yml` 并初始化 JSON 或 MySQL 存储。默认�
 
 创建和导入地图均拒绝固定保留名：`cache`、`config`、`world`、`log`、`test`、`overworld`、`default`、`worldbase`、`apply`、`public`、`private`，以及以 `plugin`、`version`、`admin`、`mapmanager`、`builder`、`visitor`、`lib`、`mmc` 开头的名称。`creation.blocked-world-name-regex` 可额外配置 Java 正则，匹配完整地图名；默认 `.*_bak$`，会拒绝 `_bak` 结尾的名称。例如 `(?:lobby|temp.*|.*_bak)` 可同时禁止 `lobby`、`temp` 前缀和 `_bak` 后缀。正则无效会阻止启动；内置限制始终生效。
 
-地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。当前地图管理员可用 `/world public [true|false|info]` 修改或查询公开状态，公开地图允许所有玩家进入；`/world setname <名称>` 修改地图显示名和 Multiverse 别名；`/world setspawn` 将当前位置设置为 MMC、Bukkit 和 Multiverse 出生点。物理和爆炸设置可用 `/world physics [true|false|info]` 与 `/world explosion [true|false|info]` 查看或修改；修改立即持久化。关闭物理会取消方块物理事件并阻止落沙实体生成；关闭爆炸会取消方块与实体爆炸事件。未登记世界不受影响。不提供 v3 全局覆盖。
+地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。当前地图管理员可用 `/world public [true|false|info]` 修改或查询公开状态，公开地图允许所有玩家进入；`/world setname <名称>` 修改地图显示名和 Multiverse 别名；`/world setspawn` 将当前位置设置为 MMC、Bukkit 和 Multiverse 出生点。物理和爆炸设置可用 `/world physics [true|false|info]` 与 `/world explosion [true|false|info]` 查看或修改；修改立即持久化。关闭地图物理会取消方块物理事件并阻止落沙实体生成。画、展示框（含荧光展示框）及 26.3 坐垫因支撑丢失或方块挤占而破坏的行为始终全局禁止，不读取地图物理开关，默认世界和未登记世界也生效；玩家主动拆除不受此规则影响。26.3 的 EntityBreakEvent 按服务器能力条件注册，旧版服务器仍使用悬挂实体事件；关闭爆炸会取消方块与实体爆炸事件。未登记世界不受单地图方块物理和爆炸设置影响，但同样受全局实体支撑保护。不提供 v3 全局覆盖。
 
 MySQL 自动创建五张 InnoDB 表：
 

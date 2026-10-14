@@ -7,6 +7,7 @@ import org.bukkit.entity.*;
 import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.hanging.HangingBreakEvent;
 import org.junit.jupiter.api.Test;
 import studio.lorian.mapmanager.api.model.*;
 import studio.lorian.mapmanager.api.result.FailureReason;
@@ -46,6 +47,20 @@ class MapListenersTest {
             listener.onEntityExplode(entityExplosion); assertEquals(!explosion, entityExplosion.isCancelled());
         }
     }
+    @Test void defaultWorldBypassesStoredSettingsAndAccessDenials() {
+        MapRepository repository = proxy(MapRepository.class, (o, m, a) -> { throw new AssertionError(m); });
+        var settings = new MapSettingsListener(repository, "arena"::equals);
+        var physics = new BlockPhysicsEvent(block, proxy(BlockData.class, (o, m, a) -> Material.SAND));
+        settings.onPhysics(physics); assertFalse(physics.isCancelled());
+        var explosion = new BlockExplodeEvent(block, new ArrayList<>(), 1);
+        settings.onBlockExplode(explosion); assertFalse(explosion.isCancelled());
+        Hanging hanging = proxy(Hanging.class, (o, m, a) -> world);
+        var support = new HangingBreakEvent(hanging, HangingBreakEvent.RemoveCause.PHYSICS);
+        settings.onHangingPhysics(support); assertTrue(support.isCancelled());
+        var access = new MapAccessListener(null, null, null, true, "arena"::equals);
+        var teleport = new PlayerTeleportEvent(null, new Location(world, 0, 0, 0), new Location(world, 0, 64, 0));
+        access.onTeleport(teleport); assertFalse(teleport.isCancelled());
+    }
     @Test void unregisteredWorldAndAlreadyCancelledEventsArePreserved() {
         var listener = settings(null);
         var event = new BlockPhysicsEvent(block, proxy(BlockData.class, (o, m, a) -> Material.SAND)); listener.onPhysics(event); assertFalse(event.isCancelled());
@@ -66,6 +81,27 @@ class MapListenersTest {
         Entity entity = proxy(Entity.class, (o, m, a) -> new Location(world, 0, 64, 0));
         var event = new EntitySpawnEvent(entity); settings(map(false, false)).onFallingBlock(event);
         assertFalse(event.isCancelled()); assertNull(restored);
+    }
+    @Test void hangingSupportBreaksAreBlockedGloballyAndAllowManualRemoval() {
+        for (Class<? extends Hanging> type : List.of(Painting.class, ItemFrame.class, GlowItemFrame.class)) {
+            Hanging entity = proxy(type, (o, m, a) -> world);
+            for (MapInstance registered : Arrays.asList(map(false, true), map(true, false), null)) {
+                for (var cause : HangingBreakEvent.RemoveCause.values()) {
+                    var event = new HangingBreakEvent(entity, cause);
+                    settings(registered).onHangingPhysics(event);
+                    boolean physicalCause = cause == HangingBreakEvent.RemoveCause.PHYSICS
+                            || cause == HangingBreakEvent.RemoveCause.OBSTRUCTION;
+                    assertEquals(physicalCause,
+                            event.isCancelled(), type.getSimpleName() + ": " + cause);
+                }
+            }
+        }
+    }
+    @Test void genericBreakableEntitiesUseGlobalPhysicsRule() {
+        for (String cause : List.of("PHYSICS", "OBSTRUCTION", "ENTITY", "EXPLOSION", "DEFAULT")) {
+            assertEquals(cause.equals("PHYSICS") || cause.equals("OBSTRUCTION"),
+                    MapSettingsListener.cancelEntityPhysics(cause));
+        }
     }
     @Test void strictTeleportRejectsDeniedEntryAndAllowsAuthorizedOrUnregisteredWorlds() {
         UUID id = UUID.randomUUID(); List<Object> messages = new ArrayList<>();

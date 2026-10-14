@@ -109,6 +109,7 @@ migration:
   default_group_missing: Cannot read the LP default group to determine v3 public access
   uuid_missing: 'Could not resolve v3 player UUID: <player>'
   marker_failed: Could not write migration completion marker
+  config_cleanup_failed: 'Migration completed, but could not remove the v3 config from <file>'
   group_conflict: 'v4 group contains other maps: <group>'
   map_conflict: 'v4 map conflicts with v3 data: <world>'
   id_conflict: 'v4 map ID conflict: <world>'

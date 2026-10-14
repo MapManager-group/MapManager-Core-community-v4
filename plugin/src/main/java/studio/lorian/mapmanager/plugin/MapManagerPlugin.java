@@ -1,7 +1,11 @@
 package studio.lorian.mapmanager.plugin;
 
+import java.util.function.Predicate;
+
 import net.luckperms.api.LuckPerms;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -32,6 +36,9 @@ import studio.lorian.mapmanager.plugin.internal.world.FlatChunkGenerator;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 
@@ -56,7 +63,17 @@ public final class MapManagerPlugin extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
         try {
+            boolean configChanged;
+            try { configChanged = completeConfig(); }
+            catch (Exception error) {
+                try { Messages.load(this); } catch (Exception ignored) { }
+                throw error;
+            }
             Messages.load(this);
+            if (configChanged) {
+                reloadConfig();
+                Messages.load(this);
+            }
             StorageConfig config = StorageConfig.load(getConfig());
             Pattern deletionPattern = Pattern.compile(getConfig().getString(
                     "deletion.allowed-world-name-regex", ".*_bak$"));
@@ -68,17 +85,22 @@ public final class MapManagerPlugin extends JavaPlugin {
             var repository = StorageBackendMigration.openAndMigrate(getConfig(), directory);
             LuckPerms luckPerms = getServer().getServicesManager().load(LuckPerms.class);
             if (luckPerms == null) throw new IllegalStateException(Messages.text("startup.luckperms_unavailable"));
-            projection = new QueuedWorldBaseProjection(new WorldBaseProjectionImpl(luckPerms),
+            var defaultWorldName = new java.util.concurrent.atomic.AtomicReference<String>(
+                    getServer().getWorlds().stream().findFirst().map(org.bukkit.World::getName).orElse(null));
+            Predicate<String> defaultWorld = name -> name != null && name.equalsIgnoreCase(defaultWorldName.get());
+            projection = new QueuedWorldBaseProjection(new WorldBaseProjectionImpl(luckPerms, defaultWorld),
                     directory.resolve("permission-sync.json"), getLogger());
             var players = new PlayerGatewayImpl(this);
             var notifier = new OperationNotifierImpl();
             var worldVersions = new WorldVersionServiceImpl(getServer().getWorldContainer().toPath());
             api = new MapManagerImpl(repository, repository, repository, projection, players,
-                    blockedCreationPattern, getLogger(), worldVersions, directory);
+                    blockedCreationPattern, getLogger(), worldVersions, directory, defaultWorld);
             MapAccessListener accessListener = new MapAccessListener(this, api.maps(), api.access(),
-                    getConfig().getBoolean("access-control.strict-map-entry", true));
+                    getConfig().getBoolean("access-control.strict-map-entry", true), defaultWorld);
             getServer().getPluginManager().registerEvents(accessListener, this);
-            getServer().getPluginManager().registerEvents(new MapSettingsListener(repository), this);
+            MapSettingsListener settingsListener = new MapSettingsListener(repository, defaultWorld);
+            getServer().getPluginManager().registerEvents(settingsListener, this);
+            settingsListener.registerEntityPhysics(this);
             getLogger().info(Messages.text("startup.storage_loaded", "backend", selected));
             Path oldDirectory = getDataFolder().getParentFile().toPath().resolve("MapManager-Core");
             var migrator = new V3Migration(oldDirectory, directory, repository, repository, players, luckPerms);
@@ -123,6 +145,8 @@ public final class MapManagerPlugin extends JavaPlugin {
             });
             whenPluginEnabled("Multiverse-Core", () -> {
                 try {
+                    var fallback = org.mvplugins.multiverse.core.MultiverseCoreApi.get().getWorldManager().getDefaultWorld().getOrNull();
+                    if (fallback != null) defaultWorldName.set(fallback.getName());
                     migrator.migrate(getConfig().getBoolean("migration.dry-run", false)).whenComplete((message, error) -> {
                                 if (error != null) migration.completeExceptionally(error);
                                 else migration.complete(message);
@@ -156,6 +180,47 @@ public final class MapManagerPlugin extends JavaPlugin {
         } catch (Exception ex) {
             getLogger().severe(Messages.text("startup.failed", "error", ex.getMessage()));
             getServer().getPluginManager().disablePlugin(this);
+        }
+    }
+
+    private boolean completeConfig() throws IOException, InvalidConfigurationException {
+        File configFile = new File(getDataFolder(), "config.yml");
+        YamlConfiguration config = new YamlConfiguration();
+        config.options().parseComments(true);
+        String contents = Files.readString(configFile.toPath(), StandardCharsets.UTF_8);
+        boolean changed = contents.startsWith("!MapManagerConfig");
+        if (changed) {
+            int endOfTag = contents.indexOf('\n');
+            contents = endOfTag < 0 ? "" : contents.substring(endOfTag + 1);
+        }
+        config.loadFromString(contents);
+        if (Files.exists(getDataFolder().toPath().resolve("v3-migration.done"))
+                && config.contains("global", true)) {
+            config.set("global", null);
+            changed = true;
+        }
+
+        try (var resource = getResource("config.yml")) {
+            if (resource == null) throw new IOException("Bundled config.yml is missing");
+            YamlConfiguration defaults = new YamlConfiguration();
+            defaults.options().parseComments(true);
+            defaults.load(new InputStreamReader(resource, StandardCharsets.UTF_8));
+
+            for (String path : defaults.getKeys(true)) {
+                boolean section = defaults.isConfigurationSection(path);
+                if (config.contains(path, true)) {
+                    if (config.isConfigurationSection(path) != section)
+                        throw new IllegalArgumentException("Configuration path has an incompatible type: " + path);
+                    continue;
+                }
+                if (section) config.createSection(path);
+                else config.set(path, defaults.get(path));
+                config.setComments(path, defaults.getComments(path));
+                config.setInlineComments(path, defaults.getInlineComments(path));
+                changed = true;
+            }
+            if (changed) config.save(configFile);
+            return changed;
         }
     }
 

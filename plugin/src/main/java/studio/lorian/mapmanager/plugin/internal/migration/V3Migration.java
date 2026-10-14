@@ -2,6 +2,8 @@ package studio.lorian.mapmanager.plugin.internal.migration;
 
 import net.luckperms.api.LuckPerms;
 import org.bukkit.Location;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.mvplugins.multiverse.core.MultiverseCoreApi;
 import studio.lorian.mapmanager.api.model.MapGroup;
 import studio.lorian.mapmanager.api.model.MapInstance;
@@ -25,7 +27,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-/** 启动时导入 v3 元数据；只读取旧文件与 LP，且只写 MMC 仓储。 */
+/** 导入 v3 元数据；成功写入完成标记后清理旧配置。 */
 public final class V3Migration {
     private final Path source;
     private final Path destination;
@@ -138,8 +140,26 @@ public final class V3Migration {
         prepared.apply(maps, roles, (OperationRepository) maps, false);
         try { StorageSnapshot.writeJson(destination.resolve("v3-migration.done"), "v3 migration completed\n"); }
         catch (IOException error) { throw new IllegalStateException(Messages.text("migration.marker_failed"), error); }
+        removeLegacyConfig();
         return Messages.text("migration.done", "maps", prepared.maps().size(), "groups", prepared.groups().size(),
                 "roles", prepared.grants().size());
+    }
+
+    private void removeLegacyConfig() {
+        Path file = destination.resolve("config.yml");
+        if (!Files.isRegularFile(file)) return;
+        YamlConfiguration config = new YamlConfiguration();
+        config.options().parseComments(true);
+        try { config.load(file.toFile()); }
+        catch (IOException | InvalidConfigurationException error) {
+            throw new IllegalStateException(Messages.text("migration.config_cleanup_failed", "file", file), error);
+        }
+        if (!config.contains("global", true)) return;
+        config.set("global", null);
+        try { config.save(file.toFile()); }
+        catch (IOException error) {
+            throw new IllegalStateException(Messages.text("migration.config_cleanup_failed", "file", file), error);
+        }
     }
 
     private void report(StorageSnapshot prepared) {

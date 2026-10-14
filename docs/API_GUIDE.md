@@ -1,5 +1,9 @@
 # MapManager v4 外部插件 API 调用指南
 
+默认世界以启动时 Multiverse-Core 的默认世界为准（Multiverse 启用前暂用服务器首个已加载世界）。它始终允许玩家进入，即使存在旧 MMC 私有地图或非 ACTIVE 记录；MMC 不赋予该世界有效角色、不应用单地图方块物理/爆炸设置（坐垫、画、展示框的实体支撑保护为全局规则，默认世界也生效），也不允许修改其别名、出生点、设置或执行生命周期管理。已有地图/角色记录保留用于追溯，但在默认世界上不生效。默认世界变更后需重启 MMC 以刷新识别。 此前已写入 Multiverse 配置或 gamerule 的值不会猜测恢复，需按服务端配置调整。
+
+默认世界不投影 `worldbase` 建造权限：启动后的地图组同步会异步移除已有的默认世界上下文继承，后续同步也不会重建；同组其他地图仍正常投影。实际放置/破坏限制由现有保护插件和 LuckPerms 配置执行；MMC 不新增方块破坏/放置拦截，也不撤销管理员另行配置的全局或其他插件权限。
+
 本文说明其他 Paper 插件如何依赖并获取 MapManager 服务，以及各服务的当前调用范围。公开契约在 `mapmanager-api` 模块；不要依赖 `plugin` 模块的实现类、repository、LuckPerms 或 Multiverse 对象。
 
 需要从 v3 插件迁移时，先看 [v3→v4 插件 API 迁移指南](V3_TO_V4_API_MIGRATION.md)；完整功能差异见 [v3/v4 对照表](API_INVENTORY.md)。v4 公共 API 的 HTML Javadoc 导出包：[`mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip`](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
@@ -152,7 +156,7 @@ public final class MapTeleportExample extends JavaPlugin {
 - `settings().getSpawn(mapId)` / `settings().setSpawn(mapId, spawnPoint)` 查询或更新出生点；设置出生点会写 MMC，并同步 Bukkit 和 Multiverse。
 - `aliases().setAlias(mapId)` 将别名重置为世界名；`setAlias(mapId, alias)` 保存纯文本展示名，并按公开状态给 MV 别名加颜色。
 
-别名、公开状态和出生点会调用 Bukkit/Multiverse，必须在服务器主线程调用。物理/爆炸只修改存储设置。API 不接受操作者，因此设置服务也不会自动执行地图管理员校验。
+别名、公开状态和出生点会调用 Bukkit/Multiverse，必须在服务器主线程调用。物理/爆炸只修改存储设置；`setPhysical` 仅影响普通方块和落沙，画/展示框及 26.3 坐垫的支撑丢失/挤占破坏固定全局禁止，不由该 API 控制。API 不接受操作者，因此设置服务也不会自动执行地图管理员校验。
 
 ### 传送和踢出
 

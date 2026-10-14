@@ -61,6 +61,72 @@ class MapServicesTest {
     }
 
     @Test
+    void defaultWorldAllowsEntryWithoutRolesAndKeepsSharedGroupOnOtherMaps() {
+        UUID player = UUID.randomUUID();
+        roles.addMember(arena2.id(), player, MapRole.ADMIN);
+        var defaultRoles = new MapRoleServiceImpl(storage, storage, permissions, "arena"::equals);
+        var defaultAccess = new MapAccessServiceImpl(storage, defaultRoles, "arena"::equals);
+        assertTrue(defaultAccess.decide(UUID.randomUUID(), arena.id()).allowed());
+        assertNull(defaultAccess.decide(player, arena.id()).effectiveRole());
+        assertFalse(defaultRoles.hasRole(arena.id(), player, MapRole.ADMIN));
+        assertTrue(defaultRoles.members(arena.id(), MapRole.BUILDER).isEmpty());
+        assertTrue(defaultRoles.assignedMembers(arena.id(), MapRole.ADMIN).isEmpty());
+        assertTrue(defaultRoles.hasRole(arena2.id(), player, MapRole.ADMIN));
+        assertFalse(defaultAccess.administratedMaps(player).contains(arena));
+        assertTrue(defaultAccess.administratedMaps(player).contains(arena2));
+        var denied = assertInstanceOf(OperationResult.Failure.class,
+                defaultRoles.addMember(arena.id(), UUID.randomUUID(), MapRole.BUILDER));
+        assertEquals(FailureReason.ACCESS_DENIED, denied.reason());
+        var defaultSettings = new MapSettingsServiceImpl(storage, new MapAliasServiceImpl(storage), "arena"::equals);
+        assertInstanceOf(OperationResult.Failure.class, defaultSettings.setPhysical(arena.id(), false));
+        assertInstanceOf(OperationResult.Failure.class, defaultSettings.setExplosion(arena.id(), true));
+        assertEquals(arena, storage.findById(arena.id()));
+    }
+
+    @Test
+    void defaultWorldRejectsManagementAndIgnoresHistoricalMmcSpawn() throws Exception {
+        var predicate = (java.util.function.Predicate<String>) "arena"::equals;
+        var world = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(org.bukkit.World.class,
+                (o, m, a) -> switch (m.getName()) {
+                    case "getName" -> "arena";
+                    case "getSpawnLocation" -> new org.bukkit.Location((org.bukkit.World) o, 1, 64, 2);
+                    default -> throw new AssertionError(m);
+                });
+        try (var server = new studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer((o, m, a) -> switch (m.getName()) {
+            case "isPrimaryThread" -> true;
+            case "getWorld" -> world;
+            default -> throw new AssertionError(m);
+        })) {
+            var aliases = new MapAliasServiceImpl(storage, predicate);
+            var settings = new MapSettingsServiceImpl(storage, aliases, predicate);
+            assertEquals(FailureReason.ACCESS_DENIED,
+                    assertInstanceOf(OperationResult.Failure.class, aliases.setAlias(arena.id(), "renamed")).reason());
+            assertEquals(FailureReason.ACCESS_DENIED,
+                    assertInstanceOf(OperationResult.Failure.class, settings.setPublic(arena.id(), true)).reason());
+            assertInstanceOf(OperationResult.Failure.class,
+                    settings.setSpawn(arena.id(), new SpawnPoint("arena", 3, 64, 3, 0, 0)));
+            var lifecycle = new WorldLifeCycleServiceImpl(storage, storage, storage, permissions, aliases, null,
+                    java.util.regex.Pattern.compile(".*_bak$"), java.util.logging.Logger.getAnonymousLogger(), temporaryDirectory, predicate);
+            for (var result : java.util.List.of(lifecycle.initialize("arena"), lifecycle.load("arena"),
+                    lifecycle.recover("arena"), lifecycle.delete("arena"))) {
+                assertEquals(FailureReason.ACCESS_DENIED, assertInstanceOf(OperationResult.Failure.class, result).reason());
+            }
+            storage.save(new MapInstance(arena.id(), arena.worldName(), arena.groupId(), arena.displayName(),
+                    arena.settings(), arena.status(), new SpawnPoint("arena", 99, 100, 99, 0, 0)));
+            assertNull(settings.getSpawn(arena.id()));
+            var players = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(
+                    studio.lorian.mapmanager.api.service.PlayerGateway.class, (o, m, a) -> switch (m.getName()) {
+                        case "isOnline" -> true;
+                        case "teleport" -> { assertEquals(new SpawnPoint("arena", 1, 64, 2, 0, 0), a[1]); yield true; }
+                        default -> throw new AssertionError(m);
+                    });
+            var access = new MapAccessServiceImpl(storage, roles, predicate);
+            assertInstanceOf(OperationResult.Success.class,
+                    new MapTravelServiceImpl(storage, access, players, lifecycle, predicate).teleport(UUID.randomUUID(), arena.id()));
+        }
+    }
+
+    @Test
     void appliesGroupRoleInheritanceAndKeepsVisitorsMapScoped() {
         UUID adminId = UUID.randomUUID();
         UUID builderId = UUID.randomUUID();

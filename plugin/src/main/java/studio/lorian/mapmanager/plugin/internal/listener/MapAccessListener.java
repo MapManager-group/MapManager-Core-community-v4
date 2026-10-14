@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.internal.listener;
 
+import java.util.function.Predicate;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -23,6 +25,7 @@ import java.util.logging.Level;
 
 /** 按 MMC 准入规则处理玩家进入地图、登录位置、重生和撤权后的移出。 */
 public final class MapAccessListener implements Listener {
+    private final Predicate<String> defaultWorld;
     private final JavaPlugin plugin;
     private final MapService maps;
     private final MapAccessService access;
@@ -30,6 +33,11 @@ public final class MapAccessListener implements Listener {
 
     /** 创建地图准入监听器并注入地图、准入服务及严格校验开关。 */
     public MapAccessListener(JavaPlugin plugin, MapService maps, MapAccessService access, boolean strictEnabled) {
+        this(plugin, maps, access, strictEnabled, world -> false);
+    }
+
+    public MapAccessListener(JavaPlugin plugin, MapService maps, MapAccessService access, boolean strictEnabled, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
         this.plugin = plugin;
         this.maps = maps;
         this.access = access;
@@ -109,6 +117,7 @@ public final class MapAccessListener implements Listener {
 
     /** 检查玩家当前地图；无权进入时送回默认世界，校验异常时断开连接。 */
     private void checkCurrentWorld(Player player, String messageKey) {
+        if (defaultWorld.test(player.getWorld().getName())) return;
         try {
             MapInstance map = maps.findByWorldName(player.getWorld().getName());
             if (map == null || access.decide(player.getUniqueId(), map.id()).allowed()) return;
@@ -121,6 +130,7 @@ public final class MapAccessListener implements Listener {
 
     /** 判断玩家是否可以进入指定世界；未登记为地图的世界默认允许进入。 */
     private boolean canEnter(Player player, World world) {
+        if (defaultWorld.test(world.getName())) return true;
         try {
             MapInstance map = maps.findByWorldName(world.getName());
             return map == null || access.decide(player.getUniqueId(), map.id()).allowed();

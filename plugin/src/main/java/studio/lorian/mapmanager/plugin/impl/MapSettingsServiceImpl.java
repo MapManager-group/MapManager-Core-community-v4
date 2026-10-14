@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import java.util.function.Predicate;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -19,9 +21,15 @@ import java.util.function.Function;
 
 /** 修改 MMC 持久化的单地图设置。 */
 public final class MapSettingsServiceImpl implements MapSettingsService {
+    private final Predicate<String> defaultWorld;
     private final MapRepository maps;
     private final MapAliasServiceImpl aliases;
     public MapSettingsServiceImpl(MapRepository maps, MapAliasServiceImpl aliases) {
+        this(maps, aliases, world -> false);
+    }
+
+    public MapSettingsServiceImpl(MapRepository maps, MapAliasServiceImpl aliases, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
         this.maps = maps;
         this.aliases = aliases;
     }
@@ -33,6 +41,7 @@ public final class MapSettingsServiceImpl implements MapSettingsService {
         try {
             MapInstance old = maps.findById(id);
             if (old == null) return new OperationResult.Failure<>(operation, operationId, FailureReason.MAP_NOT_FOUND);
+            if (defaultWorld.test(old.worldName())) return new OperationResult.Failure<>(operation, operationId, FailureReason.ACCESS_DENIED);
             maps.save(edit.apply(old));
             return new OperationResult.Success<>(operation, operationId, null);
         } catch (IllegalArgumentException ex) {
@@ -51,6 +60,7 @@ public final class MapSettingsServiceImpl implements MapSettingsService {
         try {
             MapInstance old = maps.findById(id);
             if (old == null) return new OperationResult.Failure<>(OperationName.SET_PUBLIC, operationId, FailureReason.MAP_NOT_FOUND);
+            if (defaultWorld.test(old.worldName())) return new OperationResult.Failure<>(OperationName.SET_PUBLIC, operationId, FailureReason.ACCESS_DENIED);
             // 先读取原有 MV 别名并去掉旧颜色，避免公开状态切换时把别名重置为地图名。
             String alias = aliases.currentAlias(old);
             maps.save(with(old, old.displayName(), new MapSettings(old.settings().physical(),
@@ -80,7 +90,7 @@ public final class MapSettingsServiceImpl implements MapSettingsService {
     }
     @Override public SpawnPoint getSpawn(UUID id) {
         MapInstance map = maps.findById(id);
-        return map == null ? null : map.spawn();
+        return map == null || defaultWorld.test(map.worldName()) ? null : map.spawn();
     }
     @Override public OperationResult<Void> setSpawn(UUID id, SpawnPoint spawn) {
         UUID operationId = UUID.randomUUID();
@@ -92,6 +102,8 @@ public final class MapSettingsServiceImpl implements MapSettingsService {
             MapInstance old = maps.findById(id);
             if (old == null)
                 return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.MAP_NOT_FOUND);
+            if (defaultWorld.test(old.worldName()))
+                return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.ACCESS_DENIED);
             if (!old.worldName().equalsIgnoreCase(spawn.worldName()))
                 return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.INVALID_INPUT);
             World bukkitWorld = Bukkit.getWorld(old.worldName());

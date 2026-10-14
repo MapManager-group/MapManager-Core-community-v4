@@ -1,5 +1,7 @@
 # MapManager v4 已实现功能测试用例
 
+默认世界回归：`MapServicesTest.defaultWorldAllowsEntryWithoutRolesAndKeepsSharedGroupOnOtherMaps` 验证自由准入、角色失效、同组隔离和设置拒绝；`MapServicesTest.defaultWorldRejectsManagementAndIgnoresHistoricalMmcSpawn` 验证别名/出生点/生命周期管理拒绝及旧出生点绕过；`MapListenersTest.defaultWorldBypassesStoredSettingsAndAccessDenials` 验证默认世界跳过事件约束；`DefaultWorldProjectionTest` 验证旧默认世界 worldbase 继承被移除且不重建，并保留其他世界继承。实服还需验证 Multiverse 默认世界识别、LP 后台落盘与实际保护插件组合。
+
 本清单依据当前源码整理，区分可在本地自动运行的单元测试和需要 Paper/依赖服务的集成验收。状态以 [`CLASS_STATUS.md`](CLASS_STATUS.md) 为准；标记“部分实现”的流程仍测试已存在的分支，同时记录未实现的行为，不将设计目标算作通过。自动测试使用 JUnit Jupiter，由 Maven Surefire 在 `test` 阶段运行；`mvn package` 会先运行测试，任一测试失败都会阻止进入打包阶段。
 
 ## 测试环境与数据
@@ -39,7 +41,7 @@ mvn clean package
 | UNIT-TRAVEL-01 至 UNIT-TRAVEL-13 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapTravelServiceImplTest.java` | 传送输入/线程/在线/准入校验、按需加载、Failure/Partial 传播、出生点和朝向、错误世界和传送失败、踢出同图与管理员校验 |
 | UNIT-VERSION-01 至 UNIT-VERSION-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldVersionServiceImplTest.java` | 旧版/同版/未来版本兼容判断、损坏或缺失 NBT、世界名定位及路径逃逸拒绝 |
 | UNIT-FLAT-01 至 UNIT-FLAT-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/FlatChunkGeneratorTest.java` | 生成器 ID 往返、实际层材料/顺序/范围、负最小高度、区块高度截断、出生点和非法设置 |
-| UNIT-LISTENER-01 至 UNIT-LISTENER-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/listener/MapListenersTest.java` | 物理与爆炸设置独立、未登记世界、落沙恢复、其他实体、严格传送准入及关闭整套监听 |
+| UNIT-LISTENER-01 至 UNIT-LISTENER-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/listener/MapListenersTest.java` | 物理与爆炸设置独立、未登记世界、落沙恢复、其他实体、画/展示框全局支撑保护（地图物理开/关、未登记世界、默认世界）和通用实体破坏原因、严格传送准入及关闭整套监听 |
 | UNIT-VALIDATE-01 至 UNIT-VALIDATE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、API 删除不要求 _bak 后缀且仍校验地图状态；拒绝时不新增地图/组/操作记录 |
 | UNIT-FAILURE-01 至 UNIT-FAILURE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServiceFailureTest.java` | 角色写入失败返回 Failure、写后读取或 LP 异常返回 Partial、无效角色输入、物理/爆炸读写失败 |
 | UNIT-ADMIN-01 至 UNIT-ADMIN-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapAdminCommandTest.java` | 控制台限制、路由、默认值、非法/重复选项、导入参数拒绝、一次性/过期删除码、身份与状态保护、补全 |
@@ -131,7 +133,8 @@ mvn clean package
 | SET-09   | physics=true 时生成 FallingBlock                                | 本监听器不取消实体生成，也不执行方块恢复                                          |
 | SET-10   | explosion=false 时触发 BlockExplodeEvent 与 EntityExplodeEvent  | 对应事件取消，爆炸不破坏方块                                                      |
 | SET-11   | explosion=true 时触发两类爆炸事件                               | 本监听器不取消爆炸事件                                                            |
-| SET-12   | 物理/爆炸关闭但地图未登记、设置开启的对照世界发生事件           | 未登记世界不受本监听器影响；不同地图设置互不串扰                                  |
+| SET-12   | 物理/爆炸关闭但地图未登记、设置开启的对照世界发生事件           | 未登记世界的方块物理和爆炸不受影响；不同地图设置互不串扰；实体支撑保护仍全局生效                                  |
+| SET-13 | 在物理开启/关闭、默认和未登记世界移除坐垫/画/展示框的支撑方块或挤占其位置 | PHYSICS/OBSTRUCTION 事件取消，实体不掉落；直接敲击拆除仍允许 |
 | SET-13   | API 调用 setPhysical/setExplosion 使用有效地图 UUID             | 只更新字段且保留 explosion/physical、public、spawn、displayName、status 等其他值  |
 | SET-14   | API 设置使用 null UUID、未知 UUID或存储写失败                   | 分别返回 INVALID_INPUT、MAP_NOT_FOUND、STORAGE_FAILED；不报告成功                 |
 | ALIAS-01 | 设置展示名，分别包含颜色码、空文本、超长文本                    | 保存/同步遵循别名服务输入校验；颜色码不进入持久展示文本                           |
@@ -273,7 +276,7 @@ mvn clean package
 
 ## 目前不列为通过项的能力
 
-以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：延迟卸载、PVP/全局物理或全局爆炸覆盖、SIFT 环境、API 操作者授权入口（调用方负责）。JSON/MySQL 不会静默切换，必须显式指定迁移源。实际 Paper 服务注册、插件类路径及服务事件仍需执行 API-01 至 API-07 的集成用例；地图准入监听用例列在 ACCESS-01 至 ACCESS-07。
+以下在当前源码中标为未实现、占位或尚未接入，不能作为已实现功能验收：延迟卸载、PVP/全局方块物理或全局爆炸覆盖、SIFT 环境、API 操作者授权入口（调用方负责）。JSON/MySQL 不会静默切换，必须显式指定迁移源。实际 Paper 服务注册、插件类路径及服务事件仍需执行 API-01 至 API-07 的集成用例；地图准入监听用例列在 ACCESS-01 至 ACCESS-07。
 
 ## 执行记录
 

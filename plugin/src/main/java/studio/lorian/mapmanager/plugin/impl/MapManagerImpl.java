@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import java.util.function.Predicate;
+
 import studio.lorian.mapmanager.api.MapManager;
 import studio.lorian.mapmanager.api.service.MapAccessService;
 import studio.lorian.mapmanager.api.service.MapAliasService;
@@ -51,15 +53,22 @@ public final class MapManagerImpl implements MapManager {
                           WorldBaseProjection permissions, PlayerGateway players,
                           Pattern blockedCreationPattern, Logger logger, WorldVersionService worldVersions,
                           java.nio.file.Path dataDirectory) {
+        this(repository, roleRepository, operations, permissions, players, blockedCreationPattern, logger, worldVersions, dataDirectory, world -> false);
+    }
+
+    public MapManagerImpl(MapRepository repository, RoleRepository roleRepository, OperationRepository operations,
+                          WorldBaseProjection permissions, PlayerGateway players,
+                          Pattern blockedCreationPattern, Logger logger, WorldVersionService worldVersions,
+                          java.nio.file.Path dataDirectory, Predicate<String> defaultWorld) {
         this.maps = new MapServiceImpl(repository);
-        this.aliases = new MapAliasServiceImpl(repository);
-        this.settings = new MapSettingsServiceImpl(repository, aliases);
-        this.roles = new MapRoleServiceImpl(repository, roleRepository, permissions);
-        this.access = new MapAccessServiceImpl(repository, roles);
+        this.aliases = new MapAliasServiceImpl(repository, defaultWorld);
+        this.settings = new MapSettingsServiceImpl(repository, aliases, defaultWorld);
+        this.roles = new MapRoleServiceImpl(repository, roleRepository, permissions, defaultWorld);
+        this.access = new MapAccessServiceImpl(repository, roles, defaultWorld);
         this.worldVersions = worldVersions;
         this.worldLifeCycle = new WorldLifeCycleServiceImpl(repository, roleRepository, operations,
-                permissions, aliases, worldVersions, blockedCreationPattern, logger, dataDirectory);
-        this.travel = new MapTravelServiceImpl(repository, access, players, worldLifeCycle);
+                permissions, aliases, worldVersions, blockedCreationPattern, logger, dataDirectory, defaultWorld);
+        this.travel = new MapTravelServiceImpl(repository, access, players, worldLifeCycle, defaultWorld);
     }
 
     @Override

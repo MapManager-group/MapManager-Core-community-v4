@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.internal.permission;
 
+import java.util.function.Predicate;
+
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.group.GroupManager;
 import net.luckperms.api.node.types.InheritanceNode;
@@ -14,10 +16,16 @@ import java.util.concurrent.CompletableFuture;
 /** LuckPerms worldbase 初始化及权限投影实现。 */
 public final class WorldBaseProjectionImpl implements WorldBaseProjection {
     private static final String WORLD_BASE = "worldbase";
+    private final Predicate<String> defaultWorld;
     private final LuckPerms luckPerms;
     private CompletableFuture<Boolean> worldBaseFuture;
 
     public WorldBaseProjectionImpl(LuckPerms luckPerms) {
+        this(luckPerms, world -> false);
+    }
+
+    public WorldBaseProjectionImpl(LuckPerms luckPerms, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
         this.luckPerms = Objects.requireNonNull(luckPerms);
     }
 
@@ -45,7 +53,13 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
                 .orElseGet(() -> manager.createAndLoadGroup(groupId)))
                 .thenCompose(group -> {
                     group.data().add(InheritanceNode.builder("default").build());
+                    for (var node : group.getNodes()) {
+                        if (node instanceof InheritanceNode inheritance && inheritance.getGroupName().equals(WORLD_BASE)
+                                && node.getContexts().getValues(DefaultContextKeys.WORLD_KEY).stream().anyMatch(defaultWorld))
+                            group.data().remove(node);
+                    }
                     for (String worldName : worldNames) {
+                        if (defaultWorld.test(worldName)) continue;
                         group.data().add(InheritanceNode.builder(WORLD_BASE)
                                 .withContext(DefaultContextKeys.WORLD_KEY, worldName).build());
                     }

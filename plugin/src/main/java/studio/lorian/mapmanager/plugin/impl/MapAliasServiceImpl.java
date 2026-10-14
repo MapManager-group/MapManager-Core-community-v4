@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import java.util.function.Predicate;
+
 import org.bukkit.Bukkit;
 import org.mvplugins.multiverse.core.MultiverseCoreApi;
 import studio.lorian.mapmanager.api.model.MapInstance;
@@ -16,9 +18,15 @@ import java.util.Objects;
 
 /** 从 MMC 地图记录计算颜色并设置 Multiverse 别名。 */
 public final class MapAliasServiceImpl implements MapAliasService {
+    private final Predicate<String> defaultWorld;
     private final MapRepository maps;
 
     public MapAliasServiceImpl(MapRepository maps) {
+        this(maps, world -> false);
+    }
+
+    public MapAliasServiceImpl(MapRepository maps, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
         this.maps = maps;
     }
 
@@ -56,6 +64,8 @@ public final class MapAliasServiceImpl implements MapAliasService {
             MapInstance map = maps.findById(mapId);
             if (map == null)
                 return new OperationResult.Failure<>(OperationName.SET_ALIAS, operationId, FailureReason.MAP_NOT_FOUND);
+            if (defaultWorld.test(map.worldName()))
+                return new OperationResult.Failure<>(OperationName.SET_ALIAS, operationId, FailureReason.ACCESS_DENIED);
             var manager = MultiverseCoreApi.get().getWorldManager();
             var world = manager.getWorld(map.worldName()).getOrNull();
             if (world == null)

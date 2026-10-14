@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import java.util.function.Predicate;
+
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -22,6 +24,7 @@ import java.util.UUID;
 
 /** 执行准入检查、按需加载地图并传送玩家。 */
 public final class MapTravelServiceImpl implements MapTravelService {
+    private final Predicate<String> defaultWorld;
     private final MapRepository maps;
     private final MapAccessService access;
     private final PlayerGateway players;
@@ -29,6 +32,12 @@ public final class MapTravelServiceImpl implements MapTravelService {
 
     public MapTravelServiceImpl(MapRepository maps, MapAccessService access, PlayerGateway players,
                                 WorldLifeCycleService lifeCycle) {
+        this(maps, access, players, lifeCycle, world -> false);
+    }
+
+    public MapTravelServiceImpl(MapRepository maps, MapAccessService access, PlayerGateway players,
+                                WorldLifeCycleService lifeCycle, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
         this.maps = maps;
         this.access = access;
         this.players = players;
@@ -72,7 +81,7 @@ public final class MapTravelServiceImpl implements MapTravelService {
             world = Bukkit.getWorld(map.worldName());
             if (world == null) return new OperationResult.Failure<>(OperationName.TELEPORT, operationId, FailureReason.WORLD_NOT_FOUND);
         }
-        SpawnPoint spawn = map.spawn();
+        SpawnPoint spawn = defaultWorld.test(map.worldName()) ? null : map.spawn();
         if (spawn == null) {
             var location = world.getSpawnLocation();
             spawn = new SpawnPoint(world.getName(), location.getX(), location.getY(), location.getZ(),

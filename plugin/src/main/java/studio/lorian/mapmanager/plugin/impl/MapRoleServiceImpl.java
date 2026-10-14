@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import java.util.function.Predicate;
+
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
 import studio.lorian.mapmanager.api.model.MapStatus;
@@ -18,10 +20,16 @@ import java.util.UUID;
 
 /** MMC 持久角色规则；组角色对该组地图生效。 */
 public final class MapRoleServiceImpl implements MapRoleService {
+    private final Predicate<String> defaultWorld;
     private final MapRepository maps;
     private final RoleRepository roles;
     private final WorldBaseProjection permissions;
     public MapRoleServiceImpl(MapRepository maps, RoleRepository roles, WorldBaseProjection permissions) {
+        this(maps, roles, permissions, world -> false);
+    }
+
+    public MapRoleServiceImpl(MapRepository maps, RoleRepository roles, WorldBaseProjection permissions, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
         this.maps = maps;
         this.roles = roles;
         this.permissions = permissions;
@@ -31,12 +39,12 @@ public final class MapRoleServiceImpl implements MapRoleService {
     }
     @Override public Set<UUID> assignedMembers(UUID mapId, MapRole role) {
         MapInstance map = maps.findById(mapId);
-        if (map == null || role == null) return Set.of();
+        if (map == null || defaultWorld.test(map.worldName()) || role == null) return Set.of();
         return Set.copyOf(roles.members(scope(map, role), role));
     }
     @Override public Set<UUID> members(UUID mapId, MapRole role) {
         MapInstance map = maps.findById(mapId);
-        if (map == null || role == null) return Set.of();
+        if (map == null || defaultWorld.test(map.worldName()) || role == null) return Set.of();
         Set<UUID> result = new HashSet<>(roles.members(scope(map, role), role));
         if (role == MapRole.BUILDER || role == MapRole.VISITOR) result.addAll(roles.members(map.groupId(), MapRole.ADMIN));
         if (role == MapRole.VISITOR) result.addAll(roles.members(map.groupId(), MapRole.BUILDER));
@@ -44,7 +52,7 @@ public final class MapRoleServiceImpl implements MapRoleService {
     }
     @Override public boolean hasRole(UUID mapId, UUID playerId, MapRole role) {
         MapInstance map = maps.findById(mapId);
-        if (map == null || playerId == null || role == null) return false;
+        if (map == null || defaultWorld.test(map.worldName()) || playerId == null || role == null) return false;
         if (roles.members(map.groupId(), MapRole.ADMIN).contains(playerId)) return true;
         if (role != MapRole.ADMIN && roles.members(map.groupId(), MapRole.BUILDER).contains(playerId)) return true;
         return role == MapRole.VISITOR && roles.members(map.id().toString(), MapRole.VISITOR).contains(playerId);
@@ -57,7 +65,7 @@ public final class MapRoleServiceImpl implements MapRoleService {
         try {
             MapInstance map = maps.findById(mapId);
             if (map == null) return new OperationResult.Failure<>(operation, id, FailureReason.MAP_NOT_FOUND);
-            if (map.status() != MapStatus.ACTIVE)
+            if (defaultWorld.test(map.worldName()) || map.status() != MapStatus.ACTIVE)
                 return new OperationResult.Failure<>(operation, id, FailureReason.ACCESS_DENIED);
             String scope = scope(map, role);
             if (add) roles.add(scope, role, playerId); else roles.remove(scope, role, playerId);

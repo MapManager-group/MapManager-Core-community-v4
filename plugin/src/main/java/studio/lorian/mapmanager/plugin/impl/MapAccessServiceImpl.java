@@ -1,5 +1,7 @@
 package studio.lorian.mapmanager.plugin.impl;
 
+import java.util.function.Predicate;
+
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
 import studio.lorian.mapmanager.api.model.MapStatus;
@@ -14,13 +16,23 @@ import java.util.UUID;
 
 /** 只根据 MMC 持久状态计算地图准入。 */
 public final class MapAccessServiceImpl implements MapAccessService {
+    private final Predicate<String> defaultWorld;
     private final MapRepository maps;
     private final MapRoleService roles;
-    public MapAccessServiceImpl(MapRepository maps, MapRoleService roles) { this.maps = maps; this.roles = roles; }
+    public MapAccessServiceImpl(MapRepository maps, MapRoleService roles) {
+        this(maps, roles, world -> false);
+    }
+
+    public MapAccessServiceImpl(MapRepository maps, MapRoleService roles, Predicate<String> defaultWorld) {
+        this.defaultWorld = defaultWorld;
+        this.maps = maps;
+        this.roles = roles;
+    }
     @Override public AccessDecision decide(UUID playerId, UUID mapId) {
         if (playerId == null || mapId == null) return new AccessDecision(false, null, FailureReason.INVALID_INPUT);
         MapInstance map = maps.findById(mapId);
         if (map == null) return new AccessDecision(false, null, FailureReason.MAP_NOT_FOUND);
+        if (defaultWorld.test(map.worldName())) return new AccessDecision(true, null, null);
         if (map.status() != MapStatus.ACTIVE) return new AccessDecision(false, null, FailureReason.ACCESS_DENIED);
         if (roles.hasRole(mapId, playerId, MapRole.ADMIN)) return new AccessDecision(true, MapRole.ADMIN, null);
         if (roles.hasRole(mapId, playerId, MapRole.BUILDER)) return new AccessDecision(true, MapRole.BUILDER, null);
@@ -32,7 +44,7 @@ public final class MapAccessServiceImpl implements MapAccessService {
         return maps.findAll().stream().filter(map -> decide(playerId, map.id()).allowed()).toList();
     }
     @Override public List<MapInstance> administratedMaps(UUID playerId) {
-        return maps.findAll().stream().filter(map -> map.status() == MapStatus.ACTIVE
+        return maps.findAll().stream().filter(map -> !defaultWorld.test(map.worldName()) && map.status() == MapStatus.ACTIVE
                 && roles.hasRole(map.id(), playerId, MapRole.ADMIN)).toList();
     }
 }
