@@ -44,7 +44,7 @@ mvn clean package
 | UNIT-LISTENER-01 至 UNIT-LISTENER-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/listener/MapListenersTest.java` | 物理与爆炸设置独立、未登记世界、落沙恢复、其他实体、画/展示框全局支撑保护（地图物理开/关、未登记世界、默认世界）和通用实体破坏原因、严格传送准入及关闭整套监听 |
 | UNIT-VALIDATE-01 至 UNIT-VALIDATE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、API 删除不要求 _bak 后缀且仍校验地图状态；拒绝时不新增地图/组/操作记录 |
 | UNIT-FAILURE-01 至 UNIT-FAILURE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServiceFailureTest.java` | 角色写入失败返回 Failure、写后读取或 LP 异常返回 Partial、无效角色输入、物理/爆炸读写失败 |
-| UNIT-ADMIN-01 至 UNIT-ADMIN-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapAdminCommandTest.java` | 控制台限制、路由、默认值、非法/重复选项、导入参数拒绝、一次性/过期删除码、身份与状态保护、补全 |
+| UNIT-ADMIN-01 至 UNIT-ADMIN-10 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapAdminCommandTest.java` | 控制台/RCON 放行，玩家及命令方块拒绝、路由、默认值、非法/重复选项、导入参数拒绝、一次性/过期删除码、身份与状态保护、补全 |
 | UNIT-CMD-01 至 UNIT-CMD-07 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapWorldCommandTest.java` | world/wtp 共用传送、设置/别名/出生点路由、管理员授权、只读 info、角色 info 名单/准入、存储错误及补全过滤 |
 | UNIT-RECOVERY-01 至 UNIT-RECOVERY-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/RecoveryJournalTest.java` | 完整请求重启、目录身份变更拒绝、符号链接与路径穿越拒绝 |
 | UNIT-CACHE-01 至 UNIT-CACHE-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageRecoveryTest.java` | 快照恢复和冲突、事件读取隔离、缓存写失败不发布、重命名/换组索引、旧快照不可变、角色清理与删除保护、后端切换标记 |
@@ -302,7 +302,7 @@ JUnit 单元用例由 Maven 构建自动执行，具体结果见各模块 `targe
 | REC-04 | 删除中断后用不同目录替换原世界 | 拒绝删除替换目录，保留 DELETING 与失败原因 |
 | REC-05 | 旧 PENDING 无完整请求 | 保留数据并提示人工核查，不猜测 owner 或生成器 |
 | QUE-01 | LP 写入不可用后授予/撤销并重启 | MMC 角色立即生效；Partial 表示待同步；队列落盘并自动重试；不乱序恢复已撤销权限 |
-| MAINT-01 | 控制台 load/recover/operations/export；玩家执行维护命令 | 控制台得到结构化结果与快照；玩家被拒绝 |
+| MAINT-01 | 控制台或 RCON 执行 load/recover/operations/export；玩家及命令方块执行维护命令 | 控制台与 RCON 可执行，结果仍输出服务器控制台；玩家及命令方块被拒绝 |
 | MIG-13 | v3 dry-run，再 apply，注入半完成写入 | dry-run 只有报告；apply 先备份与冻结计划，重试补齐一致子集；完成才写标记 |
 | SQL-01 | JSON → MySQL → 另一 MySQL → JSON | 空组、地图、出生点、角色、全部操作一致；切换前校验源指纹 |
 | SQL-02 | 目标冲突、源变化、部分写入或标记后归档前中断 | 冲突不覆盖，源变化拒绝，部分写入恢复，标记后归档安全收尾 |

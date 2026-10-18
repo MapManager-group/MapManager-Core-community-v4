@@ -68,7 +68,7 @@
 | `WorldLifeCycleServiceImpl` | 创建、导入、初始化和删除的用例入口 | 已实现；保留名称、参数、版本、默认世界、在线玩家和目录边界校验；完整请求先落 RecoveryJournal，世界初始化后保存 level.dat，再登记 ACTIVE；LP 持久异步投影；启动及显式 recover 继续创建/导入/删除；删除目录身份不符时停止，保留恢复记录 |
 | `FlatChunkGenerator` | 按编码层设置生成平坦区块 | 已实现；读取 Multiverse generator ID 中的层设置，可用于非主世界环境及导入后的后续生成；生成由 Paper 调用，测试用 Paper 26.2 区块数据验证 |
 
-| `MapAdminCommand` | 控制台生命周期与维护命令 | 已实现；create/import/init/delete、load/recover、operations、migration、storage export；包含命令专用删除名称正则、六位一次性删除确认和创建/导入参数补全 |
+| `MapAdminCommand` | 控制台与 RCON 生命周期及维护命令 | 已实现；create/import/init/delete、load/recover、operations、migration、storage export；包含命令专用删除名称正则、六位一次性删除确认和创建/导入参数补全 |
 
 ## plugin 模块：迁移、通知、权限和玩家
 

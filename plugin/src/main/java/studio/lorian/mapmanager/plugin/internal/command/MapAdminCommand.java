@@ -20,7 +20,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** 控制台维护入口；世界恢复在主线程，报告和备份在异步线程执行。 */
+/** 控制台与 RCON 维护入口；世界恢复在主线程，报告和备份在异步线程执行。 */
 public final class MapAdminCommand extends Command {
     private static final String CONFIRM_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final long DELETE_CONFIRM_NANOS = TimeUnit.SECONDS.toNanos(10);
@@ -43,7 +43,7 @@ public final class MapAdminCommand extends Command {
         this.migration = migration; this.notifier = notifier; this.afterMigration = afterMigration;
     }
     @Override public boolean execute(CommandSender sender, String label, String[] args) {
-        if (!(sender instanceof ConsoleCommandSender)) {
+        if (!(sender instanceof ConsoleCommandSender) && !(sender instanceof RemoteConsoleCommandSender)) {
             sender.sendMessage(Messages.component("reasons.NO_PERMISSION")); return true;
         }
         NotificationTarget target = NotificationTarget.console();
@@ -90,7 +90,8 @@ public final class MapAdminCommand extends Command {
         });
     }
     @Override public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
-        if (!(sender instanceof ConsoleCommandSender) || args.length == 0) return List.of();
+        if ((!(sender instanceof ConsoleCommandSender) && !(sender instanceof RemoteConsoleCommandSender))
+                || args.length == 0) return List.of();
         String command = args[0].toLowerCase(Locale.ROOT);
         String current = args[args.length - 1];
         try {

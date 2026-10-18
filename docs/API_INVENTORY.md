@@ -68,7 +68,7 @@
 
 ### 命令和策略差异
 
-- v3 的 `/create`、`/import`、`/init`、`/delete` 是独立命令并按权限节点授权；v4 将创建、导入、初始化、删除合并到 `/mapadmin`，仅允许控制台执行；玩家操作使用 `/world`。
+- v3 的 `/create`、`/import`、`/init`、`/delete` 是独立命令并按权限节点授权；v4 将创建、导入、初始化、删除合并到 `/mapadmin`，仅允许控制台或 RCON 执行；玩家操作使用 `/world`。
 - v3 与 v4 创建/导入未指定生成器时均默认为 `FLAT`；v4 环境默认为 `NORMAL`。v3 未提供 group 时用地图名，v4 也默认地图名。
 - v3 创建/导入未提供 owner 时使用命令发送者；v4 控制台命令未提供 `admin=<玩家>` 时不添加管理员。
 - v3 传送补全及准入读取 LuckPerms 的 `multiverse.access.<world>`；v4 按 MMC ACTIVE 状态、角色和 `isPublic` 判定。

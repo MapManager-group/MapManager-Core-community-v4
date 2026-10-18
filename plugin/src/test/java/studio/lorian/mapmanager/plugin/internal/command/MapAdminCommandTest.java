@@ -2,6 +2,9 @@ package studio.lorian.mapmanager.plugin.internal.command;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.command.RemoteConsoleCommandSender;
+import org.bukkit.command.BlockCommandSender;
+import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import studio.lorian.mapmanager.api.model.*;
@@ -76,11 +79,29 @@ class MapAdminCommandTest {
         store.delete(map.id()); store.save(new MapInstance(UUID.randomUUID(), "arena_bak", "team", "Other", map.settings(), MapStatus.ACTIVE, null));
         command.execute(console, "mapadmin", new String[]{"delete", code}); assertEquals(1, calls.size());
     }
-    @Test void nonConsoleCannotExecuteOrCompleteMaintenanceCommands() throws Exception {
-        var command = command(store()); var sender = sender(CommandSender.class);
-        for (String verb : List.of("create", "import", "init", "delete", "load", "recover", "operations"))
-            command.execute(sender, "mapadmin", new String[]{verb, "arena"});
-        assertTrue(calls.isEmpty()); assertTrue(command.tabComplete(sender, "mapadmin", new String[]{""}).isEmpty());
+    @Test void playersAndCommandBlocksCannotExecuteOrCompleteMaintenanceCommands() throws Exception {
+        var command = command(store());
+        for (Class<? extends CommandSender> type : List.of(CommandSender.class, Player.class, BlockCommandSender.class)) {
+            var sender = sender(type);
+            for (String verb : List.of("create", "import", "init", "delete", "load", "recover", "operations"))
+                command.execute(sender, "mapadmin", new String[]{verb, "arena"});
+            assertTrue(calls.isEmpty()); assertTrue(command.tabComplete(sender, "mapadmin", new String[]{""}).isEmpty());
+        }
+    }
+    @Test void rconCanExecuteLifecycleCommandsAndCompleteMaintenanceCommands() throws Exception {
+        var store = store(); store.saveGroup(new MapGroup("team", Set.of()));
+        store.save(new MapInstance(UUID.randomUUID(), "arena_bak", "team", "Arena",
+                new MapSettings(true, false, false), MapStatus.ACTIVE, null));
+        var command = command(store); var rcon = sender(RemoteConsoleCommandSender.class);
+        for (String verb : List.of("create", "import", "init", "load", "recover"))
+            assertTrue(command.execute(rcon, "mapadmin", new String[]{verb, "arena"}));
+        command.execute(rcon, "mapadmin", new String[]{"delete", "arena_bak"});
+        assertNotNull(code);
+        command.execute(rcon, "mapadmin", new String[]{"delete", code});
+        assertEquals(List.of("create", "importWorld", "initialize", "load", "recover", "delete"), calls);
+        assertEquals(command.tabComplete(sender(ConsoleCommandSender.class), "mapadmin", new String[]{""}),
+                command.tabComplete(rcon, "mapadmin", new String[]{""}));
+        assertEquals(List.of("dry-run"), command.tabComplete(rcon, "mapadmin", new String[]{"migration", "dry"}));
     }
     @Test void malformedAndDuplicateOptionsNeverInvokeLifecycle() throws Exception {
         var command = command(store()); var console = sender(ConsoleCommandSender.class);
