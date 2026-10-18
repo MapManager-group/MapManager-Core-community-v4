@@ -24,6 +24,8 @@ class MapWorldCommandTest {
     private final List<Object> values = new ArrayList<>();
     private OperationResult<?> result;
     private String key;
+    private List<Object> keyArguments;
+    private boolean settingFails;
     private MapWorldCommand worldCommand, wtp;
     private Player player;
     private BukkitTestServer server;
@@ -42,14 +44,18 @@ class MapWorldCommandTest {
                 m.getName().equals("accessibleMaps") ? List.of(map) : new AccessDecision(allowed, role, allowed ? null : FailureReason.NO_PERMISSION));
         MapSettingsService settings = proxy(MapSettingsService.class, (o, m, a) -> {
             calls.add(m.getName()); assertEquals(map.id(), a[0]); values.add(a[1]);
-            return new OperationResult.Success<>(OperationName.SET_PHYSICAL, UUID.randomUUID(), null);
+            return settingFails
+                    ? new OperationResult.Failure<>(OperationName.SET_PHYSICAL, UUID.randomUUID(), FailureReason.STORAGE_FAILED)
+                    : new OperationResult.Success<>(OperationName.SET_PHYSICAL, UUID.randomUUID(), null);
         });
         MapTravelService travel = proxy(MapTravelService.class, (o, m, a) -> {
             calls.add(m.getName()); assertEquals(playerId, a[0]); assertEquals(map.id(), a[1]);
             return new OperationResult.Success<>(OperationName.TELEPORT, UUID.randomUUID(), null);
         });
         OperationNotifier notifier = proxy(OperationNotifier.class, (o, m, a) -> {
-            if (m.getName().equals("notifyKey")) key = (String) a[1];
+            if (m.getName().equals("notifyKey")) {
+                key = (String) a[1]; keyArguments = Arrays.asList((Object[]) a[2]);
+            }
             else if (a[1] instanceof OperationResult<?> operationResult) result = operationResult;
             return null;
         });
@@ -69,12 +75,80 @@ class MapWorldCommandTest {
     }
     @Test void administratorSettingCommandsRouteBooleanNameAndSpawn() {
         worldCommand.execute(player, "world", new String[]{"physics", "false"});
+        assertEquals("command.physics_updated", key); assertEquals(List.of("value", false), keyArguments);
         worldCommand.execute(player, "world", new String[]{"explosion", "TRUE"});
+        worldCommand.execute(player, "world", new String[]{"explosion", "TRUE", "confirm"});
+        assertEquals("command.explosion_updated", key); assertEquals(List.of("value", true), keyArguments);
         worldCommand.execute(player, "world", new String[]{"public", "on"});
+        assertEquals("command.public_updated", key); assertEquals(List.of("value", true), keyArguments);
         worldCommand.execute(player, "world", new String[]{"setname", "My", "Arena"});
+        assertEquals("command.name_updated", key); assertEquals(List.of("value", "My Arena"), keyArguments);
         worldCommand.execute(player, "world", new String[]{"setspawn"});
+        assertEquals("command.spawn_updated", key);
+        assertEquals(List.of("world", "arena", "x", 10.0, "y", 70.0, "z", 20.0, "yaw", 90.0f, "pitch", 15.0f), keyArguments);
         assertEquals(List.of("setPhysical", "setExplosion", "setPublic", "setDisplayName", "setSpawn"), calls);
         assertEquals(List.of(false, true, true, "My Arena", new SpawnPoint("arena", 10, 70, 20, 90, 15)), values);
+    }
+    @Test void enablingRequiresPriorMatchingConfirmationAndCannotBeReplayed() {
+        for (String setting : List.of("physics", "explosion")) {
+            int before = calls.size();
+            worldCommand.execute(player, "world", new String[]{setting, "true", "confirm"});
+            assertEquals("command.setting_confirm", key); assertEquals(before, calls.size());
+            worldCommand.execute(player, "world", new String[]{setting, "true", "confirm"});
+            assertEquals(before + 1, calls.size()); assertEquals(true, values.getLast());
+            worldCommand.execute(player, "world", new String[]{setting, "true", "confirm"});
+            assertEquals(before + 1, calls.size()); assertEquals("command.setting_confirm", key);
+        }
+    }
+    @Test void confirmationIsBoundToMapAndSetting() {
+        worldCommand.execute(player, "world", new String[]{"physics", "true"});
+        worldCommand.execute(player, "world", new String[]{"explosion", "true", "confirm"});
+        assertTrue(calls.isEmpty());
+        worldCommand.execute(player, "world", new String[]{"physics", "true"});
+        map = new MapInstance(UUID.randomUUID(), map.worldName(), map.groupId(), map.displayName(), map.settings(), map.status(), null);
+        worldCommand.execute(player, "world", new String[]{"physics", "true", "confirm"});
+        assertTrue(calls.isEmpty()); assertEquals("command.setting_confirm", key);
+    }
+    @Test void confirmationRechecksAccessAndAdministratorRole() {
+        worldCommand.execute(player, "world", new String[]{"physics", "true"});
+        role = MapRole.BUILDER;
+        worldCommand.execute(player, "world", new String[]{"physics", "true", "confirm"});
+        assertEquals(FailureReason.NO_PERMISSION, assertInstanceOf(OperationResult.Failure.class, result).reason());
+        role = MapRole.ADMIN; allowed = false;
+        worldCommand.execute(player, "world", new String[]{"physics", "true", "confirm"});
+        assertEquals(FailureReason.NO_PERMISSION, assertInstanceOf(OperationResult.Failure.class, result).reason());
+        assertTrue(calls.isEmpty());
+    }
+    @Test void confirmationExpiresWithoutSleeping() throws Exception {
+        worldCommand.execute(player, "world", new String[]{"physics", "true"});
+        var field = MapWorldCommand.class.getDeclaredField("pendingSettings"); field.setAccessible(true);
+        @SuppressWarnings("unchecked") var pending = (Map<UUID, Object>) field.get(worldCommand);
+        var constructor = pending.get(playerId).getClass().getDeclaredConstructor(UUID.class, OperationName.class, long.class);
+        constructor.setAccessible(true);
+        pending.put(playerId, constructor.newInstance(map.id(), OperationName.SET_PHYSICAL,
+                System.nanoTime() - java.util.concurrent.TimeUnit.SECONDS.toNanos(11)));
+        worldCommand.execute(player, "world", new String[]{"physics", "true", "confirm"});
+        assertTrue(calls.isEmpty()); assertEquals("command.setting_confirm", key);
+    }
+    @Test void confirmationCannotBeUsedByAnotherPlayerAndDisablingCancelsIt() {
+        worldCommand.execute(player, "world", new String[]{"physics", "true"});
+        Player other = proxy(Player.class, (o, m, a) -> switch (m.getName()) {
+            case "getName" -> "Other"; case "getUniqueId" -> UUID.nameUUIDFromBytes(new byte[]{1});
+            case "getWorld" -> player.getWorld(); default -> throw new AssertionError(m);
+        });
+        worldCommand.execute(other, "world", new String[]{"physics", "true", "confirm"});
+        assertTrue(calls.isEmpty());
+        worldCommand.execute(player, "world", new String[]{"physics", "false"});
+        assertEquals(List.of(false), values);
+        worldCommand.execute(player, "world", new String[]{"physics", "true", "confirm"});
+        assertEquals(1, calls.size()); assertEquals("command.setting_confirm", key);
+    }
+    @Test void failedSettingDoesNotSendSuccessTextAndInvalidConfirmationDoesNotWrite() {
+        worldCommand.execute(player, "world", new String[]{"physics", "false", "confirm"});
+        assertEquals("command.setting_usage", key); assertTrue(calls.isEmpty());
+        key = null; settingFails = true;
+        worldCommand.execute(player, "world", new String[]{"physics", "false"});
+        assertNull(key); assertInstanceOf(OperationResult.Failure.class, result);
     }
     @Test void nonAdministratorCannotWriteSettings() {
         role = MapRole.BUILDER;
@@ -116,6 +190,8 @@ class MapWorldCommandTest {
         assertEquals(List.of("add", "info", "remove"), worldCommand.tabComplete(player, "world", new String[]{"admin", ""}));
         assertTrue(worldCommand.tabComplete(player, "world", new String[]{""}).contains("setspawn"));
         assertEquals(List.of("false", "info", "true"), worldCommand.tabComplete(player, "world", new String[]{"physics", ""}));
+        assertEquals(List.of("confirm"), worldCommand.tabComplete(player, "world", new String[]{"physics", "true", ""}));
+        assertTrue(worldCommand.tabComplete(player, "world", new String[]{"physics", "false", ""}).isEmpty());
     }
     @Test void roleInfoListsDirectMembersForVisitorsAndValidatesAccessAndArguments() {
         role = MapRole.VISITOR;

@@ -31,6 +31,9 @@ import java.util.concurrent.CompletableFuture;
  * 注册并分派 /world 子命令；玩家操作由 MMC 地图角色与准入规则授权。
  */
 public final class MapWorldCommand extends Command {
+    private static final long SETTING_CONFIRM_NANOS = java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+    private record PendingSetting(UUID mapId, OperationName operation, long issuedAtNanos) {}
+    private final Map<UUID, PendingSetting> pendingSettings = new HashMap<>();
     private final JavaPlugin plugin;
     private final MapService maps;
     private final MapAccessService access;
@@ -155,8 +158,10 @@ public final class MapWorldCommand extends Command {
                 case "kick" -> args.length == 2
                         ? kickSuggestions((Player) sender, currentArg) : List.of();
                 case "admin", "builder", "visitor" -> roleSuggestions((Player) sender, command, args);
-                case "physics", "explosion" -> args.length == 2
-                        && manageableSettingMap((Player) sender) ? suggestions(currentArg, List.of("true", "false", "info")) : List.of();
+                case "physics", "explosion" -> !manageableSettingMap((Player) sender) ? List.of()
+                        : args.length == 2 ? suggestions(currentArg, List.of("true", "false", "info"))
+                        : args.length == 3 && args[1].equalsIgnoreCase("true")
+                        ? suggestions(currentArg, List.of("confirm")) : List.of();
                 case "public" -> args.length == 2 && manageableSettingMap((Player) sender)
                         ? suggestions(currentArg, List.of("true", "false", "info")) : List.of();
                 default -> List.of();
@@ -349,7 +354,10 @@ public final class MapWorldCommand extends Command {
 
     private void changeSetting(Player actor, NotificationTarget target, String[] args, boolean physics) {
         OperationName operation = physics ? OperationName.SET_PHYSICAL : OperationName.SET_EXPLOSION;
-        if (args.length > 2 || (args.length == 2 && !Set.of("true", "false", "info").contains(args[1].toLowerCase(Locale.ROOT)))) {
+        boolean confirming = args.length == 3 && args[1].equalsIgnoreCase("true")
+                && args[2].equalsIgnoreCase("confirm");
+        if (!confirming && (args.length > 2 || (args.length == 2
+                && !Set.of("true", "false", "info").contains(args[1].toLowerCase(Locale.ROOT))))) {
             notifier.notifyKey(target, "command.setting_usage", "setting", physics ? "physics" : "explosion");
             return;
         }
@@ -361,7 +369,19 @@ public final class MapWorldCommand extends Command {
             return;
         }
         boolean enabled = Boolean.parseBoolean(args[1]);
-        notifier.notify(target, physics ? settings.setPhysical(map.id(), enabled) : settings.setExplosion(map.id(), enabled));
+        if (enabled) {
+            long now = System.nanoTime();
+            pendingSettings.values().removeIf(pending -> now - pending.issuedAtNanos() >= SETTING_CONFIRM_NANOS);
+            PendingSetting pending = pendingSettings.remove(actor.getUniqueId());
+            if (!confirming || pending == null || !pending.mapId().equals(map.id()) || pending.operation() != operation) {
+                pendingSettings.put(actor.getUniqueId(), new PendingSetting(map.id(), operation, now));
+                notifier.notifyKey(target, physics ? "command.physics_risk" : "command.explosion_risk");
+                notifier.notifyKey(target, "command.setting_confirm", "setting", physics ? "physics" : "explosion");
+                return;
+            }
+        } else pendingSettings.remove(actor.getUniqueId());
+        notifySetting(target, physics ? settings.setPhysical(map.id(), enabled) : settings.setExplosion(map.id(), enabled),
+                physics ? "command.physics_updated" : "command.explosion_updated", "value", enabled);
     }
 
     private void changePublic(CommandSender sender, NotificationTarget target, String[] args) {
@@ -381,7 +401,7 @@ public final class MapWorldCommand extends Command {
             return;
         }
         boolean enabled = Set.of("true", "on", "enable", "yes").contains(args[1].toLowerCase(Locale.ROOT));
-        notifier.notify(target, settings.setPublic(map.id(), enabled));
+        notifySetting(target, settings.setPublic(map.id(), enabled), "command.public_updated", "value", enabled);
     }
 
     private void setName(CommandSender sender, NotificationTarget target, String[] args) {
@@ -394,7 +414,7 @@ public final class MapWorldCommand extends Command {
         MapInstance map = manageableCurrentMap(actor, target, OperationName.SET_ALIAS);
         if (map == null) return;
         String displayName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-        notifier.notify(target, settings.setDisplayName(map.id(), displayName));
+        notifySetting(target, settings.setDisplayName(map.id(), displayName), "command.name_updated", "value", displayName);
     }
 
     private void setSpawn(CommandSender sender, NotificationTarget target, String[] args) {
@@ -409,7 +429,16 @@ public final class MapWorldCommand extends Command {
         var location = actor.getLocation();
         SpawnPoint spawn = new SpawnPoint(map.worldName(), location.getX(), location.getY(), location.getZ(),
                 location.getYaw(), location.getPitch());
-        notifier.notify(target, settings.setSpawn(map.id(), spawn));
+        notifySetting(target, settings.setSpawn(map.id(), spawn), "command.spawn_updated",
+                "world", spawn.worldName(), "x", spawn.x(), "y", spawn.y(), "z", spawn.z(),
+                "yaw", spawn.yaw(), "pitch", spawn.pitch());
+    }
+
+    private void notifySetting(NotificationTarget target, OperationResult<?> result, String key, Object... arguments) {
+        if (result instanceof OperationResult.Success<?>) {
+            notifier.notify(NotificationTarget.console(), result);
+            notifier.notifyKey(target, key, arguments);
+        } else notifier.notify(target, result);
     }
 
     private MapInstance manageableCurrentMap(Player actor, NotificationTarget target, OperationName operation) {
@@ -419,7 +448,8 @@ public final class MapWorldCommand extends Command {
                 fail(target, operation, FailureReason.MAP_NOT_FOUND);
                 return null;
             }
-            if (access.decide(actor.getUniqueId(), map.id()).effectiveRole() != MapRole.ADMIN) {
+            AccessDecision decision = access.decide(actor.getUniqueId(), map.id());
+            if (!decision.allowed() || decision.effectiveRole() != MapRole.ADMIN) {
                 fail(target, operation, FailureReason.NO_PERMISSION);
                 return null;
             }

@@ -112,7 +112,7 @@ mvn clean package
 | LIFE-23 | 导入目录为符号链接或名称试图逃逸世界根目录                                 | 输入校验或目录检查拒绝，不触碰根目录外文件                                                                               |
 | LIFE-24 | 创建/导入过程中分别令 MV 操作、初始化、存储或 LP 投影失败                  | 后端/存储失败保留完整请求及 PENDING 供恢复；LP 入队后地图 ACTIVE，返回 Partial(PERMISSION_SYNC_PENDING)，后台重试                              |
 | LIFE-25 | 成功创建或导入后检查世界属性                                               | difficulty peaceful、creative、自动加载开启、出生区块常驻关闭；普通生物生成关闭、MISC 开启；规定 gamerule 全部生效并保存 |
-| LIFE-26 | 对已加载且已登记地图执行 `/mapadmin init <name>`                              | 控制台重放 MV 与 gamerule 初始化；不重建角色、不改变地图状态；返回成功                                                   |
+| LIFE-26 | 对已加载且已登记地图执行 `/mapadmin init <name>`                              | 先持久化关闭物理和爆炸，再重放 MV 与 gamerule 初始化；保留公开状态、出生点和角色，不改变地图状态；返回的地图快照包含关闭后的设置                                                   |
 | LIFE-27 | init 目标不存在、未登记或未加载                                            | 分别返回 MAP_NOT_FOUND 或 WORLD_NOT_FOUND；不产生其他世界变更                                                            |
 | LIFE-28 | init 名称含非法字符或由玩家执行                                            | 返回 INVALID_INPUT/NO_PERMISSION；不执行 MV 操作                                                                         |
 | LIFE-29 | 在 FLAT+NETHER/THE_END 创建 `flat.height=64` 或自定义 `generator-settings`；检查区块和 Environment | 生成预期平坦层和 biome；选定环境保留；非法方块、非法 JSON 和总层高超过 254 在登记前拒绝 |
@@ -337,3 +337,9 @@ create/import/init/delete 从 `/world` 移至 `/mapadmin`，旧入口不再执�
 以当前工作区为基线，原 63 个用例全部通过；本次新增 59 个用例，合计 122 个（api 4、plugin 118）。补充传送/按需加载、世界版本、实际区块层生成、监听器、角色失败语义、生命周期输入保护、玩家/控制台命令、缓存快照及通知分流。仅修改测试和本清单，不修改业务源码或增加依赖。
 
 验证使用 JDK 21 执行 `mvn -o --no-transfer-progress clean test`，实际 122 个测试全部通过：0 failures、0 errors、0 skipped。未启动 `server` 测试服或连接外部服务；上文历史集成结果不属于本次验证。尚未覆盖为普通单元门禁的运行时路径包括完整 Multiverse 创建/初始化/删除/恢复、LP 适配器实际节点写入、玩家身份解析与 Mojang 网络、登录/重生后的调度复核及安全默认世界回退。这些路径继续使用集成验收，不能将本次单测通过视为全路径或 100% 覆盖率。
+
+## 设置反馈与创建/导入保护验收
+
+`MessagesTest` 验证中文风险原文、参数渲染和双语键一致性；`MapWorldCommandTest` 覆盖设置参数反馈、开启二次确认、防重放、过期、地图/设置/玩家绑定、权限复核、关闭取消确认、非法确认参数与失败不报成功。
+
+真实 Paper 验收：通过 `/mapadmin create`、`/mapadmin import` 和 API 分别创建/导入地图，确认初次加载即阻止方块更新、落沙和爆炸；重启后设置仍为 false。依次执行 physics/explosion 的 true、true confirm，核对风险说明、10 秒有效期和成功参数。已有地图和 v3 迁移维持原设置；显式执行 `/mapadmin init` 或 API `initialize` 后两项均关闭，公开状态等其他数据保留，重启后仍关闭；后续世界初始化失败时也保持关闭。此场景须在测试服另行验证。

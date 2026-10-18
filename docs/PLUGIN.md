@@ -16,7 +16,11 @@ Paper 入口会在读取业务配置前按 v4 内置资源补齐 `config.yml` �
 
 创建和导入地图均拒绝固定保留名：`cache`、`config`、`world`、`log`、`test`、`overworld`、`default`、`worldbase`、`apply`、`public`、`private`，以及以 `plugin`、`version`、`admin`、`mapmanager`、`builder`、`visitor`、`lib`、`mmc` 开头的名称。`creation.blocked-world-name-regex` 可额外配置 Java 正则，匹配完整地图名；默认 `.*_bak$`，会拒绝 `_bak` 结尾的名称。例如 `(?:lobby|temp.*|.*_bak)` 可同时禁止 `lobby`、`temp` 前缀和 `_bak` 后缀。正则无效会阻止启动；内置限制始终生效。
 
-地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。当前地图管理员可用 `/world public [true|false|info]` 修改或查询公开状态，公开地图允许所有玩家进入；`/world setname <名称>` 修改地图显示名和 Multiverse 别名；`/world setspawn` 将当前位置设置为 MMC、Bukkit 和 Multiverse 出生点。物理和爆炸设置可用 `/world physics [true|false|info]` 与 `/world explosion [true|false|info]` 查看或修改；修改立即持久化。关闭地图物理会取消方块物理事件并阻止落沙实体生成。画、展示框（含荧光展示框）及 26.3 坐垫因支撑丢失或方块挤占而破坏的行为始终全局禁止，不读取地图物理开关，默认世界和未登记世界也生效；玩家主动拆除不受此规则影响。26.3 的 EntityBreakEvent 按服务器能力条件注册，旧版服务器仍使用悬挂实体事件；关闭爆炸会取消方块与实体爆炸事件。未登记世界不受单地图方块物理和爆炸设置影响，但同样受全局实体支撑保护。不提供 v3 全局覆盖。
+地图记录包含 UUID、世界名、组 ID、展示名、`MapSettings`、持久状态（`PENDING`、`ACTIVE`、`ARCHIVED`、`DELETING`、`DELETED`）和可空出生点。`MapGroup.worldNames` 从地图与组的关系计算，保存组时只写组 ID。访客与地图关联；管理员和建筑师与组关联。操作阶段单独持久化。当前地图管理员可用 `/world public [true|false|info]` 修改或查询公开状态，公开地图允许所有玩家进入；`/world setname <名称>` 修改地图显示名和 Multiverse 别名；`/world setspawn` 将当前位置设置为 MMC、Bukkit 和 Multiverse 出生点。物理和爆炸设置可用 `/world physics [true|false|info]` 与 `/world explosion [true|false|info]` 查看或修改；关闭立即持久化，开启经风险二次确认后持久化。关闭地图物理会取消方块物理事件并阻止落沙实体生成。画、展示框（含荧光展示框）及 26.3 坐垫因支撑丢失或方块挤占而破坏的行为始终全局禁止，不读取地图物理开关，默认世界和未登记世界也生效；玩家主动拆除不受此规则影响。26.3 的 EntityBreakEvent 按服务器能力条件注册，旧版服务器仍使用悬挂实体事件；关闭爆炸会取消方块与实体爆炸事件。未登记世界不受单地图方块物理和爆炸设置影响，但同样受全局实体支撑保护。不提供 v3 全局覆盖。
+
+新建和导入的地图从加载前的 PENDING 记录开始默认 `physical=false`、`explosion=false`，命令与 API 创建/导入共用此规则；恢复沿用已保存设置。已有地图及 v3 迁移设置不会自动改写；显式执行 `/mapadmin init <地图>` 或 API `initialize` 会先持久化关闭物理和爆炸，再重放世界初始化，保留公开状态、角色和地图状态；后续世界初始化失败时也保持关闭。
+
+设置成功提示显示实际参数：物理、爆炸、公开状态显示 true/false，名称显示新名称，出生点显示世界、坐标和朝向。开启物理或爆炸须先执行 `/world physics true` 或 `/world explosion true` 阅读风险说明，再在 10 秒内执行对应的 `true confirm` 命令；确认绑定玩家、地图 UUID 与设置类型，消费后失效，并重新校验当前地图管理员身份。关闭设置立即生效。风险说明分别为：“开启物理后，一些非正常放置的方块和实体可能会全部掉落，你确认要开启吗？”、“开启爆炸后，所有爆炸物均可以正常破坏周围方块，你确认要开启吗？”。全局装饰实体支撑保护仍独立生效；公开 API 设置方法由调用方自行处理授权与交互确认。
 
 MySQL 自动创建五张 InnoDB 表：
 
@@ -42,7 +46,7 @@ MySQL 自动创建五张 InnoDB 表：
 |---|---|
 | `/mapadmin create <地图> [生成器] [环境] [选项...]` | 创建地图；保留创建参数校验和 admin 用户名/UUID 解析 |
 | `/mapadmin import <地图> [生成器] [环境] [alias=... group=... admin=...]` | 导入地图；不接受生成参数 |
-| `/mapadmin init <地图>` | 重放已加载地图的初始化规则 |
+| `/mapadmin init <地图>` | 关闭物理和爆炸，再重放已加载地图的初始化规则 |
 | `/mapadmin delete <地图或确认码>` | 申请删除后 10 秒内输入一次性六位码确认 |
 | `/mapadmin load <地图>` | 加载已登记 ACTIVE 地图，校验目录和版本；传送也会按准入结果自动加载 |
 | `/mapadmin recover <地图>` | 按完整请求继续创建/导入或已确认的删除；不猜测缺失请求 |

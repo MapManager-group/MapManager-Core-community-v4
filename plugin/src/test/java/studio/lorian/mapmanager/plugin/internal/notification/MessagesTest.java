@@ -51,6 +51,20 @@ class MessagesTest {
     }
 
     @Test
+    void settingMessagesRenderValuesAndExactChineseRiskWarnings() throws Exception {
+        field("selected").set(null, load("/langs/zh_CN.yml"));
+        assertEquals("修改世界物理为false。", Messages.text("command.physics_updated", "value", false));
+        assertEquals("修改世界爆炸为true。", Messages.text("command.explosion_updated", "value", true));
+        assertEquals("开启爆炸后，所有爆炸物均可以正常破坏周围方块，你确认要开启吗？",
+                Messages.text("command.explosion_risk"));
+        assertEquals("开启物理后，一些非正常放置的方块和实体可能会全部掉落，你确认要开启吗？",
+                Messages.text("command.physics_risk"));
+        assertTrue(Messages.text("command.setting_confirm", "setting", "physics")
+                .contains("/world physics true confirm"));
+        assertTrue(Messages.text("command.name_updated", "value", "<red>Arena").contains("<red>Arena"));
+    }
+
+    @Test
     void fallsBackToChineseWhenSelectedLanguageKeyIsMissing() {
         english.set("command.kicked", null);
 

@@ -391,7 +391,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         if (alias.isBlank() || alias.length() > 255)
             return new OperationResult.Failure<>(operation, operationId, FailureReason.INVALID_INPUT);
         MapInstance pending = new MapInstance(UUID.randomUUID(), name, groupId, alias,
-                new MapSettings(true, false, false), MapStatus.PENDING, null);
+                new MapSettings(false, false, false), MapStatus.PENDING, null);
         try {
             var worldManager = MultiverseCoreApi.get().getWorldManager();
             // 拒绝已由 MMC、Bukkit 或 Multiverse 管理的同名世界。
@@ -513,8 +513,11 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             var world = MultiverseCoreApi.get().getWorldManager().getLoadedWorld(worldName).getOrNull();
             if (world == null)
                 return new OperationResult.Failure<>(OperationName.INITIALIZE, operationId, FailureReason.WORLD_NOT_FOUND);
-            // 手动初始化仅重放 MV 和 gamerule 设置，不重建角色或改变地图状态。
+            // 先关闭物理和爆炸，再重放世界设置；不重建角色或改变地图状态。
             operations.save(new OperationRecord(operationId, OperationName.INITIALIZE, worldName, OperationStage.STARTED, null));
+            map = new MapInstance(map.id(), map.worldName(), map.groupId(), map.displayName(),
+                    new MapSettings(false, false, map.settings().isPublic()), map.status(), map.spawn());
+            maps.save(map);
             initializeWorld(world, map.id(), map.displayName());
             operations.save(new OperationRecord(operationId, OperationName.INITIALIZE, worldName, OperationStage.COMPLETED, null));
             return new OperationResult.Success<>(OperationName.INITIALIZE, operationId, map);

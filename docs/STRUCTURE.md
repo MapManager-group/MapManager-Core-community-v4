@@ -99,7 +99,7 @@ MapManager-v4/
 
 当前公开的 `MapRoleService.addMember/removeMember` 没有操作者参数，因此角色管理权限由 `/world` 命令入口检查；直接调用该 API 的其他插件需要自行验证操作者。存储迁移和 LP `worldbase` 初始化成功后，`MapManager` 会注册到 Bukkit ServicesManager。LP 写入在后台 FIFO 工作线程执行，命令不等待网络；MMC 写入和本地队列落盘仍同步。`access-control.strict-map-entry` 默认开启，关闭后传送、加入、重生和撤权后的准入复核均停用。自动重试队列已实现。外部插件接入方式见 [API_GUIDE.md](API_GUIDE.md)。
 
-`MapSettingsListener` 由插件启动时注册，按 `MapRepository.findByWorldName` 读取当前地图设置，控制方块物理、落沙实体和方块/实体爆炸；画/展示框的悬挂事件以及 26.3 坐垫的 EntityBreakEvent 则全局取消 PHYSICS/OBSTRUCTION 破坏，不查询地图仓储或物理开关，默认和未登记世界也生效；新事件按服务器能力条件注册；`/world physics|explosion` 经 `MapSettingsService` 写入同一存储。
+`MapSettingsListener` 由插件启动时注册，按 `MapRepository.findByWorldName` 读取当前地图设置，控制方块物理、落沙实体和方块/实体爆炸；画/展示框的悬挂事件以及 26.3 坐垫的 EntityBreakEvent 则全局取消 PHYSICS/OBSTRUCTION 破坏，不查询地图仓储或物理开关，默认和未登记世界也生效；新事件按服务器能力条件注册；`/world physics|explosion` 开启时由命令层验证 10 秒内、同玩家/地图/设置的一次性确认，再经 `MapSettingsService` 写入同一存储；关闭无需确认，设置成功反馈实际参数。创建和导入在加载世界前写入物理和爆炸均关闭的 PENDING 记录，恢复沿用该快照。显式 `initialize` 在重放世界设置前持久化关闭两项，保留公开状态、角色、出生点与地图状态；结果返回更新后的地图快照。
 
 `MapAccessListener` 在 `HIGHEST` 阶段校验传送目标，并在 `MONITOR` 阶段排队复核实际所在世界；同时检查登录落点、重生目标和世界切换。玩家因撤销角色而失去当前地图准入时，会被送至 MV 默认世界出生点。默认世界不可用或传送失败时会断开玩家；默认世界始终放行准入。v3 迁移完成时，启动期间已在线玩家也会接受复核。
 

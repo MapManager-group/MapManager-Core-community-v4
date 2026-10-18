@@ -16,3 +16,5 @@
 ## 错误文本范围
 
 启动、迁移、存储和业务层主动生成的诊断由 `Messages` 本地化。部分底层库或 Paper 自身抛出的原始异常文本可能随依赖版本变化，当前会作为异常详情附加输出，未必有翻译。
+
+设置命令成功时由命令层向玩家发送带参数的 `command.*_updated` 提示，完整操作结果仍发控制台；失败和部分完成继续走原结果通知。`command.physics_risk`、`command.explosion_risk` 和 `command.setting_confirm` 提供开启风险与 10 秒确认用法，两种语言同步维护。
