@@ -12,7 +12,7 @@ Paper 入口会在读取业务配置前按 v4 内置资源补齐 `config.yml` �
 
 `/mapadmin create <地图名> [生成器类型] [环境]` 和 `/mapadmin import <地图名> [生成器类型] [环境]` 使用独立的生成器类型与维度环境；默认分别为 `flat` 和 `normal`。生成器类型为 `flat`、`normal`、`void`，环境为 `normal`、`nether`、`the_end`、`sift`。`normal` 使用原版标准地形生成器，`flat` 使用平坦生成器，`void` 使用 VoidGen；环境分别映射主世界、下界和末地。`sift` 是预留环境，当前请求会返回 `UNSUPPORTED_ENVIRONMENT`，不会创建或导入地图。
 
-创建时 `flat.height` 只适用于 `flat` 生成器，不能与 `generator-settings` 同时使用；在 `normal` 环境总层高可为 2–320，在 `nether`、`the_end` 环境为 2–254。高度从底到顶依次为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。导入命令同样可选生成器与环境，但不接受生成参数；已有区块按存档内容保留，选项保存在 Multiverse 配置中并影响后续生成。导入会读取 `level.dat` 的 `Data.DataVersion`，并与当前 Bukkit 服务器 dataVersion 比较；高于服务器版本或缺少有效版本信息的地图会被拒绝。`MapManager.worldVersions()` 提供公开版本查询接口，NBT 解析实现位于 plugin 模块。
+创建时 `flat.height` 仅用于 FLAT，不能与 generator-settings 同时使用。flat.height 表示表层草方块的绝对 Y 坐标：0 对应 Y=0，-60 对应 Y=-60。生成时读取目标世界实际 minHeight（含）与 maxHeight（不含），范围为 minHeight ≤ Y < maxHeight，不固定限制为 -64～319 或 -2000～2000；破限高数据包须已在目标世界生效。从世界最低 Y 放基岩，中间填泥土，指定 Y 放草方块；表层等于最低 Y 时仅生成草方块。出生点在表层上方一格。指定 flat.height 时各环境使用内置生成器，Y 编码进 Multiverse generator ID 供重启恢复；旧 layers ID 继续按原层数读取，已有区块不重写。实际范围在生成器获得世界信息后校验，超出范围中止生成并报告实际上下界。未指定 flat.height 的默认行为及手工 generator-settings 保持不变。导入命令同样可选生成器与环境，但不接受生成参数；已有区块按存档内容保留，选项保存在 Multiverse 配置中并影响后续生成。导入会读取 `level.dat` 的 `Data.DataVersion`，并与当前 Bukkit 服务器 dataVersion 比较；高于服务器版本或缺少有效版本信息的地图会被拒绝。`MapManager.worldVersions()` 提供公开版本查询接口，NBT 解析实现位于 plugin 模块。
 
 创建和导入地图均拒绝固定保留名：`cache`、`config`、`world`、`log`、`test`、`overworld`、`default`、`worldbase`、`apply`、`public`、`private`，以及以 `plugin`、`version`、`admin`、`mapmanager`、`builder`、`visitor`、`lib`、`mmc` 开头的名称。`creation.blocked-world-name-regex` 可额外配置 Java 正则，匹配完整地图名；默认 `.*_bak$`，会拒绝 `_bak` 结尾的名称。例如 `(?:lobby|temp.*|.*_bak)` 可同时禁止 `lobby`、`temp` 前缀和 `_bak` 后缀。正则无效会阻止启动；内置限制始终生效。
 
@@ -55,7 +55,7 @@ MySQL 自动创建五张 InnoDB 表：
 | `/mapadmin migration apply` | 再次预检后正式导入或继续冻结计划的部分写入 |
 | `/mapadmin storage export <文件名>` | 异步导出完整快照到 `exports/`；文件名只含字母、数字、下划线或连字符 |
 
-启动在发布 API 前自动继续 `world-recovery/` 中的请求。失败保留 PENDING/DELETING；恢复核对地图与目录身份。目录被替换、出现符号链接或旧版本没有原始请求时停止并提示核查。六位确认码仍用于发起新的 `/mapadmin delete`，恢复仅继续已经持久化的删除。Paper 26 已登记维度读取共享主世界 `level.dat`；经典导入目录仍要求自身有效 `level.dat`。
+启动在发布 API 前自动继续 `world-recovery/` 中的请求。失败保留 PENDING/DELETING；恢复核对地图与目录身份。删除预检分别返回 `INVALID_MAP_STATE`（状态不允许）、`WORLD_HAS_PLAYERS`（图内有在线玩家）或 `RECOVERY_CONFLICT`（恢复请求操作类型或地图 UUID 冲突）；命令入口的状态检查同样返回 `INVALID_MAP_STATE`。目录被替换、出现符号链接或旧版本没有原始请求时停止并提示核查。六位确认码仍用于发起新的 `/mapadmin delete`，恢复仅继续已经持久化的删除。Paper 26 已登记维度读取共享主世界 `level.dat`；经典导入目录仍要求自身有效 `level.dat`。
 
 事件读取使用不可变内存索引，写入仍同步持久化；LP 在后台执行和自动重试，返回 `Partial(PERMISSION_SYNC_PENDING)`，MMC 角色已经生效。全局 FIFO 的失败任务会延后后续投影。详细配置见 [STORAGE.md](STORAGE.md) 和 [MIGRATION.md](MIGRATION.md)。创建选项 `admin=` 同时接受用户名和 UUID。
 

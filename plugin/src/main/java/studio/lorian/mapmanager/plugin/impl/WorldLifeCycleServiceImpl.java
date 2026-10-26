@@ -227,39 +227,22 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 String flatSettings = params.get("generator-settings");
                 int flatHeightLimit = otherDimensionEnvironment ? 254 : 320;
                 if (params.containsKey("flat.height")) {
-                    int height = Integer.parseInt(params.get("flat.height"));
-                    if (height < 2 || height > flatHeightLimit) {
-                        String key = otherDimensionEnvironment
-                                ? "errors.flat_dimension_height_range" : "errors.flat_height_range";
-                        throw new IllegalArgumentException(Messages.text(key));
-                    }
-                    JsonObject settings = new JsonObject();
-                    JsonArray layers = new JsonArray();
-                    JsonObject bedrockLayer = new JsonObject();
-                    bedrockLayer.addProperty("block", "minecraft:bedrock");
-                    bedrockLayer.addProperty("height", 1);
-                    layers.add(bedrockLayer);
-                    if (height > 2) {
-                        JsonObject dirtLayer = new JsonObject();
-                        dirtLayer.addProperty("block", "minecraft:dirt");
-                        dirtLayer.addProperty("height", height - 2);
-                        layers.add(dirtLayer);
-                    }
-                    JsonObject grassLayer = new JsonObject();
-                    grassLayer.addProperty("block", "minecraft:grass_block");
-                    grassLayer.addProperty("height", 1);
-                    layers.add(grassLayer);
-                    settings.add("layers", layers);
+                    int surfaceY = Integer.parseInt(params.get("flat.height"));
+                    // Keep vanilla flat settings valid while the plugin resolves the actual world bounds.
+                    JsonObject settings = JsonParser.parseString(defaultFlatSettings()).getAsJsonObject();
+                    settings.addProperty("surface_y", surfaceY);
                     settings.addProperty("biome", params.getOrDefault("biome", "minecraft:plains"));
                     flatSettings = settings.toString();
                 }
-                if (otherDimensionEnvironment) {
+                if (otherDimensionEnvironment || params.containsKey("flat.height")) {
                     if (flatSettings == null) flatSettings = defaultFlatSettings();
-                    // Paper's vanilla flat generator ignores generator-settings for Nether and End environments.
+                    // Absolute surface Y needs the actual world bounds, which are only available during generation.
                     String generatorId = FlatChunkGenerator.generatorId(flatSettings);
-                    long layerHeight = FlatChunkGenerator.totalHeight(flatSettings);
-                    if (layerHeight < 2 || layerHeight > flatHeightLimit)
-                        throw new IllegalArgumentException(Messages.text("errors.flat_dimension_height_range"));
+                    if (!params.containsKey("flat.height")) {
+                        long layerHeight = FlatChunkGenerator.totalHeight(flatSettings);
+                        if (layerHeight < 2 || layerHeight > flatHeightLimit)
+                            throw new IllegalArgumentException(Messages.text("errors.flat_dimension_height_range"));
+                    }
                     options.generatorSettings(flatSettings);
                     if (!params.containsKey("biome")) {
                         String settingsBiome = flatSettingsBiome(flatSettings);
@@ -541,17 +524,21 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             MapInstance map = maps.findByWorldName(worldName);
             if (map == null) return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.MAP_NOT_FOUND);
             if (map.status() != MapStatus.ACTIVE && map.status() != MapStatus.DELETING)
-                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.OPERATION_IN_PROGRESS);
+                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.INVALID_MAP_STATE);
 
-            var manager = MultiverseCoreApi.get().getWorldManager();
-            var defaultWorld = manager.getDefaultWorld().getOrNull();
-            if (defaultWorld != null && defaultWorld.getName().equals(map.worldName()))
-                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.ACCESS_DENIED);
             if (Bukkit.getWorlds().stream().findFirst().map(World::getName).filter(map.worldName()::equals).isPresent())
                 return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.ACCESS_DENIED);
             World loaded = Bukkit.getWorld(map.worldName());
             if (loaded != null && !loaded.getPlayers().isEmpty())
-                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.OPERATION_IN_PROGRESS);
+                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.WORLD_HAS_PLAYERS);
+
+            RecoveryJournal.Plan plan = journal.read(worldName);
+            if (plan != null && (!plan.map().id().equals(map.id()) || plan.operation() != OperationName.DELETE))
+                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.RECOVERY_CONFLICT);
+            var manager = MultiverseCoreApi.get().getWorldManager();
+            var defaultWorld = manager.getDefaultWorld().getOrNull();
+            if (defaultWorld != null && defaultWorld.getName().equals(map.worldName()))
+                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.ACCESS_DENIED);
 
             Path folder = worldGateway.worldDirectory(map.worldName());
             Path parent = worldGateway.worldParentDirectory();
@@ -562,9 +549,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             if (map.status() == MapStatus.ACTIVE && (!worldExists || !folderExists
                     || !worldVersions.isCompatible(folder)))
                 return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.WORLD_NOT_FOUND);
-            RecoveryJournal.Plan plan = journal.read(worldName);
-            if (plan != null && (!plan.map().id().equals(map.id()) || plan.operation() != OperationName.DELETE))
-                return new OperationResult.Failure<>(OperationName.DELETE, id, FailureReason.OPERATION_IN_PROGRESS);
             if (plan == null) {
                 var mv = manager.getWorld(worldName).getOrNull();
                 Set<UUID> members = new java.util.HashSet<>(roles.members(map.groupId(), MapRole.ADMIN));

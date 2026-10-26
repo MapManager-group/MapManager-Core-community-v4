@@ -35,6 +35,8 @@ public interface WorldLifeCycleService {
      * 删除受管理的地图，并请求世界后端删除对应世界。
      * 命令删除名称正则不限制此 API；仍执行名称格式、默认世界、在线玩家及目录安全校验。
      * 调用方须自行校验操作者权限。
+     * 状态不允许删除时返回 INVALID_MAP_STATE，地图内有在线玩家时返回 WORLD_HAS_PLAYERS，
+     * 恢复请求的操作类型或地图 UUID 冲突时返回 RECOVERY_CONFLICT。
      *
      * @param worldName 服务器世界名称
      * @return 操作结果

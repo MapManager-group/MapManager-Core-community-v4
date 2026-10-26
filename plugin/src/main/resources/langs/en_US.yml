@@ -43,6 +43,9 @@ reasons:
   PERMISSION_SYNC_PENDING: MMC changes are effective; permission projection is queued with automatic retries
   PERMISSION_SYNC_FAILED: Permission sync failed
   OPERATION_IN_PROGRESS: An operation is already in progress
+  INVALID_MAP_STATE: The current map state does not allow this operation
+  WORLD_HAS_PLAYERS: Players are still in this map; move all players out before deleting it
+  RECOVERY_CONFLICT: A recovery record conflicts with the operation type or map identity; inspect it before proceeding
   INTERNAL_ERROR: Internal error
 roles:
   ADMIN: admin
@@ -160,7 +163,7 @@ errors:
   structures_boolean: structures must be true or false
   flat_only: flat.height is only supported for the FLAT generator
   flat_generator_conflict: flat.height and generator-settings cannot be set together
-  flat_height_range: flat.height must be between 2 and 320
+  flat_surface_height_range: flat.height=<height> is outside the world's actual available Y range <min> to <max>
   flat_dimension_height_range: FLAT generator layers in NETHER and THE_END environments must total between 2 and 254 blocks
   voidgen_required: VOID worlds require VoidGen
   mv_alias_failed: 'Multiverse alias sync failed: <world>'

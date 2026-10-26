@@ -148,14 +148,14 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 
 创建命令还支持以下选项：
 
-地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 生成器需要安装 VoidGen。`flat.height` 仅适用于 `flat` 生成器，且不能同时使用 `generator-settings`；它表示地形总层数，从底到顶为 1 层基岩、`N-2` 层泥土和 1 层草方块，例如 `flat.height=64` 会生成 1 层基岩、62 层泥土和 1 层草方块。`normal` 环境的范围是 2–320；`nether` 和 `the_end` 环境的范围是 2–254，以保留出生空间。
+地图名须为 4–16 位小写字母、数字、下划线或连字符；组 ID 须为 1–16 位相同字符，不能使用 `default` 或 `worldbase`。`void` 生成器需要安装 VoidGen。`flat.height` 仅适用于 flat，不能与 generator-settings 同时使用。flat.height 表示表层草方块的绝对 Y 坐标：0 对应 Y=0，-60 对应 Y=-60。生成时读取目标世界实际 minHeight（含）与 maxHeight（不含），范围为 minHeight ≤ Y < maxHeight，不固定限制为 -64～319 或 -2000～2000；破限高数据包须已在目标世界生效。旧世界已保存层数设置继续按原义读取，新请求改用绝对 Y。
 
 | 选项 | 作用 |
 |---|---|
 | `alias=<文本>` | 地图展示名，默认地图名 |
 | `group=<组ID>` | 地图组，默认地图名 |
 | `admin=<玩家名或UUID>` | 首位地图管理员，可省略但地图将没有管理员 |
-| `flat.height=<2–320>` | 仅供 `flat` 生成器使用；`nether`/`the_end` 环境使用 2–254；底层基岩、泥土层、表层草方块 |
+| `flat.height=<Y>` | 表层绝对 Y，实际范围 minHeight 至 maxHeight-1，支持生效的数据包扩展 |
 | `seed=<数值>` | 世界种子 |
 | `structures=true\|false` | 是否生成结构 |
 | `biome=<生物群系>` | 设置生物群系 |

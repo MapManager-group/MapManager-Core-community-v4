@@ -111,7 +111,7 @@ public final class ApiProbe extends JavaPlugin implements Listener {
             World world = Bukkit.getWorld(name); check(world != null, "loaded " + name);
             check(world.getEnvironment().name().equals(environment.name()), "environment " + name);
             check(world.getBlockAt(0, world.getMinHeight(), 0).getType() == Material.BEDROCK, "bedrock " + name);
-            check(world.getBlockAt(0, world.getMinHeight() + 63, 0).getType() == Material.GRASS_BLOCK, "flat layers " + name);
+            check(world.getBlockAt(0, 64, 0).getType() == Material.GRASS_BLOCK, "flat layers " + name);
         }
         UUID guest = UUID.fromString("00000000-0000-0000-0000-000000000002");
         MapInstance map = api().maps().findByWorldName("probe-flat");

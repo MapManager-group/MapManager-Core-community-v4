@@ -32,6 +32,12 @@ public enum FailureReason {
     PERMISSION_SYNC_PENDING,
     /** 同一资源上已有其他操作正在执行。 */
     OPERATION_IN_PROGRESS,
+    /** 地图状态不允许执行请求的操作。 */
+    INVALID_MAP_STATE,
+    /** 地图内仍有在线玩家，不能删除。 */
+    WORLD_HAS_PLAYERS,
+    /** 恢复请求的操作类型或地图身份与当前操作冲突。 */
+    RECOVERY_CONFLICT,
     /** 发生未预期的错误。 */
     INTERNAL_ERROR
 }

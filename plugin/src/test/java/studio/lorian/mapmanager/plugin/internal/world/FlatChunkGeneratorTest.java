@@ -46,6 +46,49 @@ class FlatChunkGeneratorTest {
         assertSame(world, spawn.getWorld()); assertEquals(-33, spawn.getY());
         assertEquals(0.5, spawn.getX()); assertEquals(0.5, spawn.getZ());
     }
+    @Test void absoluteSurfaceUsesActualWorldBoundsAndSurvivesGeneratorReload() {
+        for (int y : new int[]{-64, -60, 0, 309, 319}) {
+            var generator = surface(y);
+            var regions = generate(generator, -64, 320);
+            assertEquals(new Region(y, y + 1, Material.GRASS_BLOCK), regions.getLast());
+            if (y > -64) assertEquals(new Region(-64, -63, Material.BEDROCK), regions.getFirst());
+            if (y > -63) assertEquals(new Region(-63, y, Material.DIRT), regions.get(1));
+            assertEquals(y + 1, generator.getBaseHeight(info(-64, 320), new Random(), 0, 0, HeightMap.WORLD_SURFACE));
+            World world = proxy(World.class, (o, m, a) -> switch (m.getName()) {
+                case "getMinHeight" -> -64; case "getMaxHeight" -> 320; default -> throw new AssertionError(m);
+            });
+            assertEquals(y + 1.0, generator.getFixedSpawnLocation(world, new Random()).getY());
+        }
+        for (int y : new int[]{-2000, 2000}) {
+            var generator = surface(y);
+            var regions = generate(generator, -2032, 2032);
+            assertEquals(new Region(-2032, -2031, Material.BEDROCK), regions.getFirst());
+            assertEquals(new Region(y, y + 1, Material.GRASS_BLOCK), regions.getLast());
+            assertEquals(y + 1, generator.getBaseHeight(info(-2032, 2032), new Random(), 0, 0, HeightMap.WORLD_SURFACE));
+        }
+    }
+    @Test void absoluteSurfaceOutsideActualWorldRangeIsRejectedWithoutClipping() {
+        for (int y : new int[]{-2000, -65, 320, 2000}) {
+            var generator = surface(y);
+            assertThrows(IllegalArgumentException.class, () -> generate(generator, -64, 320));
+            assertThrows(IllegalArgumentException.class,
+                    () -> generator.getBaseHeight(info(-64, 320), new Random(), 0, 0, HeightMap.WORLD_SURFACE));
+            World world = proxy(World.class, (o, m, a) -> switch (m.getName()) {
+                case "getMinHeight" -> -64; case "getMaxHeight" -> 320; default -> throw new AssertionError(m);
+            });
+            assertThrows(IllegalArgumentException.class, () -> generator.getFixedSpawnLocation(world, new Random()));
+        }
+        assertEquals(List.of(new Region(0, 1, Material.GRASS_BLOCK)), generate(surface(0), 0, 256));
+        assertThrows(IllegalArgumentException.class, () -> generate(surface(-60), 0, 256));
+    }
+    private FlatChunkGenerator surface(int y) {
+        return new FlatChunkGenerator(FlatChunkGenerator.generatorId("{\"surface_y\":" + y + "}"));
+    }
+    private WorldInfo info(int min, int max) {
+        return proxy(WorldInfo.class, (o, m, a) -> switch (m.getName()) {
+            case "getMinHeight" -> min; case "getMaxHeight" -> max; default -> throw new AssertionError(m);
+        });
+    }
     private List<Region> generate(FlatChunkGenerator generator, int min, int max) {
         List<Region> regions = new ArrayList<>();
         ChunkGenerator.ChunkData data = proxy(ChunkGenerator.ChunkData.class, (o, m, a) -> switch (m.getName()) {

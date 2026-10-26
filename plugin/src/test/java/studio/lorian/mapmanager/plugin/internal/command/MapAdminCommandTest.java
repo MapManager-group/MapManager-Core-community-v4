@@ -150,7 +150,7 @@ class MapAdminCommandTest {
         command.execute(console, "mapadmin", new String[]{"delete", "missing_bak"});
         assertEquals(FailureReason.MAP_NOT_FOUND, assertInstanceOf(OperationResult.Failure.class, lastResult).reason());
         command.execute(console, "mapadmin", new String[]{"delete", "arena_bak"});
-        assertEquals(FailureReason.OPERATION_IN_PROGRESS, assertInstanceOf(OperationResult.Failure.class, lastResult).reason());
+        assertEquals(FailureReason.INVALID_MAP_STATE, assertInstanceOf(OperationResult.Failure.class, lastResult).reason());
         assertNull(code); assertTrue(calls.isEmpty());
     }
     @Test void expiredConfirmationCannotDeleteAndIsConsumed() throws Exception {

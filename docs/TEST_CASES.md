@@ -37,12 +37,12 @@ mvn clean package
 | UNIT-MIG-01 至 UNIT-MIG-02       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationSourceTest.java` | v3 地图、组、角色范围和物理/爆炸设置解析；组地图清单不一致时拒绝                                              |
 | UNIT-MSG-01 至 UNIT-MSG-07       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文与安全占位符、中文回退、参数校验、双语键及结果枚举齐全；三种结果通知及玩家/控制台/日志分流；双语玩家隐藏 ID、控制台保留 ID                                                              |
 | UNIT-CONFIG-01 至 UNIT-CONFIG-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageConfigTest.java`       | JSON 默认值、MySQL 配置读取与空白裁剪、未知类型及必填项/端口/数据库名校验                                     |
-| UNIT-LIFE-01 至 UNIT-LIFE-06     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | 创建和导入覆盖三种生成器与三种已实现环境的组合；SIFT 保持未支持；校验 FLAT 层高和非 FLAT 的 flat.height 拒绝 |
+| UNIT-LIFE-01 至 UNIT-LIFE-06     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | 创建和导入覆盖三种生成器与三种已实现环境的组合；SIFT 保持未支持；校验绝对表层 Y 编码和非 FLAT 的 flat.height 拒绝 |
 | UNIT-TRAVEL-01 至 UNIT-TRAVEL-13 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapTravelServiceImplTest.java` | 传送输入/线程/在线/准入校验、按需加载、Failure/Partial 传播、出生点和朝向、错误世界和传送失败、踢出同图与管理员校验 |
 | UNIT-VERSION-01 至 UNIT-VERSION-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldVersionServiceImplTest.java` | 旧版/同版/未来版本兼容判断、损坏或缺失 NBT、世界名定位及路径逃逸拒绝 |
-| UNIT-FLAT-01 至 UNIT-FLAT-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/FlatChunkGeneratorTest.java` | 生成器 ID 往返、实际层材料/顺序/范围、负最小高度、区块高度截断、出生点和非法设置 |
+| UNIT-FLAT-01 至 UNIT-FLAT-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/FlatChunkGeneratorTest.java` | 生成器 ID 往返、实际层材料/顺序/范围、负最小高度、旧层数高度截断、绝对表层 Y、实际及扩展范围校验、出生点和非法设置 |
 | UNIT-LISTENER-01 至 UNIT-LISTENER-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/listener/MapListenersTest.java` | 物理与爆炸设置独立、未登记世界、落沙恢复、其他实体、画/展示框全局支撑保护（地图物理开/关、未登记世界、默认世界）和通用实体破坏原因、严格传送准入及关闭整套监听 |
-| UNIT-VALIDATE-01 至 UNIT-VALIDATE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、API 删除不要求 _bak 后缀且仍校验地图状态；拒绝时不新增地图/组/操作记录 |
+| UNIT-VALIDATE-01 至 UNIT-VALIDATE-08 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、API 删除不要求 _bak 后缀且仍校验地图状态；删除预检区分状态、在线玩家和恢复类型/UUID 冲突，拒绝时保留地图及恢复请求；拒绝时不新增地图/组/操作记录 |
 | UNIT-FAILURE-01 至 UNIT-FAILURE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServiceFailureTest.java` | 角色写入失败返回 Failure、写后读取或 LP 异常返回 Partial、无效角色输入、物理/爆炸读写失败 |
 | UNIT-ADMIN-01 至 UNIT-ADMIN-10 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapAdminCommandTest.java` | 控制台/RCON 放行，玩家及命令方块拒绝、路由、默认值、非法/重复选项、导入参数拒绝、一次性/过期删除码、身份与状态保护、补全 |
 | UNIT-CMD-01 至 UNIT-CMD-07 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapWorldCommandTest.java` | world/wtp 共用传送、设置/别名/出生点路由、管理员授权、只读 info、角色 info 名单/准入、存储错误及补全过滤 |
@@ -95,7 +95,7 @@ mvn clean package
 | LIFE-06 | 创建地图时提供带 Minecraft 颜色代码的 alias                                | 保存别名文本时去掉颜色代码；MV 别名根据公开状态附加颜色                                                                  |
 | LIFE-07 | 组合 `flat/normal/void` 与 `normal/nether/the_end` 创建并导入               | Multiverse 配置中的生成器和 Bukkit 环境分别匹配请求；FLAT+非 NORMAL 使用编码的内置生成器；VOID 需要 VoidGen       |
 | LIFE-08 | 创建或导入时选择 `sift` 环境                                               | 返回 `UNSUPPORTED_ENVIRONMENT`；不改变世界或登记 PENDING 地图                                                          |
-| LIFE-09 | FLAT+NORMAL 使用 `flat.height=2`、`320`；FLAT+NETHER/THE_END 使用 `2`、`254` | 各组合在对应高度范围内通过校验；超出环境上限拒绝                                                                     |
+| LIFE-09 | FLAT 使用 flat.height=0、-60 及实际上下界；生效的数据包扩展世界使用 -2000、2000 | 草方块位于指定 Y，出生点在 Y+1；按目标世界实际 minHeight～maxHeight-1 校验，超出时报错                                                                     |
 | LIFE-10 | structures 分别使用 `true`、`false`、其他文本                              | 两个布尔值映射正确；其他文本拒绝，世界不创建                                                                             |
 | LIFE-11 | 在 NORMAL/VOID 生成器使用 `flat.height`；FLAT 同时提供 `flat.height` 与 `generator-settings` | 分别拒绝创建，错误信息指向参数冲突或适用生成器                                                                      |
 | LIFE-12 | 测试合法 seed、biome、generator、generator-settings、property.*            | 参数传入 MV 创建选项或世界属性；创建成功                                                                                 |
@@ -115,7 +115,7 @@ mvn clean package
 | LIFE-26 | 对已加载且已登记地图执行 `/mapadmin init <name>`                              | 先持久化关闭物理和爆炸，再重放 MV 与 gamerule 初始化；保留公开状态、出生点和角色，不改变地图状态；返回的地图快照包含关闭后的设置                                                   |
 | LIFE-27 | init 目标不存在、未登记或未加载                                            | 分别返回 MAP_NOT_FOUND 或 WORLD_NOT_FOUND；不产生其他世界变更                                                            |
 | LIFE-28 | init 名称含非法字符或由玩家执行                                            | 返回 INVALID_INPUT/NO_PERMISSION；不执行 MV 操作                                                                         |
-| LIFE-29 | 在 FLAT+NETHER/THE_END 创建 `flat.height=64` 或自定义 `generator-settings`；检查区块和 Environment | 生成预期平坦层和 biome；选定环境保留；非法方块、非法 JSON 和总层高超过 254 在登记前拒绝 |
+| LIFE-29 | 在 FLAT+NETHER/THE_END 创建 `flat.height=64` 或自定义 `generator-settings`；检查区块和 Environment | flat.height=64 时草方块 Y=64；生成预期 biome 并保留环境；手工 layers 设置保持原校验，非法方块、JSON 和总层数超过 254 在登记前拒绝 |
 | LIFE-30 | 创建 FLAT+NETHER/THE_END 后重启；确认 MapManager-Core 先于 Multiverse-Core 启用并进入新区块 | Multiverse 解析持久化生成器 ID；新生成区块层设置正确，Environment 仍与所选维度一致 |
 
 ## 地图设置、别名与事件
@@ -210,8 +210,8 @@ mvn clean package
 | DEL-03 | 玩家执行 delete                                      | 返回 NO_PERMISSION；不产生确认码或删除操作                                                 |
 | DEL-04 | 对错误码、过期码、已消费码、另一地图确认码执行第二步 | 分别拒绝；只有匹配且未过期的一次性码能确认对应地图                                         |
 | DEL-05 | 删除 MV 默认世界或 Bukkit 首个加载世界               | 拒绝 ACCESS_DENIED；文件、地图和玩家不变                                                   |
-| DEL-06 | 删除含在线玩家地图                                   | 拒绝 OPERATION_IN_PROGRESS；不卸载/删除世界                                                |
-| DEL-07 | 地图状态为非 ACTIVE/DELETING，或地图记录不存在       | 返回 OPERATION_IN_PROGRESS/MAP_NOT_FOUND                                                   |
+| DEL-06 | 删除含在线玩家地图                                   | 拒绝 WORLD_HAS_PLAYERS；提示玩家离开，不卸载/删除世界                                                |
+| DEL-07 | 地图状态为非 ACTIVE/DELETING，或地图记录不存在       | 返回 INVALID_MAP_STATE/MAP_NOT_FOUND                                                   |
 | DEL-08 | ACTIVE 地图的 MV 世界、目录或 level.dat 缺失         | 返回 WORLD_NOT_FOUND；不误删 MMC 记录                                                      |
 | DEL-09 | 世界路径指向根目录外、符号链接或不符合预期父目录     | 拒绝 INVALID_INPUT；不得删除目录外内容                                                     |
 | DEL-10 | 删除同组中仍有其他地图的一张地图                     | 删除该图并移除此世界的 LP 继承；保留组、其他地图和组角色                                   |
@@ -219,6 +219,7 @@ mvn clean package
 | DEL-12 | MV 删除、LP 清理或存储删除中途失败                   | 保留 DELETING 与失败 operation 阶段；修复原因后可重新走确认并安全重试                      |
 | DEL-13 | 检查成功生命周期操作记录                             | operation ID 唯一，阶段依次包含 STARTED、WORLD_CHANGED、DATA_SAVED（创建/导入）、COMPLETED |
 | DEL-14 | 检查生命周期失败操作记录                             | 阶段记录 FAILED 和对应 FailureReason；控制台通知 operation ID 与仓储记录一致，玩家通知不含 ID                     |
+| DEL-15 | 存在 CREATE/IMPORT 恢复请求，或 DELETE 请求的地图 UUID 不匹配 | 返回 RECOVERY_CONFLICT；地图和恢复请求不变，不调用世界后端 |
 
 ## JSON/MySQL 存储与数据校验
 

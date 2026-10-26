@@ -18,10 +18,16 @@ class WorldLifeCycleValidationTest {
     private JsonStorage storage;
     private WorldLifeCycleServiceImpl lifecycle;
     private boolean primary = true;
+    private org.bukkit.World loadedWorld;
     @BeforeEach void setUp() throws Exception {
         storage = new JsonStorage(directory.resolve("maps.json"));
         server = new BukkitTestServer((o, m, a) -> {
-            assertEquals("isPrimaryThread", m.getName()); return primary;
+            return switch (m.getName()) {
+                case "isPrimaryThread" -> primary;
+                case "getWorlds" -> List.of();
+                case "getWorld" -> loadedWorld;
+                default -> throw new AssertionError(m.getName());
+            };
         });
         lifecycle = new WorldLifeCycleServiceImpl(storage, storage, storage, null, null, null,
                 Pattern.compile("(?:.*_bak|lobby|temp.*)"), Logger.getLogger("validation"), directory);
@@ -48,7 +54,7 @@ class WorldLifeCycleValidationTest {
     @Test void invalidCreationParametersNeverLeavePendingMaps() {
         for (Map<String, String> params : List.of(Map.of("unknown", "1"), Map.of("seed", " "), Map.of("seed", "x"),
                 Map.of("seed", "1".repeat(4097)), Map.of("structures", "TRUE"), Map.of("property.", "1"),
-                Map.of("flat.height", "1"), Map.of("flat.height", "2", "generator-settings", "{}"))) {
+                Map.of("flat.height", "1.5"), Map.of("flat.height", "2", "generator-settings", "{}"))) {
             failure(lifecycle.create(new CreateMapRequest("arena", null, null, null, WorldType.FLAT, Environment.NORMAL, params)),
                     OperationName.CREATE, FailureReason.INVALID_INPUT);
         }
@@ -65,7 +71,48 @@ class WorldLifeCycleValidationTest {
                 new MapSettings(true, false, false), MapStatus.PENDING, null);
         storage.save(map);
         var result = assertInstanceOf(OperationResult.Failure.class, lifecycle.delete("test0107"));
-        assertEquals(FailureReason.OPERATION_IN_PROGRESS, result.reason());
+        assertEquals(FailureReason.INVALID_MAP_STATE, result.reason());
+        assertEquals(map, storage.findById(map.id()));
+        assertTrue(storage.allOperations().isEmpty());
+    }
+    @Test void deletionWithPlayersIsRejectedBeforeBackendOrStorageChanges() {
+        var map = activeMap();
+        var player = BukkitTestServer.proxy(org.bukkit.entity.Player.class,
+                (o, m, a) -> { throw new AssertionError(m.getName()); });
+        loadedWorld = BukkitTestServer.proxy(org.bukkit.World.class, (o, m, a) -> {
+            assertEquals("getPlayers", m.getName());
+            return List.of(player);
+        });
+        assertDeleteRejected(map, FailureReason.WORLD_HAS_PLAYERS);
+    }
+    @Test void deletionRejectsConflictingRecoveryTypeAndMapIdentity() {
+        var map = activeMap();
+        var journal = new RecoveryJournal(directory.resolve("world-recovery"));
+        for (OperationName operation : List.of(OperationName.CREATE, OperationName.IMPORT, OperationName.DELETE)) {
+            var recorded = operation == OperationName.DELETE
+                    ? new MapInstance(UUID.randomUUID(), map.worldName(), map.groupId(), map.displayName(),
+                            map.settings(), map.status(), map.spawn()) : map;
+            var plan = new RecoveryJournal.Plan(UUID.randomUUID(), operation, recorded,
+                    operation == OperationName.CREATE ? new CreateMapRequest(map.worldName(), null, "team", null) : null,
+                    operation == OperationName.IMPORT ? new ImportMapRequest(map.worldName(), null, "team", null) : null,
+                    null, null, null, null, null, Set.of());
+            journal.save(plan);
+            assertDeleteRejected(map, FailureReason.RECOVERY_CONFLICT);
+            assertEquals(plan, journal.read(map.worldName()));
+        }
+    }
+    private MapInstance activeMap() {
+        storage.saveGroup(new MapGroup("team", Set.of()));
+        var map = new MapInstance(UUID.randomUUID(), "test0107", "team", "Test",
+                new MapSettings(false, false, false), MapStatus.ACTIVE, null);
+        storage.save(map);
+        return map;
+    }
+    private void assertDeleteRejected(MapInstance map, FailureReason reason) {
+        var result = assertInstanceOf(OperationResult.Failure.class, lifecycle.delete(map.worldName()));
+        assertEquals(OperationName.DELETE, result.operation());
+        assertEquals(reason, result.reason());
+        assertNotNull(result.operationId());
         assertEquals(map, storage.findById(map.id()));
         assertTrue(storage.allOperations().isEmpty());
     }

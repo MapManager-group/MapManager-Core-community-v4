@@ -43,7 +43,7 @@
 
 | 功能 | v3 实际行为 | v4 实际行为 | 对照结论 |
 |---|---|---|---|
-| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/mapadmin create <地图名> [WorldType] [Environment] [选项...]`；WorldType 为 `FLAT/NORMAL/VOID`，Environment 为 `NORMAL/NETHER/THE_END/SIFT`（SIFT 预留且当前不支持）；二者可独立组合；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | v4 将生成器和环境分开；命令 token 与颜色设置方式不兼容；不传 `admin=` 时不创建首位管理员；FLAT 层高按环境限制 |
+| 创建地图 | `/create n:... [e:... a:... c:... g:... o:...]`；未指定 owner 时用发送者；类型为 `flat/normal/void_gen/nether/the_end` | `/mapadmin create <地图名> [WorldType] [Environment] [选项...]`；WorldType 为 `FLAT/NORMAL/VOID`，Environment 为 `NORMAL/NETHER/THE_END/SIFT`（SIFT 预留且当前不支持）；二者可独立组合；另支持 `flat.height`、`seed`、`structures`、`biome`、`generator`、`generator-settings`、`property.*` | v4 将生成器和环境分开；命令 token 与颜色设置方式不兼容；不传 `admin=` 时不创建首位管理员；flat.height 为绝对表层 Y，范围由实际世界高度决定 |
 | 导入地图 | `/import` 接受与创建相近的参数，导入前校验目录、世界名和版本；导入选项始终设置 `VoidGen:{}` | `/mapadmin import <地图名> [WorldType] [Environment] [alias=... group=... admin=...]`；校验根目录 `level.dat`、路径及版本；按生成器和环境配置 MV；不接受生成参数 | 已实现；版本校验保留，已有区块按存档数据保留，所选生成器用于后续新区块；v4 未提供 v3 的 `c:` 显式颜色参数 |
 | 初始化设置 | 自动加载、和平、创造、关闭常见生物生成，设置随机刻/火焰/天气/昼夜/生物破坏/生物生成/进度播报规则 | 创建、导入、手动初始化调用同组初始化规则，并校验配置是否成功 | 核心规则基本一致；别名颜色和失败记录策略不同 |
 | 删除地图 | `/delete <地图>` 后 10 秒内 `/delete confirm`；会先将在线玩家送回默认出生点，再卸载并清理 LP/MV 数据 | `/mapadmin delete <地图>` 由控制台发起，一次性六位码 10 秒有效；有在线玩家时拒绝，另校验默认世界、路径、符号链接和名称规则 | 已实现但确认交互和在线玩家策略不同；v4 增加删除保护 |

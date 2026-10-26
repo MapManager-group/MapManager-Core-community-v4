@@ -171,7 +171,7 @@ public final class MapTeleportExample extends JavaPlugin {
 - `worldLifeCycle().load(worldName)` 加载已登记 ACTIVE 地图；目标目录与版本须有效，Multiverse 中须有世界登记。
 - `worldLifeCycle().recover(worldName)` 根据持久请求继续未完成创建、导入或已经确认的删除；缺少请求或地图/目录身份冲突时停止。旧版本没有完整请求的 PENDING 记录不能自动猜测恢复。
 - `worldLifeCycle().initialize(worldName)` 先持久化关闭已加载 MMC 地图的物理和爆炸，再重放 Multiverse 属性和 gamerule；保留公开状态、角色、出生点和地图状态，返回更新后的地图快照。后续世界初始化失败时，两项仍保持关闭。
-- `worldLifeCycle().delete(worldName)` 删除地图及世界；不受命令专用的 `deletion.allowed-world-name-regex` 限制，仍校验名称格式，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。六位、10 秒确认码只适用于 `/mapadmin delete` 命令；直接调用此 API 不经过命令确认，外部插件仍须自行授权调用者。
+- `worldLifeCycle().delete(worldName)` 删除地图及世界；不受命令专用的 `deletion.allowed-world-name-regex` 限制，仍校验名称格式，并拒绝默认世界、首个加载世界、含在线玩家的世界或目录不符合预期的地图。删除拒绝原因分别为 `INVALID_MAP_STATE`（非 ACTIVE/DELETING）、`WORLD_HAS_PLAYERS`（图内有在线玩家）和 `RECOVERY_CONFLICT`（恢复请求不是 DELETE 或地图 UUID 不匹配）；调用方应根据 `Failure.reason()` 分支处理，不能将其统一视为操作忙。六位、10 秒确认码只适用于 `/mapadmin delete` 命令；直接调用此 API 不经过命令确认，外部插件仍须自行授权调用者。
 
 生命周期操作必须在主线程调用。创建请求中的 `ownerId` 可为 null；若为空，地图不会自动获得首位管理员。创建/导入的初始设置为物理开启、爆炸关闭、私有。两个请求都通过 `WorldType` 和 `Environment` 独立指定生成器及维度，例如：
 
@@ -182,7 +182,7 @@ new ImportMapRequest("arena-copy", "Arena Copy", "team", ownerId,
         WorldType.NORMAL, Environment.THE_END);
 ```
 
-生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 `FLAT` 生成器：`NORMAL` 环境范围为 2–320，`NETHER`/`THE_END` 为 2–254；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载与操作恢复通过 `load` 和 `recover` 调用；恢复继续原步骤，不自动删除创建/导入留下的世界。
+生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 FLAT，表示绝对表层 Y（如 0、-60）而非总层数；生成时按实际世界 minHeight ≤ Y < maxHeight 校验，支持生效的数据包扩展；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载与操作恢复通过 `load` 和 `recover` 调用；恢复继续原步骤，不自动删除创建/导入留下的世界。
 
 ### 世界版本
 

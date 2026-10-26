@@ -10,6 +10,7 @@ import org.bukkit.World;
 import org.bukkit.HeightMap;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.WorldInfo;
+import studio.lorian.mapmanager.plugin.internal.notification.Messages;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -17,10 +18,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Random;
 
-/** Supplies flat block layers when a flat generator is used with a non-normal environment. */
+/** Generates flat layers, optionally placing the surface at an absolute world Y coordinate. */
 public final class FlatChunkGenerator extends ChunkGenerator {
     private static final String ID_PREFIX = "flat:";
     private final List<Layer> layers;
+    private final Integer surfaceY;
 
     public FlatChunkGenerator(String generatorId) {
         if (generatorId == null || !generatorId.startsWith(ID_PREFIX)) {
@@ -29,14 +31,19 @@ public final class FlatChunkGenerator extends ChunkGenerator {
         String encoded = generatorId.substring(ID_PREFIX.length());
         try {
             String settings = new String(Base64.getUrlDecoder().decode(encoded), StandardCharsets.UTF_8);
-            this.layers = parseLayers(settings);
-        } catch (IllegalArgumentException exception) {
+            JsonObject input = JsonParser.parseString(settings).getAsJsonObject();
+            this.surfaceY = input.has("surface_y") ? Integer.valueOf(input.get("surface_y").getAsString()) : null;
+            this.layers = surfaceY == null ? parseLayers(settings) : List.of();
+        } catch (RuntimeException exception) {
             throw new IllegalArgumentException("Invalid MapManager flat generator settings", exception);
         }
     }
 
     public static String generatorId(String settings) {
-        parseLayers(settings);
+        JsonElement input = JsonParser.parseString(settings);
+        if (input.isJsonObject() && input.getAsJsonObject().has("surface_y"))
+            Integer.parseInt(input.getAsJsonObject().get("surface_y").getAsString());
+        else parseLayers(settings);
         String encoded = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(settings.getBytes(StandardCharsets.UTF_8));
         return ID_PREFIX + encoded;
@@ -79,7 +86,7 @@ public final class FlatChunkGenerator extends ChunkGenerator {
     public void generateNoise(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, ChunkData chunkData) {
         int y = chunkData.getMinHeight();
         int maxHeight = chunkData.getMaxHeight();
-        for (Layer layer : layers) {
+        for (Layer layer : layers(y, maxHeight)) {
             int endY = (int) Math.min(maxHeight, (long) y + layer.height());
             if (endY > y) chunkData.setRegion(0, y, 0, 16, endY, 16, layer.material());
             y = endY;
@@ -87,14 +94,38 @@ public final class FlatChunkGenerator extends ChunkGenerator {
         }
     }
 
+    private List<Layer> layers(int minHeight, int maxHeight) {
+        if (surfaceY == null) return layers;
+        validateSurface(minHeight, maxHeight);
+        List<Layer> result = new ArrayList<>(3);
+        if (surfaceY > minHeight) result.add(new Layer(Material.BEDROCK, 1));
+        if (surfaceY > minHeight + 1) result.add(new Layer(Material.DIRT, surfaceY - minHeight - 1));
+        result.add(new Layer(Material.GRASS_BLOCK, 1));
+        return result;
+    }
+
+    private void validateSurface(int minHeight, int maxHeight) {
+        if (surfaceY < minHeight || surfaceY >= maxHeight)
+            throw new IllegalArgumentException(Messages.text("errors.flat_surface_height_range",
+                    "height", surfaceY, "min", minHeight, "max", maxHeight - 1));
+    }
+
     @Override
     public int getBaseHeight(WorldInfo worldInfo, Random random, int x, int z, HeightMap heightMap) {
+        if (surfaceY != null) {
+            validateSurface(worldInfo.getMinHeight(), worldInfo.getMaxHeight());
+            return surfaceY + 1;
+        }
         long top = (long) worldInfo.getMinHeight() + layers.stream().mapToLong(Layer::height).sum();
         return (int) Math.min(worldInfo.getMaxHeight(), top);
     }
 
     @Override
     public Location getFixedSpawnLocation(World world, Random random) {
+        if (surfaceY != null) {
+            validateSurface(world.getMinHeight(), world.getMaxHeight());
+            return new Location(world, 0.5, surfaceY + 1.0, 0.5);
+        }
         long surface = (long) world.getMinHeight() + layers.stream().mapToLong(Layer::height).sum();
         int y = (int) Math.max(world.getMinHeight() + 1L, Math.min(world.getMaxHeight() - 1L, surface));
         return new Location(world, 0.5, y, 0.5);

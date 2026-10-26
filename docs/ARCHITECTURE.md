@@ -127,7 +127,7 @@ MMC 不创建或修改 `worldbase` 内的权限节点，不把所有玩家加入
 
 Multiverse-Core 仅是世界操作后端：创建、导入、加载、出生点/世界配置更新和世界删除。地图成员、访问权、地图组、公开状态与 MMC 的元数据由 MMC 管理。
 
-创建和导入请求将 `WorldType` 生成器与 `Environment` 维度环境分开指定。生成器可选 `FLAT`、原版 `NORMAL` 和依赖 VoidGen 的 `VOID`；环境 `NORMAL`、`NETHER`、`THE_END` 当前可用，`SIFT` 仅作为预留枚举并返回不支持结果。`FLAT` 与 NETHER/THE_END 组合时由 `FlatChunkGenerator` 按层设置生成区块，并将设置编码进 Multiverse generator ID 供重载后恢复；层高限制为 2–254，NORMAL 环境为 2–320。`biome=minecraft:<id>` 通过 Multiverse 的 `@single:<id>` 生物群系提供器传入。导入保留存档已有区块，所选生成器用于后续新区块。
+创建和导入请求将 `WorldType` 生成器与 `Environment` 维度环境分开指定。生成器可选 `FLAT`、原版 `NORMAL` 和依赖 VoidGen 的 `VOID`；环境 `NORMAL`、`NETHER`、`THE_END` 当前可用，`SIFT` 仅作为预留枚举并返回不支持结果。`FLAT` 指定 flat.height 时由 FlatChunkGenerator 将表层放在绝对 Y，读取世界实际高度校验，并将 Y 编码进 Multiverse generator ID 供重载恢复。旧层设置和未指定高度时的行为保持不变；NETHER/THE_END 手工层设置仍限制总层数 2–254。`biome=minecraft:<id>` 通过 Multiverse 的 `@single:<id>` 生物群系提供器传入。导入保留存档已有区块，所选生成器用于后续新区块。
 
 为让 Multiverse 在启动自动加载世界时能解析已保存的 `MapManager-Core:flat:<settings>` 生成器，Paper 插件依赖顺序配置为 MapManager-Core 先于 Multiverse-Core 启用。v3 迁移会等到 `Multiverse-Core` 的启用事件后再读取其世界元数据；对外 `MapManager` 服务仍在迁移和 `worldbase` 初始化都完成后发布。
 

@@ -352,7 +352,7 @@ public final class MapAdminCommand extends Command {
                 return;
             }
             if (map.status() != MapStatus.ACTIVE && map.status() != MapStatus.DELETING) {
-                fail(target, OperationName.DELETE, FailureReason.OPERATION_IN_PROGRESS);
+                fail(target, OperationName.DELETE, FailureReason.INVALID_MAP_STATE);
                 return;
             }
             char[] chars = new char[6];

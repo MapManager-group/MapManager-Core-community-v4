@@ -67,17 +67,17 @@ class WorldLifeCycleServiceImplTest {
     }
 
     @Test
-    void flatHeightLimitsFollowTheSelectedEnvironment() {
-        assertEquals(320, FlatChunkGenerator.totalHeight(
-                createOptions(WorldType.FLAT, Environment.NORMAL, 320).generatorSettings()));
-        for (Environment environment : new Environment[]{Environment.NETHER, Environment.THE_END}) {
-            assertEquals(254, FlatChunkGenerator.totalHeight(
-                    createOptions(WorldType.FLAT, environment, 254).generatorSettings()));
-            assertThrows(IllegalArgumentException.class,
-                    () -> createOptions(WorldType.FLAT, environment, 255));
+    void flatHeightStoresAbsoluteSurfaceForRuntimeWorldBounds() {
+        for (Environment environment : implementedEnvironments()) {
+            for (int y : new int[]{-2000, -64, -60, 0, 309, 2000}) {
+                var options = createOptions(WorldType.FLAT, environment, y);
+                assertFlatGenerator(options.generator());
+                assertEquals(4, FlatChunkGenerator.totalHeight(options.generatorSettings()));
+                assertEquals(y, com.google.gson.JsonParser.parseString(options.generatorSettings())
+                        .getAsJsonObject().get("surface_y").getAsInt());
+                assertEquals("@single:minecraft:plains", options.biome());
+            }
         }
-        assertThrows(IllegalArgumentException.class,
-                () -> createOptions(WorldType.FLAT, Environment.NORMAL, 321));
     }
 
     @Test

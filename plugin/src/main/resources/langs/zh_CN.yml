@@ -43,6 +43,9 @@ reasons:
   PERMISSION_SYNC_PENDING: MMC 修改已生效，权限投影正在后台同步，失败将自动重试
   PERMISSION_SYNC_FAILED: 权限同步失败
   OPERATION_IN_PROGRESS: 操作正在进行
+  INVALID_MAP_STATE: 地图当前状态不允许执行此操作
+  WORLD_HAS_PLAYERS: 地图内仍有在线玩家，请让所有玩家离开后再删除
+  RECOVERY_CONFLICT: 存在操作类型或地图身份冲突的恢复记录，请先核查恢复记录
   INTERNAL_ERROR: 内部错误
 roles:
   ADMIN: 管理员
@@ -160,7 +163,7 @@ errors:
   structures_boolean: structures 必须是 true 或 false
   flat_only: flat.height 仅支持 FLAT 生成器
   flat_generator_conflict: flat.height 与 generator-settings 不能同时设置
-  flat_height_range: flat.height 必须在 2-320 之间
+  flat_surface_height_range: flat.height=<height> 超出世界实际可用 Y 坐标范围 <min> 到 <max>
   flat_dimension_height_range: NETHER 和 THE_END 环境的 FLAT 生成器层总高度必须在 2-254 格之间
   voidgen_required: VOID 世界需要 VoidGen
   mv_alias_failed: 'Multiverse 别名同步失败：<world>'

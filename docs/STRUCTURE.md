@@ -26,7 +26,7 @@ MapManager-v4/
 │     │     ├─ permission/                    LuckPerms worldbase 投影
 │     │     ├─ player/                        Paper 玩家适配
 │     │     ├─ storage/                       内部仓储接口、JSON/MySQL 实现
-│     │     └─ world/                         世界目录查询（`worldDirectories()` 公开实际存档路径）、版本检查及特殊环境平坦区块生成器
+│     │     └─ world/                         世界目录查询（`worldDirectories()` 公开实际存档路径）、版本检查及平坦区块与绝对表层 Y 生成器
 │     └─ resources/                           config.yml、paper-plugin.yml、langs/*.yml
 │  ├─ src/test/integration/                    真实 Paper 外部插件验收脚本
 │  └─ src/test/java/                           API 契约、生命周期选项、服务规则、存储和适配器单元测试
@@ -68,7 +68,7 @@ MapManager-v4/
 | `MapAccessListener` | `PlayerTeleportEvent`、`PlayerChangedWorldEvent`、`PlayerJoinEvent`、`PlayerRespawnEvent`；`MapService`；`MapAccessService`；MV 默认世界 | 严格校验开启时预先拦截并在事件后复核地图进入；加入和重生时检查；撤权后复核当前地图；无法安全送回默认世界时断开连接 |
 | `MapWorldCommand.public/setname/setspawn` | 当前 MMC 地图、`MapAccessService`、`MapSettingsService` | 只允许当前地图管理员修改公开状态、显示名和出生点；出生点取玩家当前位置并同步 MMC、Bukkit 与 Multiverse |
 | `MapSettingsServiceImpl.setSpawn` | `MapRepository`、Bukkit `World`、Multiverse `MultiverseWorld` | 先持久化 MMC 出生点，再更新 Bukkit 和 Multiverse 出生点并保存 Multiverse 配置；外部同步失败返回 `Partial` |
-| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`FlatChunkGenerator`、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 创建/导入分别接收 `WorldType` 生成器和 `Environment` 环境；导入前校验 `level.dat` 版本且不接受生成参数；FLAT 在 NETHER/THE_END 环境使用 `FlatChunkGenerator`；SIFT 环境保留为未支持的预留值；地图后续写入首位管理员、初始化并转换状态 |
+| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`FlatChunkGenerator`、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 创建/导入分别接收 `WorldType` 生成器和 `Environment` 环境；导入前校验 `level.dat` 版本且不接受生成参数；FLAT 指定 flat.height 或在 NETHER/THE_END 环境时使用 FlatChunkGenerator，指定 Y 按世界实际范围校验；SIFT 环境保留为未支持的预留值；地图后续写入首位管理员、初始化并转换状态 |
 | `MapAdminCommand.delete` → `WorldLifeCycleServiceImpl.delete` | 命令专用的控制台/RCON 一次性确认码与删除名称正则、`WorldGateway`、Bukkit、Multiverse、操作记录、`WorldBaseProjection`、地图与角色存储 | 首次输入地图名取得 10 秒有效的 6 位确认码；二次输入确认码后检查 MV 默认世界、服务器首个加载世界、在线玩家和目录；世界删除后先将 LP 清理任务落盘，再清理 MMC；失败保留恢复请求，重启继续并验证目录身份 |
 | `MapTravelServiceImpl.teleport` | `MapAccessService`、`MapRepository`、`PlayerGateway` | 准入通过后通过生命周期 load 加载 ACTIVE 世界再传送 |
 | `MapWorldCommand.kick` → `MapTravelServiceImpl.kickFromMap` | Bukkit 在线玩家、内部地图存储、`MapAccessService.decide`、Multiverse 默认世界 | 服务按操作者当前世界定位地图，确认管理员及目标在同图，再使用 MV 默认世界出生点传送 |
