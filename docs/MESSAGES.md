@@ -9,7 +9,7 @@
 
 ## MiniMessage 与通知
 
-`Messages` 使用 MiniMessage 生成 Adventure `Component`，占位符采用未解析占位符，避免参数内容被解释为格式标签。玩家操作结果使用 `result.player_success`、`result.player_failure`、`result.player_partial`，不传入操作 ID；完整结果同时发送到控制台，使用原 `result.success/failure/partial` 模板保留 ID。新增键缺失时回退内置中文，已有自定义结果模板仅用于控制台/日志。日志输出使用纯文本序列化。新增用户提示通过 `OperationNotifier.notifyKey` 或 `Messages` 语言键发送。
+`Messages` 使用 MiniMessage 生成 Adventure `Component`，占位符采用未解析占位符，避免参数内容被解释为格式标签。玩家操作结果使用 `result.player_success`、`result.player_failure`、`result.player_partial`，不传入操作 ID；完整结果同时发送到控制台，使用原 `result.success/failure/partial` 模板保留 ID。新增键缺失时回退内置中文，已有自定义结果模板仅用于控制台/日志。日志输出使用纯文本序列化。新增用户提示通过 `OperationNotifier.notifyKey` 或 `Messages` 语言键发送。OperationResult.detail 非空时，通知器优先展示该纯文本说明；表层 Y 范围消息继续由中英文语言键渲染，MMW 原样保留实际上下界。
 
 项目通知不使用 Bukkit `ChatColor`。Multiverse 别名中的 `&2`、`&3` 是写入 Multiverse 配置的旧式颜色格式，不是聊天消息格式；保留它们是为了设置 MV 别名颜色。
 

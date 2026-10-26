@@ -26,6 +26,9 @@ public sealed interface OperationResult<T>
      */
     UUID operationId();
 
+    /** 返回可选的失败详情；包含实际参数限制等可直接展示的信息。 */
+    default String detail() { return null; }
+
     /** 操作完全成功。
      *
      * @param <T> 结果数据类型
@@ -41,10 +44,14 @@ public sealed interface OperationResult<T>
      * @param <T> 预期的结果数据类型
      * @param operation 此结果对应的操作
      * @param operationId 唯一操作标识
+     * @param detail 可选的本地化失败详情
      * @param reason 稳定的失败原因代码
      */
     record Failure<T>(OperationName operation, UUID operationId,
-                      FailureReason reason) implements OperationResult<T> {
+                      FailureReason reason, String detail) implements OperationResult<T> {
+        public Failure(OperationName operation, UUID operationId, FailureReason reason) {
+            this(operation, operationId, reason, null);
+        }
     }
 
     /** MMC 数据已成功处理，但外部副作用尚未完成。
@@ -55,9 +62,13 @@ public sealed interface OperationResult<T>
      * @param operation 此结果对应的操作
      * @param operationId 唯一操作标识
      * @param value 已完成部分产生的结果
+     * @param detail 可选的本地化失败详情
      * @param reason 剩余工作未完成的原因代码
      */
     record Partial<T>(OperationName operation, UUID operationId, T value,
-                      FailureReason reason) implements OperationResult<T> {
+                      FailureReason reason, String detail) implements OperationResult<T> {
+        public Partial(OperationName operation, UUID operationId, T value, FailureReason reason) {
+            this(operation, operationId, value, reason, null);
+        }
     }
 }

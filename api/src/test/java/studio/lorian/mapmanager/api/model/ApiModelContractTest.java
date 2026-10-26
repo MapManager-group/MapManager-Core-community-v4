@@ -67,4 +67,14 @@ class ApiModelContractTest {
         assertThrows(UnsupportedOperationException.class,
                 () -> group.worldNames().add("arena3"));
     }
+    @Test void operationResultsKeepOptionalDetailAndExistingConstructors() {
+        var id = java.util.UUID.randomUUID();
+        var reason = studio.lorian.mapmanager.api.result.FailureReason.WORLD_BACKEND_FAILED;
+        var operation = studio.lorian.mapmanager.api.result.OperationName.CREATE;
+        assertEquals(null, new studio.lorian.mapmanager.api.result.OperationResult.Failure<>(operation, id, reason).detail());
+        assertEquals(null, new studio.lorian.mapmanager.api.result.OperationResult.Partial<>(operation, id, "pending", reason).detail());
+        assertEquals("actual bounds", new studio.lorian.mapmanager.api.result.OperationResult.Failure<>(operation, id, reason, "actual bounds").detail());
+        assertEquals("actual bounds", new studio.lorian.mapmanager.api.result.OperationResult.Partial<>(operation, id, "pending", reason, "actual bounds").detail());
+    }
+
 }

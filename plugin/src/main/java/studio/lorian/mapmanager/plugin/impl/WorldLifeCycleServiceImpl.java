@@ -1,6 +1,8 @@
 package studio.lorian.mapmanager.plugin.impl;
 
 import java.util.function.Predicate;
+import org.bukkit.generator.WorldInfo;
+import org.mvplugins.multiverse.core.utils.result.Attempt;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -132,7 +134,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     if (result.isFailure())
                         logger.warning(Messages.text("world.create_failed", "world", request.worldName(),
                                 "reason", result.getFailureReason()));
-                    return result.getOrNull();
+                    return result;
                 });
     }
 
@@ -140,6 +142,10 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
      * 记录失败，并在已有地图记录时返回其待处理快照。
      */
     private OperationResult<MapInstance> failed(UUID id, String name, FailureReason reason, OperationName operation) {
+        return failed(id, name, reason, operation, null);
+    }
+
+    private OperationResult<MapInstance> failed(UUID id, String name, FailureReason reason, OperationName operation, String detail) {
         try {
             operations.save(new OperationRecord(id, operation, name, OperationStage.FAILED, reason));
         } catch (Exception exception) {
@@ -152,8 +158,33 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             logger.severe(Messages.text("world.failed_state_read_failed", "error", exception.getMessage()));
             map = null;
         }
-        return map == null ? new OperationResult.Failure<>(operation, id, reason)
-                : new OperationResult.Partial<>(operation, id, map, reason);
+        return map == null ? new OperationResult.Failure<>(operation, id, reason, detail)
+                : new OperationResult.Partial<>(operation, id, map, reason, detail);
+    }
+
+    private OperationResult<MapInstance> backendFailed(UUID id, String name, OperationName operation, Attempt<?, ?> result) {
+        String detail = result.getFailureMessage().formatted();
+        // Multiverse stores the original exception message in {error}; its raw fallback is only "Failed!".
+        String[] replacements = result.getFailureMessage().getReplacements();
+        for (int i = 0; i < replacements.length; i += 2) {
+            if ("{error}".equals(replacements[i])) {
+                detail = replacements[i + 1];
+                break;
+            }
+        }
+        return failed(id, name, FailureReason.WORLD_BACKEND_FAILED, operation, detail);
+    }
+
+    static String flatSurfaceError(CreateMapRequest request, WorldInfo world) {
+        if (request == null || request.worldType() != WorldType.FLAT || !request.parameters().containsKey("flat.height"))
+            return null;
+        try {
+            FlatChunkGenerator.validateSurface(Integer.parseInt(request.parameters().get("flat.height")),
+                    world.getMinHeight(), world.getMaxHeight());
+            return null;
+        } catch (IllegalArgumentException exception) {
+            return exception.getMessage();
+        }
     }
 
     /**
@@ -250,6 +281,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     }
                     if (!params.containsKey("generator")) {
                         options.generator("MapManager-Core:" + generatorId);
+                        if (params.containsKey("flat.height")) options.biome(null);
                     }
                 } else if (flatSettings != null) {
                     options.generatorSettings(flatSettings);
@@ -340,7 +372,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     var result = MultiverseCoreApi.get().getWorldManager().importWorld(options);
                     if (result.isFailure()) logger.warning(Messages.text("world.import_failed", "world", name,
                             "reason", result.getFailureReason()));
-                    return result.getOrNull();
+                    return result;
                 });
     }
 
@@ -368,7 +400,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     private OperationResult<MapInstance> registerWorld(OperationName operation, UUID operationId, String name,
                                                        String requestedGroup, String requestedAlias, UUID ownerId,
                                                        CreateMapRequest createRequest, ImportMapRequest importRequest,
-                                                       Supplier<LoadedMultiverseWorld> worldAction) {
+                                                       Supplier<? extends Attempt<LoadedMultiverseWorld, ?>> worldAction) {
         String groupId = blank(requestedGroup) ? name : requestedGroup;
         String alias = blank(requestedAlias) ? name : MapAliasServiceImpl.stripColor(requestedAlias);
         if (alias.isBlank() || alias.length() > 255)
@@ -387,8 +419,11 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             operations.save(new OperationRecord(operationId, operation, name, OperationStage.STARTED, null));
             if (maps.findGroup(groupId) == null) maps.saveGroup(new MapGroup(groupId, Set.of()));
             maps.save(pending);
-            LoadedMultiverseWorld world = worldAction.get();
-            if (world == null) return failed(operationId, name, FailureReason.WORLD_BACKEND_FAILED, operation);
+            var backendResult = worldAction.get();
+            if (backendResult.isFailure()) return backendFailed(operationId, name, operation, backendResult);
+            LoadedMultiverseWorld world = backendResult.get();
+            String heightError = flatSurfaceError(createRequest, world.getBukkitWorld().get());
+            if (heightError != null) return failed(operationId, name, FailureReason.INVALID_INPUT, operation, heightError);
             operations.save(new OperationRecord(operationId, operation, name, OperationStage.WORLD_CHANGED, null));
 
             // 世界就绪后先应用 v3 的 MV 和 gamerule 初始化设置，失败时保持 PENDING。
@@ -703,8 +738,11 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             if (map == null) { map = plan.map(); maps.save(map); }
             var manager = MultiverseCoreApi.get().getWorldManager();
             var world = manager.getLoadedWorld(worldName).getOrNull();
-            if (world == null && manager.isWorld(worldName))
-                world = manager.loadWorld(LoadWorldOptions.world(manager.getWorld(worldName).get())).getOrNull();
+            if (world == null && manager.isWorld(worldName)) {
+                var result = manager.loadWorld(LoadWorldOptions.world(manager.getWorld(worldName).get()));
+                if (result.isFailure()) return backendFailed(plan.operationId(), worldName, plan.operation(), result);
+                world = result.get();
+            }
             if (world == null && !manager.isWorld(worldName)) {
                 Path folder = worldGateway.worldDirectory(worldName);
                 if (plan.imported() != null && !Files.exists(folder, LinkOption.NOFOLLOW_LINKS))
@@ -720,10 +758,18 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                                 .generator(created.generator()).generatorSettings(created.generatorSettings()).biome(created.biome());
                     } else if (plan.imported() != null) options = importOptions(plan.imported());
                     else throw new IllegalArgumentException(Messages.text("maintenance.recovery_invalid"));
-                    world = manager.importWorld(options).getOrNull();
-                } else if (plan.create() != null) world = manager.createWorld(options(plan.create())).getOrNull();
+                    var result = manager.importWorld(options);
+                    if (result.isFailure()) return backendFailed(plan.operationId(), worldName, plan.operation(), result);
+                    world = result.get();
+                } else if (plan.create() != null) {
+                    var result = manager.createWorld(options(plan.create()));
+                    if (result.isFailure()) return backendFailed(plan.operationId(), worldName, plan.operation(), result);
+                    world = result.get();
+                }
             }
             if (world == null) return failed(plan.operationId(), worldName, FailureReason.WORLD_BACKEND_FAILED, plan.operation());
+            String heightError = flatSurfaceError(plan.create(), world.getBukkitWorld().get());
+            if (heightError != null) return failed(plan.operationId(), worldName, FailureReason.INVALID_INPUT, plan.operation(), heightError);
             initializeWorld(world, map.id(), map.displayName());
             UUID owner = plan.create() != null ? plan.create().ownerId() : plan.imported() != null ? plan.imported().ownerId() : null;
             if (owner != null) roles.add(map.groupId(), MapRole.ADMIN, owner);

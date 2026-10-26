@@ -59,6 +59,30 @@ class WorldLifeCycleValidationTest {
                     OperationName.CREATE, FailureReason.INVALID_INPUT);
         }
     }
+    @Test void backendFailureKeepsTargetHeightDetailAndPendingState() throws Exception {
+        String detail = "flat.height=-60 is outside the world's actual available Y range 0 to 255";
+        var backend = org.mvplugins.multiverse.core.utils.result.Attempt.failure(
+                org.mvplugins.multiverse.core.world.reasons.WorldCreatorFailureReason.BUKKIT_CREATION_FAILED,
+                org.mvplugins.multiverse.core.locale.message.MessageReplacement.Replace.ERROR.with(new IllegalArgumentException(detail)))
+                .transform(org.mvplugins.multiverse.core.world.reasons.CreateFailureReason.WORLD_CREATOR_FAILED);
+        var method = WorldLifeCycleServiceImpl.class.getDeclaredMethod("backendFailed",
+                UUID.class, String.class, OperationName.class, org.mvplugins.multiverse.core.utils.result.Attempt.class);
+        method.setAccessible(true);
+        UUID id = UUID.randomUUID();
+        var result = (OperationResult<?>) method.invoke(lifecycle, id, "arena", OperationName.CREATE, backend);
+        assertEquals(detail, result.detail());
+        assertInstanceOf(OperationResult.Failure.class, result);
+        storage.saveGroup(new MapGroup("team", Set.of()));
+        var pending = new MapInstance(UUID.randomUUID(), "arena", "team", "Arena",
+                new MapSettings(false, false, false), MapStatus.PENDING, null);
+        storage.save(pending);
+        result = (OperationResult<?>) method.invoke(lifecycle, id, "arena", OperationName.CREATE, backend);
+        var partial = assertInstanceOf(OperationResult.Partial.class, result);
+        assertEquals(detail, partial.detail());
+        assertEquals(pending, partial.value());
+        assertEquals(OperationStage.FAILED, storage.allOperations().iterator().next().stage());
+    }
+
     @Test void reservedEnvironmentIsRejectedForBothRequests() {
         failure(lifecycle.create(new CreateMapRequest("arena", null, null, null, WorldType.FLAT, Environment.SIFT, Map.of())),
                 OperationName.CREATE, FailureReason.UNSUPPORTED_ENVIRONMENT);

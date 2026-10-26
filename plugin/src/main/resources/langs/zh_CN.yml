@@ -163,6 +163,7 @@ errors:
   structures_boolean: structures 必须是 true 或 false
   flat_only: flat.height 仅支持 FLAT 生成器
   flat_generator_conflict: flat.height 与 generator-settings 不能同时设置
+  flat_biome_invalid: 无效的平坦世界生物群系：<biome>
   flat_surface_height_range: flat.height=<height> 超出世界实际可用 Y 坐标范围 <min> 到 <max>
   flat_dimension_height_range: NETHER 和 THE_END 环境的 FLAT 生成器层总高度必须在 2-254 格之间
   voidgen_required: VOID 世界需要 VoidGen

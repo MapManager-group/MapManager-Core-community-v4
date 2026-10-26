@@ -182,7 +182,7 @@ new ImportMapRequest("arena-copy", "Arena Copy", "team", ownerId,
         WorldType.NORMAL, Environment.THE_END);
 ```
 
-生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 FLAT，表示绝对表层 Y（如 0、-60）而非总层数；生成时按实际世界 minHeight ≤ Y < maxHeight 校验，支持生效的数据包扩展；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载与操作恢复通过 `load` 和 `recover` 调用；恢复继续原步骤，不自动删除创建/导入留下的世界。
+生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 FLAT，表示绝对表层 Y（如 0、-60）而非总层数；内置生成器在准备生物群系提供器时按目标 WorldInfo 的 minHeight ≤ Y < maxHeight 校验，创建成功后及恢复激活前再次复核实际世界高度，支持生效的数据包扩展；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载与操作恢复通过 `load` 和 `recover` 调用；恢复继续原步骤，不自动删除创建/导入留下的世界。
 
 ### 世界版本
 
@@ -202,7 +202,7 @@ new ImportMapRequest("arena-copy", "Arena Copy", "team", ownerId,
 - `Failure<T>`：操作未完成；读取稳定的 `reason()` 失败代码。
 - `Partial<T>`：MMC 数据已处理，但 Multiverse 或 LuckPerms 等外部同步未全部完成；应报告原因。`PERMISSION_SYNC_PENDING` 表示 LP 已入持久队列，地图/角色可按 MMC 状态立即生效，调用方无需重复提交；自动重试没有固定完成期限。
 
-每种结果都包含 `operation()` 和 `operationId()`，可用于日志与故障排查。不要只判断“不是 Failure”就当作完整成功；显式处理 `Partial`。
+每种结果都包含 `operation()` 和 `operationId()`，可用于日志与故障排查。`detail()` 为可空的具体失败说明；Failure/Partial 可携带实际表层 Y 和目标世界上下界，调用方应保留并展示此文本，同时保留稳定 reason。旧 Failure/Partial 构造器继续可用，未指定详情时返回 null；使用 detail 的调用方需要同步更新 Core 插件与 API。不要只判断“不是 Failure”就当作完整成功；显式处理 `Partial`。
 
 ```java
 if (result instanceof OperationResult.Success<?> success) {

@@ -37,10 +37,10 @@ mvn clean package
 | UNIT-MIG-01 至 UNIT-MIG-02       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationSourceTest.java` | v3 地图、组、角色范围和物理/爆炸设置解析；组地图清单不一致时拒绝                                              |
 | UNIT-MSG-01 至 UNIT-MSG-07       | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/notification/MessagesTest.java`       | 英文与安全占位符、中文回退、参数校验、双语键及结果枚举齐全；三种结果通知及玩家/控制台/日志分流；双语玩家隐藏 ID、控制台保留 ID                                                              |
 | UNIT-CONFIG-01 至 UNIT-CONFIG-05 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageConfigTest.java`       | JSON 默认值、MySQL 配置读取与空白裁剪、未知类型及必填项/端口/数据库名校验                                     |
-| UNIT-LIFE-01 至 UNIT-LIFE-06     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | 创建和导入覆盖三种生成器与三种已实现环境的组合；SIFT 保持未支持；校验绝对表层 Y 编码和非 FLAT 的 flat.height 拒绝 |
+| UNIT-LIFE-01 至 UNIT-LIFE-07     | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleServiceImplTest.java`       | 创建和导入覆盖三种生成器与三种已实现环境的组合；SIFT 保持未支持；校验绝对表层 Y 编码、实际世界范围最终校验和非 FLAT 的 flat.height 拒绝 |
 | UNIT-TRAVEL-01 至 UNIT-TRAVEL-13 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapTravelServiceImplTest.java` | 传送输入/线程/在线/准入校验、按需加载、Failure/Partial 传播、出生点和朝向、错误世界和传送失败、踢出同图与管理员校验 |
 | UNIT-VERSION-01 至 UNIT-VERSION-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldVersionServiceImplTest.java` | 旧版/同版/未来版本兼容判断、损坏或缺失 NBT、世界名定位及路径逃逸拒绝 |
-| UNIT-FLAT-01 至 UNIT-FLAT-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/FlatChunkGeneratorTest.java` | 生成器 ID 往返、实际层材料/顺序/范围、负最小高度、旧层数高度截断、绝对表层 Y、实际及扩展范围校验、出生点和非法设置 |
+| UNIT-FLAT-01 至 UNIT-FLAT-07 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/world/FlatChunkGeneratorTest.java` | 生成器 ID 往返、实际层材料/顺序/范围、负最小高度、旧层数高度截断、绝对表层 Y、实际及扩展范围校验、生物群系准备前拒绝越界、出生点和非法设置 |
 | UNIT-LISTENER-01 至 UNIT-LISTENER-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/listener/MapListenersTest.java` | 物理与爆炸设置独立、未登记世界、落沙恢复、其他实体、画/展示框全局支撑保护（地图物理开/关、未登记世界、默认世界）和通用实体破坏原因、严格传送准入及关闭整套监听 |
 | UNIT-VALIDATE-01 至 UNIT-VALIDATE-08 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/WorldLifeCycleValidationTest.java` | 创建/导入名称和保留名、组/别名/参数校验、SIFT、异步拒绝、API 删除不要求 _bak 后缀且仍校验地图状态；删除预检区分状态、在线玩家和恢复类型/UUID 冲突，拒绝时保留地图及恢复请求；拒绝时不新增地图/组/操作记录 |
 | UNIT-FAILURE-01 至 UNIT-FAILURE-06 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/MapServiceFailureTest.java` | 角色写入失败返回 Failure、写后读取或 LP 异常返回 Partial、无效角色输入、物理/爆炸读写失败 |
@@ -95,7 +95,7 @@ mvn clean package
 | LIFE-06 | 创建地图时提供带 Minecraft 颜色代码的 alias                                | 保存别名文本时去掉颜色代码；MV 别名根据公开状态附加颜色                                                                  |
 | LIFE-07 | 组合 `flat/normal/void` 与 `normal/nether/the_end` 创建并导入               | Multiverse 配置中的生成器和 Bukkit 环境分别匹配请求；FLAT+非 NORMAL 使用编码的内置生成器；VOID 需要 VoidGen       |
 | LIFE-08 | 创建或导入时选择 `sift` 环境                                               | 返回 `UNSUPPORTED_ENVIRONMENT`；不改变世界或登记 PENDING 地图                                                          |
-| LIFE-09 | FLAT 使用 flat.height=0、-60 及实际上下界；生效的数据包扩展世界使用 -2000、2000 | 草方块位于指定 Y，出生点在 Y+1；按目标世界实际 minHeight～maxHeight-1 校验，超出时报错                                                                     |
+| LIFE-09 | FLAT 使用 flat.height=0、-60 及实际上下界；生效的数据包扩展世界使用 -2000、2000 | 草方块位于指定 Y，出生点在 Y+1；按目标世界实际 minHeight～maxHeight-1 校验，超出时在区块生成前拒绝，OperationResult.detail 保留所填 Y 和实际上下界，MMW 申请记录查看详情及站内信应展示该原因 |
 | LIFE-10 | structures 分别使用 `true`、`false`、其他文本                              | 两个布尔值映射正确；其他文本拒绝，世界不创建                                                                             |
 | LIFE-11 | 在 NORMAL/VOID 生成器使用 `flat.height`；FLAT 同时提供 `flat.height` 与 `generator-settings` | 分别拒绝创建，错误信息指向参数冲突或适用生成器                                                                      |
 | LIFE-12 | 测试合法 seed、biome、generator、generator-settings、property.*            | 参数传入 MV 创建选项或世界属性；创建成功                                                                                 |

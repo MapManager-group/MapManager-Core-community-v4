@@ -75,7 +75,7 @@ class WorldLifeCycleServiceImplTest {
                 assertEquals(4, FlatChunkGenerator.totalHeight(options.generatorSettings()));
                 assertEquals(y, com.google.gson.JsonParser.parseString(options.generatorSettings())
                         .getAsJsonObject().get("surface_y").getAsInt());
-                assertEquals("@single:minecraft:plains", options.biome());
+                assertNull(options.biome());
             }
         }
     }
@@ -96,6 +96,29 @@ class WorldLifeCycleServiceImplTest {
                 Map.of("generator-settings", "{\"layers\":[{\"block\":\"stone\",\"height\":255}]}"));
 
         assertThrows(IllegalArgumentException.class, () -> WorldLifeCycleServiceImpl.options(request));
+    }
+
+    @Test void finalSurfaceCheckUsesTargetWorldBounds() {
+        for (Environment environment : implementedEnvironments()) {
+            var request = new CreateMapRequest("testworld", null, null, null, WorldType.FLAT, environment,
+                    Map.of("flat.height", "-60"));
+            org.bukkit.generator.WorldInfo world = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(
+                    org.bukkit.generator.WorldInfo.class, (o, m, args) -> switch (m.getName()) {
+                        case "getMinHeight" -> -64; case "getMaxHeight" -> 320; default -> throw new AssertionError(m);
+                    });
+            assertNull(WorldLifeCycleServiceImpl.flatSurfaceError(request, world));
+            var dimension = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(
+                    org.bukkit.generator.WorldInfo.class, (o, m, args) -> switch (m.getName()) {
+                        case "getMinHeight" -> 0; case "getMaxHeight" -> 256; default -> throw new AssertionError(m);
+                    });
+            org.junit.jupiter.api.Assertions.assertNotNull(WorldLifeCycleServiceImpl.flatSurfaceError(request, dimension));
+            var expanded = studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer.proxy(
+                    org.bukkit.generator.WorldInfo.class, (o, m, args) -> switch (m.getName()) {
+                        case "getMinHeight" -> -2032; case "getMaxHeight" -> 2032; default -> throw new AssertionError(m);
+                    });
+            assertNull(WorldLifeCycleServiceImpl.flatSurfaceError(
+                    new CreateMapRequest("testworld", null, null, null, WorldType.FLAT, environment, Map.of("flat.height", "2000")), expanded));
+        }
     }
 
     private static Environment[] implementedEnvironments() {

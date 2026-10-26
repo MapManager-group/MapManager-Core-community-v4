@@ -81,6 +81,22 @@ class FlatChunkGeneratorTest {
         assertEquals(List.of(new Region(0, 1, Material.GRASS_BLOCK)), generate(surface(0), 0, 256));
         assertThrows(IllegalArgumentException.class, () -> generate(surface(-60), 0, 256));
     }
+    @Test void targetHeightIsValidatedBeforePreparingBiomeProviderAndChunks() throws Exception {
+        for (int y : new int[]{-65, 320, 2000}) {
+            assertThrows(IllegalArgumentException.class, () -> surface(y).getDefaultBiomeProvider(info(-64, 320)));
+        }
+        try (var server = new studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer((o, m, a) -> {
+            if (m.getName().equals("getRegistry")) return proxy(org.bukkit.Registry.class, (registry, method, args) -> null);
+            throw new AssertionError(m);
+        })) {
+            var provider = surface(-60).getDefaultBiomeProvider(info(-64, 320));
+            assertEquals(org.bukkit.block.Biome.PLAINS, provider.getBiome(info(-64, 320), 0, -60, 0));
+            assertEquals(List.of(org.bukkit.block.Biome.PLAINS), provider.getBiomes(info(-64, 320)));
+            var custom = new FlatChunkGenerator(FlatChunkGenerator.generatorId("{\"surface_y\":0,\"biome\":\"DESERT\"}"));
+            assertEquals(org.bukkit.block.Biome.DESERT, custom.getDefaultBiomeProvider(info(-64, 320)).getBiome(info(-64, 320), 0, 0, 0));
+        }
+    }
+
     private FlatChunkGenerator surface(int y) {
         return new FlatChunkGenerator(FlatChunkGenerator.generatorId("{\"surface_y\":" + y + "}"));
     }

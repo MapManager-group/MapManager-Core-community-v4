@@ -20,6 +20,7 @@ public final class OperationNotifierImpl implements OperationNotifier {
             key = "partial";
             reason = Messages.text("reasons." + partial.reason());
         } else return;
+        if (result.detail() != null && !result.detail().isBlank()) reason = result.detail();
         String operation = Messages.text("operations." + result.operation());
         Component consoleMessage = Messages.component("result." + key,
                 "operation", operation, "reason", reason, "operation_id", result.operationId());

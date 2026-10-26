@@ -30,7 +30,7 @@
 | `Environment`      | `NORMAL`、`NETHER`、`THE_END`、预留的 `SIFT` 维度环境        | 数据；NORMAL/NETHER/THE_END 已实现；SIFT 返回不支持结果          |
 | `FailureReason`    | 统一失败原因代码                                             | 数据；随业务实现补充必要原因，避免在命令中散写字符串               |
 | `OperationName`    | 统一操作名称代码                                             | 数据；随业务操作使用                                               |
-| `OperationResult`  | `Success`、`Failure`、`Partial` 及 operation ID              | 契约/数据；通知器用它分发成功、失败和部分完成消息                  |
+| `OperationResult`  | `Success`、`Failure`、`Partial` 及 operation ID              | 契约/数据；Failure/Partial 可带 detail，旧构造器兼容；通知器优先展示具体失败详情                  |
 
 ## api 模块：服务接口
 
@@ -66,7 +66,7 @@
 | `MapAliasServiceImpl`       | 无别名参数时使用地图名；显式别名时清除颜色代码并保存纯文本，再根据 MMC `isPublic` 设置、保存 MV 别名                                                   | 已实现；存储别名不含颜色代码，MV 非公开为 `&3<name>`、公开为 `&2<name>`，需在主线程调用                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `MapTravelServiceImpl`      | 检查入图准入并传送玩家；将玩家移出地图                                                                                                       | 已实现；主线程检查在线状态和 MMC 准入，通过生命周期 load 加载目标再传送；踢出按当前地图管理员与同图检查 |
 | `WorldLifeCycleServiceImpl` | 创建、导入、初始化和删除的用例入口 | 已实现；保留名称、参数、版本、默认世界、在线玩家和目录边界校验；创建和导入在世界加载前默认关闭物理和爆炸，显式初始化也持久化关闭两项并保留公开状态；完整请求先落 RecoveryJournal，世界初始化后保存 level.dat，再登记 ACTIVE；LP 持久异步投影；启动及显式 recover 继续创建/导入/删除；删除目录身份不符时停止，保留恢复记录；删除预检区分 INVALID_MAP_STATE、WORLD_HAS_PLAYERS 与 RECOVERY_CONFLICT |
-| `FlatChunkGenerator` | 按绝对表层 Y 或旧编码层设置生成平坦区块 | 已实现；flat.height 按世界实际范围校验并定位表层，出生点在上方一格；兼容旧 layers ID；新增坐标及扩展高度代理单测通过，真实数据包环境待验收 |
+| `FlatChunkGenerator` | 按绝对表层 Y 或旧编码层设置生成平坦区块 | 已实现；flat.height 按世界实际范围校验并定位表层，出生点在上方一格；兼容旧 layers ID；在目标 WorldInfo 生物群系准备阶段校验，最终创建/恢复再复核；坐标、扩展高度、详情回传代理单测通过，真实数据包环境待验收 |
 
 | `MapAdminCommand` | 控制台与 RCON 生命周期及维护命令 | 已实现；create/import/init/delete、load/recover、operations、migration、storage export；包含命令专用删除名称正则、六位一次性删除确认和创建/导入参数补全 |
 
@@ -115,7 +115,7 @@
 
 | 类型                                            | 作用                                 | 状态与待办                                     |
 |-------------------------------------------------|--------------------------------------|------------------------------------------------|
-| `OperationResult.Success`、`Failure`、`Partial` | 成功、失败和外部同步待完成的结果记录 | 数据；由各业务用例按真实执行结果返回           |
+| `OperationResult.Success`、`Failure`、`Partial` | 成功、失败和外部同步待完成的结果记录 | 数据；由各业务用例按真实执行结果返回；Failure/Partial 支持可空 detail           |
 | `NotificationTarget.Kind`                       | 玩家、控制台、仅日志三种通知目标     | 数据；通知分发已实现                           |
 | `StorageConfig.Type`                            | JSON/MySQL 后端选择值                | 数据；由配置解析使用                           |
 | `JsonStorage.Grant`                             | JSON 文件中的角色授予项              | 内部数据；随角色记录读写                       |

@@ -115,6 +115,13 @@ class MessagesTest {
             assertTrue(plain(sent.get(0)).contains("succeeded"));
             assertTrue(plain(sent.get(1)).contains(Messages.text("reasons.STORAGE_FAILED")));
             assertTrue(plain(sent.get(2)).contains(Messages.text("reasons.PERMISSION_SYNC_PENDING")));
+            String detail = Messages.text("errors.flat_surface_height_range", "height", -60, "min", 0, "max", 255);
+            notifier.notify(NotificationTarget.console(), new studio.lorian.mapmanager.api.result.OperationResult.Partial<>(
+                    studio.lorian.mapmanager.api.result.OperationName.CREATE, id, null,
+                    studio.lorian.mapmanager.api.result.FailureReason.WORLD_BACKEND_FAILED, detail));
+            assertTrue(plain(sent.getLast()).contains(detail));
+            assertTrue(detail.contains("-60") && detail.contains("0") && detail.contains("255"));
+
         }
     }
 

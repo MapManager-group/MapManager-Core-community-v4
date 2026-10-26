@@ -5,6 +5,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
+import org.bukkit.block.Biome;
+import org.bukkit.generator.BiomeProvider;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.HeightMap;
@@ -23,6 +27,7 @@ public final class FlatChunkGenerator extends ChunkGenerator {
     private static final String ID_PREFIX = "flat:";
     private final List<Layer> layers;
     private final Integer surfaceY;
+    private final String biomeId;
 
     public FlatChunkGenerator(String generatorId) {
         if (generatorId == null || !generatorId.startsWith(ID_PREFIX)) {
@@ -34,6 +39,7 @@ public final class FlatChunkGenerator extends ChunkGenerator {
             JsonObject input = JsonParser.parseString(settings).getAsJsonObject();
             this.surfaceY = input.has("surface_y") ? Integer.valueOf(input.get("surface_y").getAsString()) : null;
             this.layers = surfaceY == null ? parseLayers(settings) : List.of();
+            this.biomeId = input.has("biome") ? input.get("biome").getAsString() : "minecraft:plains";
         } catch (RuntimeException exception) {
             throw new IllegalArgumentException("Invalid MapManager flat generator settings", exception);
         }
@@ -83,6 +89,19 @@ public final class FlatChunkGenerator extends ChunkGenerator {
     }
 
     @Override
+    public BiomeProvider getDefaultBiomeProvider(WorldInfo worldInfo) {
+        if (surfaceY == null) return null;
+        // This hook receives the target dimension before Paper starts generating chunks.
+        validateSurface(surfaceY, worldInfo.getMinHeight(), worldInfo.getMaxHeight());
+        Biome biome = Registry.BIOME.get(NamespacedKey.fromString(biomeId.toLowerCase(java.util.Locale.ROOT)));
+        if (biome == null) throw new IllegalArgumentException(Messages.text("errors.flat_biome_invalid", "biome", biomeId));
+        return new BiomeProvider() {
+            @Override public Biome getBiome(WorldInfo worldInfo, int x, int y, int z) { return biome; }
+            @Override public List<Biome> getBiomes(WorldInfo worldInfo) { return List.of(biome); }
+        };
+    }
+
+    @Override
     public void generateNoise(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, ChunkData chunkData) {
         int y = chunkData.getMinHeight();
         int maxHeight = chunkData.getMaxHeight();
@@ -96,7 +115,7 @@ public final class FlatChunkGenerator extends ChunkGenerator {
 
     private List<Layer> layers(int minHeight, int maxHeight) {
         if (surfaceY == null) return layers;
-        validateSurface(minHeight, maxHeight);
+        validateSurface(surfaceY, minHeight, maxHeight);
         List<Layer> result = new ArrayList<>(3);
         if (surfaceY > minHeight) result.add(new Layer(Material.BEDROCK, 1));
         if (surfaceY > minHeight + 1) result.add(new Layer(Material.DIRT, surfaceY - minHeight - 1));
@@ -104,7 +123,7 @@ public final class FlatChunkGenerator extends ChunkGenerator {
         return result;
     }
 
-    private void validateSurface(int minHeight, int maxHeight) {
+    public static void validateSurface(int surfaceY, int minHeight, int maxHeight) {
         if (surfaceY < minHeight || surfaceY >= maxHeight)
             throw new IllegalArgumentException(Messages.text("errors.flat_surface_height_range",
                     "height", surfaceY, "min", minHeight, "max", maxHeight - 1));
@@ -113,7 +132,7 @@ public final class FlatChunkGenerator extends ChunkGenerator {
     @Override
     public int getBaseHeight(WorldInfo worldInfo, Random random, int x, int z, HeightMap heightMap) {
         if (surfaceY != null) {
-            validateSurface(worldInfo.getMinHeight(), worldInfo.getMaxHeight());
+            validateSurface(surfaceY, worldInfo.getMinHeight(), worldInfo.getMaxHeight());
             return surfaceY + 1;
         }
         long top = (long) worldInfo.getMinHeight() + layers.stream().mapToLong(Layer::height).sum();
@@ -123,7 +142,7 @@ public final class FlatChunkGenerator extends ChunkGenerator {
     @Override
     public Location getFixedSpawnLocation(World world, Random random) {
         if (surfaceY != null) {
-            validateSurface(world.getMinHeight(), world.getMaxHeight());
+            validateSurface(surfaceY, world.getMinHeight(), world.getMaxHeight());
             return new Location(world, 0.5, surfaceY + 1.0, 0.5);
         }
         long surface = (long) world.getMinHeight() + layers.stream().mapToLong(Layer::height).sum();

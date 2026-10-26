@@ -163,6 +163,7 @@ errors:
   structures_boolean: structures must be true or false
   flat_only: flat.height is only supported for the FLAT generator
   flat_generator_conflict: flat.height and generator-settings cannot be set together
+  flat_biome_invalid: 'Invalid flat-world biome: <biome>'
   flat_surface_height_range: flat.height=<height> is outside the world's actual available Y range <min> to <max>
   flat_dimension_height_range: FLAT generator layers in NETHER and THE_END environments must total between 2 and 254 blocks
   voidgen_required: VOID worlds require VoidGen

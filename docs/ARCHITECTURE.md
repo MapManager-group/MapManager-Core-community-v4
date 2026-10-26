@@ -127,7 +127,7 @@ MMC 不创建或修改 `worldbase` 内的权限节点，不把所有玩家加入
 
 Multiverse-Core 仅是世界操作后端：创建、导入、加载、出生点/世界配置更新和世界删除。地图成员、访问权、地图组、公开状态与 MMC 的元数据由 MMC 管理。
 
-创建和导入请求将 `WorldType` 生成器与 `Environment` 维度环境分开指定。生成器可选 `FLAT`、原版 `NORMAL` 和依赖 VoidGen 的 `VOID`；环境 `NORMAL`、`NETHER`、`THE_END` 当前可用，`SIFT` 仅作为预留枚举并返回不支持结果。`FLAT` 指定 flat.height 时由 FlatChunkGenerator 将表层放在绝对 Y，读取世界实际高度校验，并将 Y 编码进 Multiverse generator ID 供重载恢复。旧层设置和未指定高度时的行为保持不变；NETHER/THE_END 手工层设置仍限制总层数 2–254。`biome=minecraft:<id>` 通过 Multiverse 的 `@single:<id>` 生物群系提供器传入。导入保留存档已有区块，所选生成器用于后续新区块。
+创建和导入请求将 `WorldType` 生成器与 `Environment` 维度环境分开指定。生成器可选 `FLAT`、原版 `NORMAL` 和依赖 VoidGen 的 `VOID`；环境 `NORMAL`、`NETHER`、`THE_END` 当前可用，`SIFT` 仅作为预留枚举并返回不支持结果。`FLAT` 指定 flat.height 时由 FlatChunkGenerator 将表层放在绝对 Y，在生物群系提供器准备阶段读取目标 WorldInfo 实际高度校验，创建后/恢复激活前再复核，并将 Y 编码进 Multiverse generator ID 供重载恢复。旧层设置和未指定高度时的行为保持不变；NETHER/THE_END 手工层设置仍限制总层数 2–254。指定绝对表层 Y 的内置生成器直接从编码设置提供单一生物群系，以保证 Paper 调用其早期校验钩子；其他组合的 `biome=minecraft:<id>` 仍通过 Multiverse 的 `@single:<id>` 提供器传入。导入保留存档已有区块，所选生成器用于后续新区块。
 
 为让 Multiverse 在启动自动加载世界时能解析已保存的 `MapManager-Core:flat:<settings>` 生成器，Paper 插件依赖顺序配置为 MapManager-Core 先于 Multiverse-Core 启用。v3 迁移会等到 `Multiverse-Core` 的启用事件后再读取其世界元数据；对外 `MapManager` 服务仍在迁移和 `worldbase` 初始化都完成后发布。
 
@@ -154,7 +154,7 @@ ACTIVE --删除开始--> DELETING --失败--> DELETING
 
 所有修改数据或外部世界状态的用例返回统一结果，不在各命令/listener 中散落字符串：
 
-`OperationResult` 声明为 `Success`、`Failure`、`Partial` 三种结果；每个结果都包含 `OperationName` 和 UUID 类型的 operation ID。`Partial` 表示 MMC 状态已成功写入，但 LuckPerms 等外部投影仍待同步。具体签名见 `api/src/main/java/studio/lorian/mapmanager/api/result/OperationResult.java`。
+`OperationResult` 声明为 `Success`、`Failure`、`Partial` 三种结果；每个结果都包含 `OperationName` 和 UUID 类型的 operation ID，以及可空的 detail；Failure/Partial 可带实际高度限制等具体失败信息，保留原构造器。`Partial` 表示 MMC 状态已成功写入，但 LuckPerms 等外部投影仍待同步。具体签名见 `api/src/main/java/studio/lorian/mapmanager/api/result/OperationResult.java`。
 
 `FailureReason` 使用稳定代码，展示文本通过插件数据目录中的 `langs/<语言代码>.yml` 本地化，默认语言为 `zh_CN`；缺失翻译项回退到内置中文资源。通知和内部启动/存储诊断使用 `Messages`；部分底层库异常详情及 Java 插件框架自身产生的报错仍由依赖原样提供，未经过语言文件转换。`OperationNotifier` 将操作名和失败原因渲染为 MiniMessage Component，发送给命令调用者；玩家结果通知不含 operation ID，完整结果同时写入控制台；控制台与日志保留 operation ID，日志使用纯文本。API 结果继续保留原因代码、operation ID 和操作名称，供调用方处理。
 
