@@ -281,7 +281,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     }
                     if (!params.containsKey("generator")) {
                         options.generator("MapManager-Core:" + generatorId);
-                        if (params.containsKey("flat.height")) options.biome(null);
+                        if (params.containsKey("flat.height")) options.biome("");
                     }
                 } else if (flatSettings != null) {
                     options.generatorSettings(flatSettings);

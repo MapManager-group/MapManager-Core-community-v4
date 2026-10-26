@@ -75,8 +75,21 @@ class WorldLifeCycleServiceImplTest {
                 assertEquals(4, FlatChunkGenerator.totalHeight(options.generatorSettings()));
                 assertEquals(y, com.google.gson.JsonParser.parseString(options.generatorSettings())
                         .getAsJsonObject().get("surface_y").getAsInt());
-                assertNull(options.biome());
+                assertEquals("", options.biome());
             }
+        }
+    }
+
+    @Test
+    void flatHeightKeepsRequestedBiomeInGeneratorWithoutMultiverseOverride() {
+        for (Environment environment : implementedEnvironments()) {
+            var options = WorldLifeCycleServiceImpl.options(new CreateMapRequest(
+                    "combo-test", "Combo Test", "combo-test", null, WorldType.FLAT, environment,
+                    Map.of("flat.height", "64", "biome", "minecraft:desert")));
+            assertEquals("", options.biome());
+            assertEquals("minecraft:desert", com.google.gson.JsonParser.parseString(options.generatorSettings())
+                    .getAsJsonObject().get("biome").getAsString());
+            assertFlatGenerator(options.generator());
         }
     }
 
