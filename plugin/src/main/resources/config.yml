@@ -2,7 +2,7 @@ language: zh_CN # langs/<语言代码>.yml；缺失条目回退到内置 zh_CN
 
 storage:
   type: json # json | mysql
-  # 显式后端迁移：变更 type 时填原后端 json/mysql；完成后清空。
+  # 显式后端迁移：变更 type 时填原后端 json/mysql；成功后自动清空并保存配置。
   migrate-from: ''
   # 原后端为 MySQL 时填写原连接；与 storage-backend.txt 的目标必须一致。
   migration-source:

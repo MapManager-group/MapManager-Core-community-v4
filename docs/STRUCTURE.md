@@ -68,7 +68,7 @@ MapManager-v4/
 | `MapAccessListener` | `PlayerTeleportEvent`、`PlayerChangedWorldEvent`、`PlayerJoinEvent`、`PlayerRespawnEvent`；`MapService`；`MapAccessService`；MV 默认世界 | 严格校验开启时预先拦截并在事件后复核地图进入；加入和重生时检查；撤权后复核当前地图；无法安全送回默认世界时断开连接 |
 | `MapWorldCommand.public/setname/setspawn` | 当前 MMC 地图、`MapAccessService`、`MapSettingsService` | 只允许当前地图管理员修改公开状态、显示名和出生点；出生点取玩家当前位置并同步 MMC、Bukkit 与 Multiverse |
 | `MapSettingsServiceImpl.setSpawn` | `MapRepository`、Bukkit `World`、Multiverse `MultiverseWorld` | 先持久化 MMC 出生点，再更新 Bukkit 和 Multiverse 出生点并保存 Multiverse 配置；外部同步失败返回 `Partial` |
-| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`FlatChunkGenerator`、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 创建/导入分别接收 `WorldType` 生成器和 `Environment` 环境；导入前校验 `level.dat` 版本且不接受生成参数；FLAT 指定 flat.height 或在 NETHER/THE_END 环境时使用 FlatChunkGenerator，指定 Y 在准备生物群系提供器及激活前按世界实际范围校验，保留 Multiverse 原始错误至 OperationResult.detail；SIFT 环境保留为未支持的预留值；地图后续写入首位管理员、初始化并转换状态 |
+| `WorldLifeCycleServiceImpl.create/importWorld` | 内置与配置的地图名限制、存储、Multiverse、`FlatChunkGenerator`、`WorldBaseProjection`、`MapAliasService`、`WorldVersionService` | 创建/导入分别接收 `WorldType` 生成器和 `Environment` 环境；导入前校验 `level.dat` 版本且不接受生成参数；FLAT 指定 flat.height 或在 NETHER/THE_END 环境时使用 FlatChunkGenerator，指定 Y 在准备生物群系提供器及激活前按世界实际范围校验，保留 Multiverse 原始错误至 OperationResult.detail；SIFT 环境保留为未支持的预留值；地图后续写入首位管理员、初始化并转换状态；失败创建确认无世界/目录后释放占位及恢复请求，启动清理旧 FAILED 占位，保留失败审计和组角色 |
 | `MapAdminCommand.delete` → `WorldLifeCycleServiceImpl.delete` | 命令专用的控制台/RCON 一次性确认码与删除名称正则、`WorldGateway`、Bukkit、Multiverse、操作记录、`WorldBaseProjection`、地图与角色存储 | 首次输入地图名取得 10 秒有效的 6 位确认码；二次输入确认码后检查 MV 默认世界、服务器首个加载世界、在线玩家和目录；世界删除后先将 LP 清理任务落盘，再清理 MMC；失败保留恢复请求，重启继续并验证目录身份 |
 | `MapTravelServiceImpl.teleport` | `MapAccessService`、`MapRepository`、`PlayerGateway` | 准入通过后通过生命周期 load 加载 ACTIVE 世界再传送 |
 | `MapWorldCommand.kick` → `MapTravelServiceImpl.kickFromMap` | Bukkit 在线玩家、内部地图存储、`MapAccessService.decide`、Multiverse 默认世界 | 服务按操作者当前世界定位地图，确认管理员及目标在同图，再使用 MV 默认世界出生点传送 |
@@ -105,7 +105,7 @@ MapManager-v4/
 
 ## 恢复、缓存与维护调用链
 
-- `MapManagerPlugin` → `StorageBackendMigration` → `CachedStorage` → JSON/MySQL；事件只读不可变索引，写入成功后发布索引。
+- `MapManagerPlugin` → `StorageBackendMigration` → `CachedStorage` → JSON/MySQL；迁移验证及备份归档完成后自动清空来源配置并原子保存，完成标记在保存成功后移除；事件只读不可变索引，写入成功后发布索引。
 - 生命周期 → `RecoveryJournal` 保存完整请求与目录身份 → MV 世界变更 → MMC 数据 → `QueuedWorldBaseProjection` → LP 后台 FIFO；启动与 recover 继续原操作。
 - `MapAdminCommand` 编排 create/import/init/delete、load/recover、操作查询、v3 预检/正式迁移及快照导出。
 - Paper 26 的维度目录可共用根世界 level.dat；版本读取只在已存在、非符号链接的维度目录缺少独立文件时回退。经典导入仍要求导入目录自己的 level.dat。

@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+import xml.etree.ElementTree as ET
 
 
 def main():
@@ -39,7 +40,11 @@ def main():
         subprocess.run(admin + ['ping'], check=True)
         classes = work / 'classes'
         classes.mkdir()
-        jars = [repo / 'plugin/target/mapmanager-plugin-4.0.0-SNAPSHOT.jar'] + list((args.runtime.resolve() / 'libraries').rglob('*.jar'))
+        version = ET.parse(repo / 'pom.xml').getroot().findtext('{http://maven.apache.org/POM/4.0.0}version')
+        plugin_jar = repo / f'plugin/target/mapmanager-plugin-{version}.jar'
+        if not plugin_jar.is_file():
+            raise FileNotFoundError(f'Build the current plugin first: {plugin_jar}')
+        jars = [plugin_jar] + list((args.runtime.resolve() / 'libraries').rglob('*.jar'))
         cp = os.pathsep.join(map(str, jars))
         subprocess.run([str(java / 'javac'), '-proc:none', '-cp', cp, '-d', str(classes),
                         str(Path(__file__).with_name('StorageSqlProbe.java'))], check=True)

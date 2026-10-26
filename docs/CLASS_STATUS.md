@@ -65,7 +65,7 @@
 | `MapSettingsServiceImpl`    | 将单地图设置及出生点写入 repository；公开状态切换时读取 MV 原别名、去除前导颜色代码后换色；展示名修改委托别名服务                                      | 已实现；出生点写入 MMC 并同步 Bukkit/Multiverse，公开状态和显示名同步 MV 别名；地图管理员授权由命令入口执行                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `MapAliasServiceImpl`       | 无别名参数时使用地图名；显式别名时清除颜色代码并保存纯文本，再根据 MMC `isPublic` 设置、保存 MV 别名                                                   | 已实现；存储别名不含颜色代码，MV 非公开为 `&3<name>`、公开为 `&2<name>`，需在主线程调用                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `MapTravelServiceImpl`      | 检查入图准入并传送玩家；将玩家移出地图                                                                                                       | 已实现；主线程检查在线状态和 MMC 准入，通过生命周期 load 加载目标再传送；踢出按当前地图管理员与同图检查 |
-| `WorldLifeCycleServiceImpl` | 创建、导入、初始化和删除的用例入口 | 已实现；保留名称、参数、版本、默认世界、在线玩家和目录边界校验；创建和导入在世界加载前默认关闭物理和爆炸，显式初始化也持久化关闭两项并保留公开状态；flat.height 内置生成器使用空字符串 biome 选项兼容 Multiverse 解析；完整请求先落 RecoveryJournal，世界初始化后保存 level.dat，再登记 ACTIVE；LP 持久异步投影；启动及显式 recover 继续创建/导入/删除；删除目录身份不符时停止，保留恢复记录；删除预检区分 INVALID_MAP_STATE、WORLD_HAS_PLAYERS 与 RECOVERY_CONFLICT |
+| `WorldLifeCycleServiceImpl` | 创建、导入、初始化和删除的用例入口 | 已实现；保留名称、参数、版本、默认世界、在线玩家和目录边界校验；创建和导入在世界加载前默认关闭物理和爆炸，显式初始化也持久化关闭两项并保留公开状态；flat.height 内置生成器使用空字符串 biome 选项兼容 Multiverse 解析；未产生世界或目录的失败创建释放 PENDING 占位和恢复请求，启动同样清理旧 FAILED 创建；保留失败审计及地图组角色；完整请求先落 RecoveryJournal，世界初始化后保存 level.dat，再登记 ACTIVE；LP 持久异步投影；启动及显式 recover 继续创建/导入/删除；删除目录身份不符时停止，保留恢复记录；删除预检区分 INVALID_MAP_STATE、WORLD_HAS_PLAYERS 与 RECOVERY_CONFLICT |
 | `FlatChunkGenerator` | 按绝对表层 Y 或旧编码层设置生成平坦区块 | 已实现；flat.height 按世界实际范围校验并定位表层，出生点在上方一格；兼容旧 layers ID；在目标 WorldInfo 生物群系准备阶段校验，最终创建/恢复再复核；坐标、扩展高度、详情回传代理单测通过，真实数据包环境待验收 |
 
 | `MapAdminCommand` | 控制台与 RCON 生命周期及维护命令 | 已实现；create/import/init/delete、load/recover、operations、migration、storage export；包含命令专用删除名称正则、六位一次性删除确认和创建/导入参数补全 |
@@ -108,7 +108,7 @@
 | `LevelDatVersionReader`     | 读取 level.dat 中的地图数据版本                              | 已实现；从 `Data.DataVersion` 读取 int，格式无效或字段缺失时返回空值       |
 | `CachedStorage` | 写入成功后发布地图、组和角色不可变索引 | 已实现；事件读无 JDBC/文件 I/O、无写锁等待；不直接修改底层仓储 |
 | `StorageSnapshot` | 完整备份、预检和幂等写入 | 已实现；包含空组、地图、角色和全部操作；目标冲突时不开始写入 |
-| `StorageBackendMigration` | 显式后端/目标切换 | 已实现；校验源指纹，备份、恢复部分写入，核对完整目标后更新后端标记；真实 MySQL 连接验证见测试文档 |
+| `StorageBackendMigration` | 显式后端/目标切换 | 已实现；校验源指纹，备份、恢复部分写入，核对完整目标后更新后端标记；备份归档后自动清空 storage.migrate-from 并原子保存配置，保存失败保留完成标记、重启继续收尾；MySQL 8.4.11 自动保存及两次独立 JVM 重开验证通过，详见测试文档 |
 | `RecoveryJournal` | 生命周期完整请求及目录身份 | 已实现；原子落盘，保留 owner、生成参数和地图身份；拒绝损坏请求及不匹配目录 |
 
 ## 嵌套类型

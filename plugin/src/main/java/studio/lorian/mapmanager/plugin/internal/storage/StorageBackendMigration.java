@@ -27,7 +27,7 @@ public final class StorageBackendMigration {
         if (previous == null || previous.equals(next)) {
             CachedStorage target = open(selected, directory);
             if (previous == null) StorageSnapshot.writeJson(marker, next + "\n");
-            finishBackup(directory, next);
+            finishBackup(configuration, directory, next);
             return target;
         }
         String sourceType = configuration.getString("storage.migrate-from", "");
@@ -55,14 +55,24 @@ public final class StorageBackendMigration {
         StorageSnapshot.writeJson(directory.resolve("storage-transfer-completed.txt"), next + "\n");
         StorageSnapshot.writeJson(marker, next + "\n");
         // 保留已完成备份，下一次切换使用新的活动计划。
-        finishBackup(directory, next);
+        finishBackup(configuration, directory, next);
         return target;
     }
-    private static void finishBackup(Path directory, String selected) throws IOException {
+    private static void finishBackup(FileConfiguration configuration, Path directory, String selected) throws IOException {
         Path completed = directory.resolve("storage-transfer-completed.txt");
         if (!Files.exists(completed) || !Files.readString(completed).trim().equals(selected)) return;
         Path backup = directory.resolve("storage-transfer.json");
         if (Files.exists(backup)) Files.move(backup, directory.resolve("storage-transfer-" + java.util.UUID.randomUUID() + ".json"));
+        String sourceType = configuration.getString("storage.migrate-from", "");
+        if (!sourceType.isEmpty()) {
+            configuration.set("storage.migrate-from", "");
+            try {
+                StorageSnapshot.writeJson(directory.resolve("config.yml"), configuration.saveToString());
+            } catch (IOException | RuntimeException error) {
+                configuration.set("storage.migrate-from", sourceType);
+                throw error;
+            }
+        }
         Files.deleteIfExists(completed);
     }
     public static boolean same(StorageSnapshot first, StorageSnapshot second) {

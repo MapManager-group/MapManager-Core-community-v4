@@ -80,15 +80,82 @@ class StorageRecoveryTest {
     }
     @Test void completedTransferIsArchivedAfterMarkerCrashButPendingPlanIsRetained() throws Exception {
         var config = new org.bukkit.configuration.file.YamlConfiguration(); config.set("storage.type", "json");
+        config.set("storage.migrate-from", "mysql");
+        config.set("language", "en_US");
+        config.save(directory.resolve("config.yml").toFile());
         var store = StorageBackendMigration.openAndMigrate(config, directory);
         Path plan = directory.resolve("storage-transfer.json");
         StorageSnapshot.capture(store, store, store).write(plan);
         StorageBackendMigration.openAndMigrate(config, directory);
         assertTrue(java.nio.file.Files.exists(plan)); // 未完成迁移的冻结计划不能丢弃。
+        assertEquals("mysql", config.getString("storage.migrate-from"));
+        assertEquals("mysql", org.bukkit.configuration.file.YamlConfiguration
+                .loadConfiguration(directory.resolve("config.yml").toFile()).getString("storage.migrate-from"));
         java.nio.file.Files.writeString(directory.resolve("storage-transfer-completed.txt"), "JSON\n");
         StorageBackendMigration.openAndMigrate(config, directory);
         assertFalse(java.nio.file.Files.exists(plan));
         assertFalse(java.nio.file.Files.exists(directory.resolve("storage-transfer-completed.txt")));
+        assertEquals("", config.getString("storage.migrate-from"));
+        var saved = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(directory.resolve("config.yml").toFile());
+        assertEquals("", saved.getString("storage.migrate-from"));
+        assertEquals("en_US", saved.getString("language"));
+        assertEquals("json", saved.getString("storage.type"));
+        String contents = java.nio.file.Files.readString(directory.resolve("config.yml"));
+        StorageBackendMigration.openAndMigrate(saved, directory);
+        assertEquals(contents, java.nio.file.Files.readString(directory.resolve("config.yml")));
+        try (var files = java.nio.file.Files.list(directory)) {
+            assertEquals(1, files.filter(path -> path.getFileName().toString().startsWith("storage-transfer-")).count());
+        }
+    }
+    @Test void mismatchedCompletionAndFailedMigrationKeepSourceSetting() throws Exception {
+        var config = new org.bukkit.configuration.file.YamlConfiguration();
+        config.set("storage.type", "json");
+        config.set("storage.migrate-from", "mysql");
+        config.set("storage.migration-source.mysql.host", "different");
+        config.set("storage.migration-source.mysql.database", "mmc");
+        config.set("storage.migration-source.mysql.username", "root");
+        Path file = directory.resolve("config.yml");
+        config.save(file.toFile());
+        String original = java.nio.file.Files.readString(file);
+        Path completed = directory.resolve("storage-transfer-completed.txt");
+        java.nio.file.Files.writeString(completed, "MYSQL:other:3306/mmc\n");
+        StorageBackendMigration.openAndMigrate(config, directory);
+        assertEquals("mysql", config.getString("storage.migrate-from"));
+        assertEquals(original, java.nio.file.Files.readString(file));
+        assertTrue(java.nio.file.Files.exists(completed));
+        java.nio.file.Files.writeString(directory.resolve("storage-backend.txt"), "MYSQL:original:3306/mmc\n");
+        assertThrows(IllegalStateException.class, () -> StorageBackendMigration.openAndMigrate(config, directory));
+        assertEquals("mysql", config.getString("storage.migrate-from"));
+        assertEquals(original, java.nio.file.Files.readString(file));
+    }
+    @Test void failedConfigSaveRetainsCompletionAndCanFinishAfterRestart() throws Exception {
+        var config = new org.bukkit.configuration.file.YamlConfiguration();
+        config.set("storage.type", "json");
+        config.set("storage.migrate-from", "mysql");
+        Path file = directory.resolve("config.yml");
+        config.save(file.toFile());
+        var store = StorageBackendMigration.openAndMigrate(config, directory);
+        Path plan = directory.resolve("storage-transfer.json");
+        StorageSnapshot.capture(store, store, store).write(plan);
+        Path completed = directory.resolve("storage-transfer-completed.txt");
+        java.nio.file.Files.writeString(completed, "JSON\n");
+        Path original = directory.resolve("original.yml");
+        java.nio.file.Files.move(file, original);
+        java.nio.file.Files.createDirectory(file);
+        java.nio.file.Files.writeString(file.resolve("block"), "prevent replacement");
+        assertThrows(java.io.IOException.class, () -> StorageBackendMigration.openAndMigrate(config, directory));
+        assertEquals("mysql", config.getString("storage.migrate-from"));
+        assertTrue(java.nio.file.Files.exists(completed));
+        assertFalse(java.nio.file.Files.exists(plan));
+        java.nio.file.Files.delete(file.resolve("block"));
+        java.nio.file.Files.delete(file);
+        java.nio.file.Files.move(original, file);
+        var restarted = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file.toFile());
+        StorageBackendMigration.openAndMigrate(restarted, directory);
+        assertEquals("", restarted.getString("storage.migrate-from"));
+        assertEquals("", org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file.toFile())
+                .getString("storage.migrate-from"));
+        assertFalse(java.nio.file.Files.exists(completed));
         try (var files = java.nio.file.Files.list(directory)) {
             assertEquals(1, files.filter(path -> path.getFileName().toString().startsWith("storage-transfer-")).count());
         }

@@ -24,7 +24,25 @@ public final class StorageSqlProbe {
         }
         return config;
     }
+    private static void restart(Path directory) throws Exception {
+        Path file = directory.resolve("config.yml");
+        String original = Files.readString(file);
+        var saved = YamlConfiguration.loadConfiguration(file.toFile());
+        check("".equals(saved.getString("storage.migrate-from")), "restart loads cleared source from disk");
+        var store = StorageBackendMigration.openAndMigrate(saved, directory);
+        var expected = StorageSnapshot.read(directory.resolve("restart-expected.json"));
+        check(StorageBackendMigration.same(expected, StorageSnapshot.capture(store, store, store)), "restart preserves MySQL snapshot despite changed JSON source");
+        check(original.equals(Files.readString(file)), "restart does not rewrite configuration");
+        check(!Files.exists(directory.resolve("storage-transfer.json"))
+                && !Files.exists(directory.resolve("storage-transfer-completed.txt")), "restart creates no active migration plan");
+        try (var files = Files.list(directory)) {
+            check(files.filter(path -> path.getFileName().toString().startsWith("storage-transfer-")).count() == 1,
+                    "restart does not create another migration backup");
+        }
+        System.out.println("MYSQL_RESTART_PASS checks=" + checks);
+    }
     public static void main(String[] args) throws Exception {
+        if (args[0].equals("--restart")) { restart(Path.of(args[1])); return; }
         int port = Integer.parseInt(args[0]); String prefix = args[1]; Path directory = Path.of(args[2]);
         if (!prefix.matches("mmctodo_[a-zA-Z0-9_]+")) throw new IllegalArgumentException("Use a unique mmctodo_ test database prefix");
         String first = prefix + "_a", second = prefix + "_b", conflict = prefix + "_c";
@@ -42,7 +60,29 @@ public final class StorageSqlProbe {
         json.save(new OperationRecord(UUID.randomUUID(), OperationName.CREATE, "arena", OperationStage.COMPLETED, null));
         json.save(new OperationRecord(UUID.randomUUID(), OperationName.LOAD, "arena", OperationStage.FAILED, FailureReason.WORLD_BACKEND_FAILED));
         StorageSnapshot expected = StorageSnapshot.capture(json, json, json);
-        CachedStorage sql = StorageBackendMigration.openAndMigrate(config("mysql", port, first, "json", first), directory);
+        var migrationConfig = config("mysql", port, first, "json", first);
+        migrationConfig.set("language", "en_US");
+        migrationConfig.save(directory.resolve("config.yml").toFile());
+        CachedStorage sql = StorageBackendMigration.openAndMigrate(migrationConfig, directory);
+        check("".equals(migrationConfig.getString("storage.migrate-from")), "successful transfer clears in-memory source");
+        var savedConfig = YamlConfiguration.loadConfiguration(directory.resolve("config.yml").toFile());
+        check("".equals(savedConfig.getString("storage.migrate-from")), "successful transfer persists cleared source");
+        check("mysql".equals(savedConfig.getString("storage.type")) && "en_US".equals(savedConfig.getString("language")),
+                "configuration retains backend and unrelated settings");
+        expected.write(directory.resolve("restart-expected.json"));
+        Path jsonFile = directory.resolve("maps.json");
+        String originalJson = Files.readString(jsonFile);
+        json.saveGroup(new MapGroup("sourceonly", Set.of()));
+        try {
+            for (int i = 0; i < 2; i++) {
+                var child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                        "-cp", System.getProperty("java.class.path"), StorageSqlProbe.class.getName(), "--restart", directory.toString())
+                        .inheritIO().start();
+                check(child.waitFor() == 0, "fresh JVM restart " + (i + 1));
+            }
+        } finally {
+            Files.writeString(jsonFile, originalJson);
+        }
         check(StorageBackendMigration.same(expected, StorageSnapshot.capture(sql, sql, sql)), "JSON -> MySQL full snapshot");
         check(sql.findByWorldName("ARENA").equals(map), "case insensitive query");
         check(sql.findGroup("empty") != null, "empty group retained");

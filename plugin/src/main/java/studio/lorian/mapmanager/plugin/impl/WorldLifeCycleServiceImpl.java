@@ -151,6 +151,16 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         } catch (Exception exception) {
             logger.severe(Messages.text("world.operation_save_failed", "error", exception.getMessage()));
         }
+        if (operation == OperationName.CREATE) {
+            try {
+                var plan = journal.read(name);
+                if (plan != null && plan.operationId().equals(id))
+                    discardFailedCreation(plan, this::worldRegistered);
+            } catch (RuntimeException exception) {
+                logger.warning(Messages.text("world.operation_failed", "operation", Messages.text("operations." + operation),
+                        "world", name, "error", exception.getMessage()));
+            }
+        }
         MapInstance map;
         try {
             map = maps.findByWorldName(name);
@@ -160,6 +170,28 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         }
         return map == null ? new OperationResult.Failure<>(operation, id, reason, detail)
                 : new OperationResult.Partial<>(operation, id, map, reason, detail);
+    }
+
+    private boolean worldRegistered(String name) {
+        return Bukkit.getWorld(name) != null || MultiverseCoreApi.get().getWorldManager().isWorld(name);
+    }
+
+    /** 仅释放未产生世界的失败创建占位；已有目录始终保留恢复数据。 */
+    boolean discardFailedCreation(RecoveryJournal.Plan plan, Predicate<String> registeredWorld) {
+        if (plan.operation() != OperationName.CREATE || defaultWorld.test(plan.map().worldName())) return false;
+        String name = plan.map().worldName();
+        OperationRecord record = operations.find(plan.operationId());
+        if (record == null || record.name() != OperationName.CREATE || !name.equals(record.worldName())
+                || record.stage() != OperationStage.FAILED) return false;
+        MapInstance map = maps.findByWorldName(name);
+        if (map != null && (!map.id().equals(plan.map().id()) || map.status() != MapStatus.PENDING
+                || map.spawn() != null)) return false;
+        if (!Files.notExists(worldGateway.worldDirectory(name), LinkOption.NOFOLLOW_LINKS)
+                || !Files.notExists(Path.of("").toAbsolutePath().normalize().resolve(name), LinkOption.NOFOLLOW_LINKS)
+                || registeredWorld.test(name)) return false;
+        if (map != null) maps.delete(map.id());
+        journal.remove(name);
+        return true;
     }
 
     private OperationResult<MapInstance> backendFailed(UUID id, String name, OperationName operation, Attempt<?, ?> result) {
@@ -395,7 +427,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     }
 
     /**
-     * 创建和导入共用的 MMC 注册流程；世界操作由调用方提供，失败时保留 PENDING 快照。
+     * 创建和导入共用的 MMC 注册流程；已产生世界的失败操作保留 PENDING 快照。
      */
     private OperationResult<MapInstance> registerWorld(OperationName operation, UUID operationId, String name,
                                                        String requestedGroup, String requestedAlias, UUID ownerId,
@@ -797,6 +829,13 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     public void recoverAll() {
         for (RecoveryJournal.Plan plan : journal.all()) {
             if (defaultWorld.test(plan.map().worldName())) continue;
+            try {
+                if (discardFailedCreation(plan, this::worldRegistered)) continue;
+            } catch (RuntimeException error) {
+                logger.warning(Messages.text("world.operation_failed", "operation", Messages.text("operations.RECOVER"),
+                        "world", plan.map().worldName(), "error", error.getMessage()));
+                continue;
+            }
             OperationResult<MapInstance> result = recover(plan.map().worldName());
             if (result instanceof OperationResult.Failure<?> || result instanceof OperationResult.Partial<?> partial
                     && partial.reason() != FailureReason.PERMISSION_SYNC_PENDING)
@@ -815,6 +854,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             else if (journal.read(record.worldName()) != null) continue;
             else if (record.name() == OperationName.CREATE || record.name() == OperationName.IMPORT || record.name() == OperationName.DELETE) {
                 MapInstance map = maps.findByWorldName(record.worldName());
+                if (record.name() == OperationName.CREATE && record.stage() == OperationStage.FAILED
+                        && (map == null || map.status() == MapStatus.ACTIVE)) continue;
                 if ((map == null && record.name() == OperationName.DELETE) || (map != null && map.status() == MapStatus.ACTIVE && record.name() != OperationName.DELETE))
                     operations.save(new OperationRecord(record.id(), record.name(), record.worldName(), OperationStage.COMPLETED, null));
                 else logger.warning(Messages.text("maintenance.recovery_needed", "world", record.worldName()));

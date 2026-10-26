@@ -182,7 +182,7 @@ new ImportMapRequest("arena-copy", "Arena Copy", "team", ownerId,
         WorldType.NORMAL, Environment.THE_END);
 ```
 
-生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 FLAT，表示绝对表层 Y（如 0、-60）而非总层数；内置生成器在准备生物群系提供器时按目标 WorldInfo 的 minHeight ≤ Y < maxHeight 校验，创建成功后及恢复激活前再次复核实际世界高度，支持生效的数据包扩展；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载与操作恢复通过 `load` 和 `recover` 调用；恢复继续原步骤，不自动删除创建/导入留下的世界。
+生成器可选 `FLAT`、`NORMAL`（原版标准地形）和 `VOID`（需要 VoidGen）；环境可选 `NORMAL`、`NETHER`、`THE_END`。`Environment.SIFT` 是预留值，当前返回 `FailureReason.UNSUPPORTED_ENVIRONMENT`。便捷构造器默认 `WorldType.FLAT` 和 `Environment.NORMAL`。`flat.height` 仅用于创建 FLAT，表示绝对表层 Y（如 0、-60）而非总层数；内置生成器在准备生物群系提供器时按目标 WorldInfo 的 minHeight ≤ Y < maxHeight 校验，创建成功后及恢复激活前再次复核实际世界高度，支持生效的数据包扩展；导入不接受生成参数，但会按请求设置环境和后续新区块生成器。按需加载与操作恢复通过 `load` 和 `recover` 调用；恢复继续原步骤，不自动删除创建/导入留下的世界。创建失败且确认无 Bukkit/Multiverse 登记、无实际世界目录及根目录暂存路径时，删除身份匹配且无出生点的 PENDING 占位及恢复请求，返回 Failure，允许同名重试；FAILED 审计及组角色保留。启动同样清理符合条件的旧失败创建；已有世界/目录或无法确认时保留 Partial/PENDING 供恢复。
 
 ### 世界版本
 

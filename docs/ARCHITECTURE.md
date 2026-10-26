@@ -135,12 +135,13 @@ Multiverse-Core 仅是世界操作后端：创建、导入、加载、出生点/
 
 ```text
 UNREGISTERED --创建/导入--> PENDING --成功--> ACTIVE
-                         └--失败--> PENDING
+                         ├--失败且已有世界/目录--> PENDING
+                         └--失败且未产生世界或目录--> UNREGISTERED
 ACTIVE --删除开始--> DELETING --失败--> DELETING
                                 └--成功--> 删除 MMC 地图记录
 ```
 
-`MapStatus.ARCHIVED` 和 `MapStatus.DELETED` 已定义，但当前生命周期服务不会写入这两个状态。创建或导入在保存 `PENDING` 后发生失败时会保留该地图记录；删除在 `DELETING` 状态保存后发生失败时会保留该状态，成功后移除地图记录。完整请求在副作用之前原子写入 `world-recovery/`；启动和 `/mapadmin recover` 会继续未完成步骤，保留原始地图 ID、所有者及生成器参数。创建/导入不自动删除已有世界文件。删除恢复同时校验目录 fileKey 与可用的 uid.dat，拒绝目录被替换的情况；旧版本缺少完整请求时保留状态供人工核查。通过前置校验并实际进入生命周期持久化步骤的创建、导入、初始化、加载和删除会记录 operation ID 与适用阶段；名称、参数、重复地图或删除安全检查提前拒绝时不会持久化操作记录。删除操作在调用 Multiverse 前检查默认世界、玩家和目录边界。删除名称正则和六位、10 秒确认码只由 `/mapadmin delete` 命令执行；直接调用 `WorldLifeCycleService.delete` 不受命令正则和确认码限制，仍执行名称格式及生命周期安全校验。
+`MapStatus.ARCHIVED` 和 `MapStatus.DELETED` 已定义，但当前生命周期服务不会写入这两个状态。创建失败且确认 Bukkit/Multiverse 均未登记同名世界、实际世界目录和根目录暂存路径均不存在时，删除本次 PENDING 占位及恢复请求，保留 FAILED 操作审计、地图组及其角色，允许重新申请同名地图；启动时对有完整请求和 FAILED 记录的旧失败创建执行相同清理，不自动重建。仍在 STARTED 等阶段的中断请求继续恢复。已有世界/目录、地图身份不符、已登记出生点、导入失败或无法确认目录不存在时保留记录；删除在 `DELETING` 状态保存后发生失败时会保留该状态，成功后移除地图记录。完整请求在副作用之前原子写入 `world-recovery/`；启动和 `/mapadmin recover` 会继续未完成步骤，保留原始地图 ID、所有者及生成器参数。创建/导入不自动删除已有世界文件。删除恢复同时校验目录 fileKey 与可用的 uid.dat，拒绝目录被替换的情况；旧版本缺少完整请求时保留状态供人工核查。通过前置校验并实际进入生命周期持久化步骤的创建、导入、初始化、加载和删除会记录 operation ID 与适用阶段；名称、参数、重复地图或删除安全检查提前拒绝时不会持久化操作记录。删除操作在调用 Multiverse 前检查默认世界、玩家和目录边界。删除名称正则和六位、10 秒确认码只由 `/mapadmin delete` 命令执行；直接调用 `WorldLifeCycleService.delete` 不受命令正则和确认码限制，仍执行名称格式及生命周期安全校验。
 
 所有 Bukkit/Multiverse 世界对象操作在主线程执行；用户名 UUID 解析等可能访问网络的操作异步执行。地图、组和角色的事件读取使用 `CachedStorage` 的不可变索引，无数据库/文件读取且不等待写锁；持久化写入仍同步执行。LP 网络操作全部在队列工作线程执行，入队期间只保存本地任务文件。队列采用全局 FIFO，某任务持续失败会延后后续组的投影。
 
@@ -174,7 +175,7 @@ ACTIVE --删除开始--> DELETING --失败--> DELETING
 | Multiverse alias、出生点 | 读取并保存为地图展示名和出生点；其他 Multiverse 设置不会复制 |
 | v3 的公开 LP `multiverse.access.*` 状态 | 转成 `MapSettings.isPublic` 后不再用该节点准入 |
 
-启动迁移解析所有 UUID 后生成 `v3-migration-report.json`，包含目标旧值、计划新值与冲突信息。`migration.dry-run: true` 只预检和报告，不写目标或完成标记。正式迁移备份源 JSON 与完整目标快照，冻结 `v3-migration-plan.json`，按幂等步骤写入；中断后使用同一计划重试，源文件改变或目标数据冲突时停止，全部完成后才写 `v3-migration.done`。JSON/MySQL 显式切换由 `StorageBackendMigration` 执行，核对源后端指纹和完整目标后更新 `storage-backend.txt`。详见 [MIGRATION.md](MIGRATION.md) 与 [STORAGE.md](STORAGE.md)。
+启动迁移解析所有 UUID 后生成 `v3-migration-report.json`，包含目标旧值、计划新值与冲突信息。`migration.dry-run: true` 只预检和报告，不写目标或完成标记。正式迁移备份源 JSON 与完整目标快照，冻结 `v3-migration-plan.json`，按幂等步骤写入；中断后使用同一计划重试，源文件改变或目标数据冲突时停止，全部完成后才写 `v3-migration.done`。JSON/MySQL 显式切换由 `StorageBackendMigration` 执行，核对源后端指纹和完整目标后更新 `storage-backend.txt`，归档备份后自动清空 `storage.migrate-from` 并原子保存配置，再删除完成标记；保存失败保留完成标记供重启继续收尾。详见 [MIGRATION.md](MIGRATION.md) 与 [STORAGE.md](STORAGE.md)。
 
 ## 9. 安全、并发和失败约定
 

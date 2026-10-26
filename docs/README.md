@@ -218,4 +218,4 @@ mvn clean package
 | `/mapadmin migration apply` | 备份并迁移，失败后使用冻结计划恢复 |
 | `/mapadmin storage export <文件名>` | 导出地图、角色和全部操作快照 |
 
-重启自动恢复有完整请求的操作；删除恢复会核对目录身份，拒绝被替换的目录。LP 投影失败在后台自动重试，MMC 角色立即生效；全局 FIFO 中持续失败的任务会延后后续任务。导出仅含业务数据，完整备份须保留插件数据目录、世界文件和 MySQL 数据；显式切换存储见 [STORAGE.md](STORAGE.md)，迁移见 [MIGRATION.md](MIGRATION.md)。
+创建失败且确认未产生世界及目录时，会释放 PENDING 占位和恢复请求，允许重新申请同名地图；重启同样清理有完整请求及 FAILED 记录的旧失败占位。已有世界/目录的失败操作保留恢复数据。重启自动恢复其余有完整请求的操作；删除恢复会核对目录身份，拒绝被替换的目录。LP 投影失败在后台自动重试，MMC 角色立即生效；全局 FIFO 中持续失败的任务会延后后续任务。导出仅含业务数据，完整备份须保留插件数据目录、世界文件和 MySQL 数据；显式切换存储成功后自动清空 `storage.migrate-from` 并保存配置；保存失败会保留完成标记供重启收尾。详见 [STORAGE.md](STORAGE.md)，迁移见 [MIGRATION.md](MIGRATION.md)。

@@ -55,7 +55,7 @@ MySQL 自动创建五张 InnoDB 表：
 | `/mapadmin migration apply` | 再次预检后正式导入或继续冻结计划的部分写入 |
 | `/mapadmin storage export <文件名>` | 异步导出完整快照到 `exports/`；文件名只含字母、数字、下划线或连字符 |
 
-启动在发布 API 前自动继续 `world-recovery/` 中的请求。失败保留 PENDING/DELETING；恢复核对地图与目录身份。删除预检分别返回 `INVALID_MAP_STATE`（状态不允许）、`WORLD_HAS_PLAYERS`（图内有在线玩家）或 `RECOVERY_CONFLICT`（恢复请求操作类型或地图 UUID 冲突）；命令入口的状态检查同样返回 `INVALID_MAP_STATE`。目录被替换、出现符号链接或旧版本没有原始请求时停止并提示核查。六位确认码仍用于发起新的 `/mapadmin delete`，恢复仅继续已经持久化的删除。Paper 26 已登记维度读取共享主世界 `level.dat`；经典导入目录仍要求自身有效 `level.dat`。
+启动在发布 API 前自动继续 `world-recovery/` 中的请求。创建失败后，若确认 Bukkit/Multiverse 没有同名世界、实际世界目录及根目录暂存路径均不存在，且地图身份匹配、仍为 PENDING 并未保存出生点，则释放地图占位及恢复请求，允许再次申请同名地图；FAILED 操作记录、地图组及角色保留。启动时也会清理符合条件的旧失败创建；无 FAILED 记录的中断请求继续恢复。已有世界/目录、导入失败或无法确认状态时保留 PENDING，删除失败保留 DELETING；恢复核对地图与目录身份。删除预检分别返回 `INVALID_MAP_STATE`（状态不允许）、`WORLD_HAS_PLAYERS`（图内有在线玩家）或 `RECOVERY_CONFLICT`（恢复请求操作类型或地图 UUID 冲突）；命令入口的状态检查同样返回 `INVALID_MAP_STATE`。目录被替换、出现符号链接或旧版本没有原始请求时停止并提示核查。六位确认码仍用于发起新的 `/mapadmin delete`，恢复仅继续已经持久化的删除。Paper 26 已登记维度读取共享主世界 `level.dat`；经典导入目录仍要求自身有效 `level.dat`。
 
 事件读取使用不可变内存索引，写入仍同步持久化；LP 在后台执行和自动重试，返回 `Partial(PERMISSION_SYNC_PENDING)`，MMC 角色已经生效。全局 FIFO 的失败任务会延后后续投影。详细配置见 [STORAGE.md](STORAGE.md) 和 [MIGRATION.md](MIGRATION.md)。创建选项 `admin=` 同时接受用户名和 UUID。
 

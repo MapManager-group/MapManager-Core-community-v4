@@ -47,11 +47,11 @@ mvn clean package
 | UNIT-ADMIN-01 至 UNIT-ADMIN-10 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapAdminCommandTest.java` | 控制台/RCON 放行，玩家及命令方块拒绝、路由、默认值、非法/重复选项、导入参数拒绝、一次性/过期删除码、身份与状态保护、补全 |
 | UNIT-CMD-01 至 UNIT-CMD-07 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/command/MapWorldCommandTest.java` | world/wtp 共用传送、设置/别名/出生点路由、管理员授权、只读 info、角色 info 名单/准入、存储错误及补全过滤 |
 | UNIT-RECOVERY-01 至 UNIT-RECOVERY-03 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/impl/RecoveryJournalTest.java` | 完整请求重启、目录身份变更拒绝、符号链接与路径穿越拒绝 |
-| UNIT-CACHE-01 至 UNIT-CACHE-09 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageRecoveryTest.java` | 快照恢复和冲突、事件读取隔离、缓存写失败不发布、重命名/换组索引、旧快照不可变、角色清理与删除保护、后端切换标记 |
+| UNIT-CACHE-01 至 UNIT-CACHE-11 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/storage/StorageRecoveryTest.java` | 快照恢复和冲突、事件读取隔离、缓存写失败不发布、重命名/换组索引、旧快照不可变、角色清理与删除保护、后端切换标记、迁移成功后自动清空并保存来源配置、保存失败重启恢复 |
 | UNIT-QUEUE-01 至 UNIT-QUEUE-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/permission/QueuedWorldBaseProjectionTest.java` | LP 不阻塞调用者、FIFO 撤权顺序、失败重试与重启恢复、损坏任务文件拒绝 |
 | UNIT-MIGREC-01 至 UNIT-MIGREC-04 | `plugin/src/test/java/studio/lorian/mapmanager/plugin/internal/migration/V3MigrationRecoveryTest.java` | v3 预检、冻结计划中断恢复、源变化和目标冲突保护 |
 
-当前共 122 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。上述事件单测直接调用监听器，未启动 Bukkit 事件总线。服务注册/类路径、真实玩家登录/重生/换世界与安全回退、Multiverse/LuckPerms 实际写入、MySQL 建表和完整启动迁移仍需真实集成环境，不纳入普通 Maven 单元门禁。测试替身会在每个测试结束后恢复 Bukkit 静态服务器。
+当前共 158 个 JUnit 用例，会在 `mvn test`、`mvn package` 及更晚的 Maven 生命周期自动执行。上述事件单测直接调用监听器，未启动 Bukkit 事件总线。服务注册/类路径、真实玩家登录/重生/换世界与安全回退、Multiverse/LuckPerms 实际写入、MySQL 建表和完整启动迁移仍需真实集成环境，不纳入普通 Maven 单元门禁。测试替身会在每个测试结束后恢复 Bukkit 静态服务器。
 
 ## 启动、配置与本地化
 
@@ -110,7 +110,7 @@ mvn clean package
 | LIFE-21 | 导入目录不存在、不是目录或缺少 level.dat                                   | 返回 WORLD_NOT_FOUND 或 INVALID_INPUT；不创建 MMC 地图记录                                                               |
 | LIFE-22 | 创建或导入 VOID 生成器但 VoidGen 未启用                                    | 返回世界后端失败；不注册为 ACTIVE                                                                                        |
 | LIFE-23 | 导入目录为符号链接或名称试图逃逸世界根目录                                 | 输入校验或目录检查拒绝，不触碰根目录外文件                                                                               |
-| LIFE-24 | 创建/导入过程中分别令 MV 操作、初始化、存储或 LP 投影失败                  | 后端/存储失败保留完整请求及 PENDING 供恢复；LP 入队后地图 ACTIVE，返回 Partial(PERMISSION_SYNC_PENDING)，后台重试                              |
+| LIFE-24 | 创建/导入过程中分别令 MV 操作、初始化、存储或 LP 投影失败                  | 创建失败且无世界/目录时释放占位和恢复请求、允许同名重试，保留 FAILED 审计及组角色；已有世界/目录或导入失败保留完整请求及 PENDING 供恢复；LP 入队后地图 ACTIVE，返回 Partial(PERMISSION_SYNC_PENDING)，后台重试                              |
 | LIFE-25 | 成功创建或导入后检查世界属性                                               | difficulty peaceful、creative、自动加载开启、出生区块常驻关闭；普通生物生成关闭、MISC 开启；规定 gamerule 全部生效并保存 |
 | LIFE-26 | 对已加载且已登记地图执行 `/mapadmin init <name>`                              | 先持久化关闭物理和爆炸，再重放 MV 与 gamerule 初始化；保留公开状态、出生点和角色，不改变地图状态；返回的地图快照包含关闭后的设置                                                   |
 | LIFE-27 | init 目标不存在、未登记或未加载                                            | 分别返回 MAP_NOT_FOUND 或 WORLD_NOT_FOUND；不产生其他世界变更                                                            |
@@ -307,6 +307,7 @@ JUnit 单元用例由 Maven 构建自动执行，具体结果见各模块 `targe
 | MIG-13 | v3 dry-run，再 apply，注入半完成写入 | dry-run 只有报告；apply 先备份与冻结计划，重试补齐一致子集；完成才写标记 |
 | SQL-01 | JSON → MySQL → 另一 MySQL → JSON | 空组、地图、出生点、角色、全部操作一致；切换前校验源指纹 |
 | SQL-02 | 目标冲突、源变化、部分写入或标记后归档前中断 | 冲突不覆盖，源变化拒绝，部分写入恢复，标记后归档安全收尾 |
+| SQL-03 | JSON → MySQL 成功后检查 config.yml，修改原 JSON 并启动两个独立 JVM 重新打开后端 | 来源配置已保存为空；重启只读取 MySQL，数据不变，配置不重写且不新增迁移备份 |
 | PERF-01 | 在事件查询时禁止仓储访问 | 缓存查询仍成功；不表示生产负载性能已验收 |
 
 ## 可重复的真实集成测试
@@ -318,7 +319,7 @@ python3 plugin/src/test/integration/run.py --runtime server --java-home /Library
 python3 plugin/src/test/integration/run_mysql.py --mysql-base /private/tmp/mysql-8.4.11-macos15-arm64 --runtime server --java-home /Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home
 ```
 
-MySQL 脚本要求预先准备兼容系统的 MySQL 二进制，创建独立临时 datadir 和测试库，只绑定回环地址，结束关闭实例。两组真实集成因依赖运行时/端口/二进制，不属于普通 Maven 单元门禁。
+MySQL 脚本要求预先准备兼容系统的 MySQL 二进制，创建独立临时 datadir 和测试库，只绑定回环地址，结束关闭实例。脚本按根 POM 版本选择当前插件包；探针在迁移后从已保存的 config.yml 启动两个独立 JVM，验证自动清空配置及不重复迁移。两组真实集成因依赖运行时/端口/二进制，不属于普通 Maven 单元门禁。
 
 ### 2026-10-01 实际结果
 
@@ -338,6 +339,25 @@ create/import/init/delete 从 `/world` 移至 `/mapadmin`，旧入口不再执�
 以当前工作区为基线，原 63 个用例全部通过；本次新增 59 个用例，合计 122 个（api 4、plugin 118）。补充传送/按需加载、世界版本、实际区块层生成、监听器、角色失败语义、生命周期输入保护、玩家/控制台命令、缓存快照及通知分流。仅修改测试和本清单，不修改业务源码或增加依赖。
 
 验证使用 JDK 21 执行 `mvn -o --no-transfer-progress clean test`，实际 122 个测试全部通过：0 failures、0 errors、0 skipped。未启动 `server` 测试服或连接外部服务；上文历史集成结果不属于本次验证。尚未覆盖为普通单元门禁的运行时路径包括完整 Multiverse 创建/初始化/删除/恢复、LP 适配器实际节点写入、玩家身份解析与 Mojang 网络、登录/重生后的调度复核及安全默认世界回退。这些路径继续使用集成验收，不能将本次单测通过视为全路径或 100% 覆盖率。
+
+## 后端迁移配置收尾回归
+
+`StorageRecoveryTest` 验证匹配目标的已完成迁移会归档备份、清空内存与 config.yml 中的 storage.migrate-from，并保留其他配置；再次启动配置内容不变。未完成计划、完成目标不匹配和源指纹失败均保留来源配置。通过让 config.yml 路径无法替换注入保存失败，确认内存值回滚、完成标记保留，修复路径后重新加载配置即可补完保存，且不重复归档。
+
+这些单元用例使用 JSON 后端模拟已核验的迁移完成标记，不连接 MySQL；真实数据库验证见下述 2026-10-27 结果。
+
+### 2026-10-27 真实 MySQL 迁移与重启结果
+
+- 当前工作区 `mvn -o --no-transfer-progress package` 通过：API 5 项、plugin 153 项，共 158 项单元测试，0 failures/errors/skipped。
+- 使用官方 MySQL Community Server 8.4.11 macOS arm64 运行时、独立临时 datadir、随机前缀测试库及回环端口 13376。22 项主流程检查通过，覆盖 JSON → MySQL、MySQL 换目标、部分写入恢复、冲突及源变化保护、MySQL → JSON、角色幂等和外键清理。
+- JSON → MySQL 后，断言内存与实际 config.yml 的 storage.migrate-from 均为空，storage.type 和无关配置保留。随后修改旧 JSON，在两个独立 JVM 中重新加载已保存配置并调用生产 openAndMigrate 入口，各 5 项检查全部通过：MySQL 快照不变、配置未重写、没有活动迁移计划或新增备份。此处验证独立 JVM 重开存储，未启动完整 Paper 服务端。
+- 报告：`/var/folders/hs/bq2njdx955169mcb_b3mf6jw0000gn/T/mmc-mysql-yqu4byse/snapshot/mysql-report.json`；主流程与两次重启日志：`/tmp/mmc-20261027-mysql.log`；Maven 日志：`/tmp/mmc-20261027-package.log`。测试结束临时 MySQL 已关闭，未连接现有数据库。
+
+## 创建失败后同名申请回归
+
+`FailedCreationRetryTest` 的 7 个单元用例验证：无世界的失败创建释放名称、缓存与持久存储一致、保留 FAILED 审计及共享组角色；已有目录/文件/悬空符号链接、暂存目录或已登记世界时保留恢复数据；非 FAILED 阶段、ACTIVE、地图身份不符、已有出生点、导入及缺失失败记录均不清理；占位已移除但恢复请求仍在时可继续清理。
+
+真实 Paper/MMW 验收：令创建在世界生成前失败，申请记录应为 error，随后可提交同名新申请；重启后旧 FAILED 占位同样释放。另验已有存档的失败操作保持 PENDING 且文件不变，无 FAILED 记录的中断操作继续恢复。单元用例没有运行完整 HTTP 审批或 Multiverse 后端。
 
 ## 设置反馈与创建/导入保护验收
 
