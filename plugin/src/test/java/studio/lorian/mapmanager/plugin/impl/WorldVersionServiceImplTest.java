@@ -43,6 +43,14 @@ class WorldVersionServiceImplTest {
         assertFalse(versions.isCompatible((String) null)); assertFalse(versions.isCompatible(" "));
         assertFalse(versions.isCompatible("../outside"));
     }
+    @Test void nameQueriesRejectPathsBeforeReadingExistingNbt() throws Exception {
+        Path nested = Files.createDirectories(directory.resolve("nested/arena"));
+        writeVersion(nested, 4903);
+        writeVersion(directory, 4903);
+        for (String name : new String[]{"nested/arena", nested.toString(), ".", "nested/../nested/arena", "bad\u0000name"})
+            assertFalse(versions.isCompatible(name), name);
+    }
+
     private void writeVersion(Path folder, int version) throws Exception {
         CompoundTag root = new CompoundTag(), data = new CompoundTag();
         data.putInt("DataVersion", version); root.put("Data", data);

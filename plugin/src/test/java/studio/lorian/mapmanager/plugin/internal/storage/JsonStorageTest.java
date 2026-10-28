@@ -113,6 +113,23 @@ class JsonStorageTest {
         assertThrows(IOException.class, () -> new JsonStorage(file));
     }
 
+    @Test
+    void deletingEmptyGroupCascadesRolesInPersistentAndCachedStorage() throws IOException {
+        Path file = temporaryDirectory.resolve("maps.json");
+        JsonStorage backend = new JsonStorage(file);
+        CachedStorage storage = new CachedStorage(backend, backend, backend);
+        storage.saveGroup(new MapGroup("team", Set.of()));
+        UUID player = UUID.randomUUID();
+        storage.add("team", MapRole.ADMIN, player);
+        storage.add("team", MapRole.BUILDER, player);
+        storage.deleteGroup("team");
+        for (var roles : java.util.List.<RoleRepository>of(storage, backend, new JsonStorage(file))) {
+            assertTrue(roles.members("team", MapRole.ADMIN).isEmpty());
+            assertTrue(roles.members("team", MapRole.BUILDER).isEmpty());
+        }
+        assertTrue(storage.allGroups().isEmpty());
+    }
+
     private static MapInstance map(String world, String group) {
         return new MapInstance(UUID.randomUUID(), world, group, world,
                 new MapSettings(true, false, false), MapStatus.ACTIVE,

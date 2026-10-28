@@ -64,6 +64,29 @@ class QueuedWorldBaseProjectionTest {
             await(() -> !queue.pending()); assertEquals(List.of(true), projection.changes);
         }
     }
+    @Test void reservedGroupVariantsNeverEnterThePersistentQueue() throws Exception {
+        try (var queue = queue(new Projection())) {
+            for (String group : List.of("DEFAULT", "Default", "WorldBase", "WORLDBASE")) {
+                assertThrows(IllegalArgumentException.class, () -> queue.ensureGroupInheritance(group, Set.of("arena")));
+                assertThrows(IllegalArgumentException.class, () -> queue.setBuilderAccess(group, UUID.randomUUID(), true));
+                assertThrows(IllegalArgumentException.class, () -> queue.removeGroup(group));
+                assertThrows(IllegalArgumentException.class, () -> queue.removeWorldInheritance(group, "arena"));
+            }
+            assertFalse(queue.pending());
+            assertTrue(queue.knownMembers().isEmpty());
+            assertFalse(Files.exists(directory.resolve("queue.json")));
+        }
+    }
+
+    @Test void reservedGroupsInPersistedJobsAndInventoriesAreRejected() throws Exception {
+        var file = directory.resolve("queue.json");
+        Files.writeString(file, "[{\"id\":\"" + UUID.randomUUID() + "\",\"action\":\"REMOVE_GROUP\",\"group\":\"WorldBase\",\"worlds\":[],\"enabled\":false}]");
+        assertThrows(java.io.IOException.class, () -> queue(new Projection()));
+        Files.writeString(file, "[]");
+        Files.writeString(directory.resolve("permission-members.json"), "{\"Default\":[]}");
+        assertThrows(java.io.IOException.class, () -> queue(new Projection()));
+    }
+
     @Test void corruptJournalsAreRejectedRatherThanDropped() throws Exception {
         Files.writeString(directory.resolve("queue.json"), "null");
         assertThrows(java.io.IOException.class, () -> queue(new Projection()));

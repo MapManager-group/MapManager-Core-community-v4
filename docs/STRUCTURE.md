@@ -43,6 +43,7 @@ MapManager-v4/
    ├─ MESSAGES.md                            MiniMessage 与语言资源
    ├─ PLUGIN.md                              插件配置和命令用法
    ├─ PROJECT_NOTES.md                       项目约定和阶段记录
+   ├─ CODE_REVIEW_2026-10-28.md               4.0.2 全代码审查与安全风险
    ├─ TEST_CASES.md                          自动化测试与集成验收用例
    └─ README.md                              中文用户说明
 ```
@@ -60,8 +61,8 @@ MapManager-v4/
 | `MapManagerPlugin.onEnable` | `StorageConfig` → `JsonStorage`/`MySqlStorage`；`V3Migration`；`Messages`；LuckPerms → `WorldBaseProjectionImpl`；`PlayerGatewayImpl`；`MapManagerImpl`；`access-control.strict-map-entry` | MapManager-Core 先于 Multiverse-Core 启用以注册可持久化的自定义生成器；v3 迁移等待 Multiverse-Core 启用后执行；存储迁移和 `worldbase` 初始化均成功后，在主线程注册 `MapManager` 服务、复核在线玩家并注册命令 |
 | `Messages` | `config.yml` 的 `language`、插件数据目录 `langs/<语言代码>.yml`、内置中文资源 | 生成 MiniMessage Component；缺项回退中文，日志与异常使用纯文本 |
 | `V3Migration.migrate` | `V3MigrationSourceImpl`、LP 默认组只读节点、MV 别名/出生点只读元数据、`PlayerGateway.resolveId`、`MapRepository`、`RoleRepository`、`config.yml` | 校验并备份 v3 JSON；UUID 全部解析成功后写入 MMC 存储，成功写完成标记并清除旧 `global` 配置；不写 LP 或 MV |
-| `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标；`/wtp` 包含公开地图 |
-| `MapAdminCommand.tabComplete` | CachedStorage、控制台或 RCON 身份、在线玩家和服务端世界目录 | 补全 create/import 的生成器、环境与选项；导入不补全生成参数；删除仅补全符合正则的 ACTIVE/DELETING 地图 |
+| `MapWorldCommand.tabComplete` | 执行方与 MMC 准入；`MapAccessService.accessibleMaps`；`MapService`；`MapRoleService`；在线玩家 | 补全 `/world` 和 `/wtp`，过滤无权使用的子命令及不可进入的传送目标；`/wtp` 包含公开与未加载地图；提供逐项 help |
+| `MapAdminCommand.tabComplete` | CachedStorage、控制台或 RCON 身份、在线玩家和服务端世界目录 | 补全 create/import 的生成器、环境与选项；导入不补全生成参数；空组、生物群系及恢复请求按上下文补全；提供逐项 help；删除仅补全符合正则的 ACTIVE/DELETING 地图 |
 | `MapManagerImpl` | `MapRepository`、`RoleRepository`、`OperationRepository`、`WorldBaseProjection`、`PlayerGateway` | 组装地图、角色、准入、别名、设置、传送和生命周期服务 |
 | `WorldVersionServiceImpl` / `LevelDatVersionReader` | Bukkit dataVersion、Querz NBT | 读取 `level.dat` 的 `Data.DataVersion`，判断地图版本是否不高于当前服务器；导入前执行校验 |
 | `MapAccessServiceImpl.decide` | `MapRepository.findById` → `MapRoleService.hasRole` | 按 MMC 地图状态、角色和公开状态决定准入；不读取 LP |

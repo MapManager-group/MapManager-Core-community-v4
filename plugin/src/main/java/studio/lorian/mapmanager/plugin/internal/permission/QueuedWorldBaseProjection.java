@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 
 /** 单工作线程、持久 FIFO；失败保留队首并退避重试，防止旧授予覆盖新撤销。 */
 public final class QueuedWorldBaseProjection implements WorldBaseProjection, AutoCloseable {
-    // ponytail: 一个全局 FIFO 保证撤权顺序；某任务持续失败会延后其他组，确有吞吐需求时改为按组队列。
+    // shortcut: 一个全局 FIFO 保证撤权顺序；某任务持续失败会延后其他组，确有吞吐需求时改为按组队列。
     private record Job(UUID id, String action, String group, Set<String> worlds, UUID player, boolean enabled) { }
     private final WorldBaseProjection delegate;
     private final Path file;
@@ -36,20 +36,24 @@ public final class QueuedWorldBaseProjection implements WorldBaseProjection, Aut
         known = Files.exists(inventory) ? gson.fromJson(Files.readString(inventory),
                 new TypeToken<Map<String, Set<UUID>>>() { }.getType()) : new HashMap<>();
         if (known == null || known.entrySet().stream().anyMatch(e -> e.getKey() == null || e.getValue() == null
-                || Set.of("default", "worldbase").contains(e.getKey()) || e.getValue().contains(null)))
+                || reserved(e.getKey()) || e.getValue().contains(null)))
             throw new IOException(Messages.text("maintenance.queue_invalid"));
         jobs = Files.exists(file) ? gson.fromJson(Files.readString(file), new TypeToken<List<Job>>() { }.getType()) : List.of();
         if (jobs == null || jobs.stream().anyMatch(j -> j == null || j.id() == null || j.group() == null
-                || Set.of("default", "worldbase").contains(j.group()) || j.worlds() == null
+                || reserved(j.group()) || j.worlds() == null
                 || !Set.of("ENSURE", "MEMBER", "REMOVE_GROUP", "REMOVE_WORLD").contains(j.action())
                 || (j.action().equals("MEMBER") && j.player() == null)))
             throw new IOException(Messages.text("maintenance.queue_invalid"));
         worker.scheduleWithFixedDelay(this::drain, 100, 100, TimeUnit.MILLISECONDS);
     }
 
+    private static boolean reserved(String group) {
+        return group.equalsIgnoreCase("default") || group.equalsIgnoreCase("worldbase");
+    }
+
     private synchronized CompletableFuture<Boolean> enqueue(String action, String group, Set<String> worlds, UUID player, boolean enabled) {
         if (closed) throw new IllegalStateException(Messages.text("maintenance.queue_closed"));
-        if (group == null || Set.of("default", "worldbase").contains(group))
+        if (group == null || reserved(group))
             throw new IllegalArgumentException(Messages.text("errors.reserved_group"));
         Job job = new Job(UUID.randomUUID(), action, group, Set.copyOf(worlds), player, enabled);
         Set<UUID> tracked = new HashSet<>(known.getOrDefault(group, Set.of()));

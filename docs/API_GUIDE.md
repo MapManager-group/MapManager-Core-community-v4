@@ -6,11 +6,11 @@
 
 本文说明其他 Paper 插件如何依赖并获取 MapManager 服务，以及各服务的当前调用范围。公开契约在 `mapmanager-api` 模块；不要依赖 `plugin` 模块的实现类、repository、LuckPerms 或 Multiverse 对象。
 
-需要从 v3 插件迁移时，先看 [v3→v4 插件 API 迁移指南](V3_TO_V4_API_MIGRATION.md)；完整功能差异见 [v3/v4 对照表](API_INVENTORY.md)。v4 公共 API 的 HTML Javadoc 导出包：[`mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip`](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
+需要从 v3 插件迁移时，先看 [v3→v4 插件 API 迁移指南](V3_TO_V4_API_MIGRATION.md)；完整功能差异见 [v3/v4 对照表](API_INVENTORY.md)。历史 `4.0.0-SNAPSHOT` API 的 HTML Javadoc 导出包（本次未重新导出）：[`mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip`](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
 
 ## 添加编译依赖
 
-外部插件使用与服务端 MapManager 相同版本的 API。当前源码版本为 `4.0.0-SNAPSHOT`；本地从源码构建时，在 MapManager-v4 仓库根目录运行：
+外部插件使用与服务端 MapManager 相同版本的 API。当前源码版本为 `4.0.2-SNAPSHOT`；本地从源码构建时，在 MapManager-v4 仓库根目录运行：
 
 ```shell
 mvn -pl api -am install
@@ -22,7 +22,7 @@ mvn -pl api -am install
 <dependency>
     <groupId>studio.lorian.mapmanager</groupId>
     <artifactId>mapmanager-api</artifactId>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>4.0.2-SNAPSHOT</version>
     <scope>provided</scope>
 </dependency>
 ```
@@ -226,3 +226,5 @@ OperationResult<MapInstance> recovered = mmc.worldLifeCycle().recover("arena");
 ```
 
 两项操作都在主线程调用；`recover` 仅用于已有恢复请求，不替代新的创建/导入参数校验或删除授权。`PlayerGateway.disconnect` 也要求主线程，原因按纯文本处理；该适配器仍没有 `MapManager` getter。
+
+4.0.2 保持公开接口和模型签名不变。`worldVersions().isCompatible(String)` 仅接受单个合法世界名，不接收绝对路径或目录片段；显式目录查询仍使用 Path 重载。`setSpawn` 接受同名世界的大小写变体并按地图记录的世界名保存。授权与在线会话边界见 [审查报告](CODE_REVIEW_2026-10-28.md)。

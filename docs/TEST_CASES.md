@@ -364,3 +364,33 @@ create/import/init/delete 从 `/world` 移至 `/mapadmin`，旧入口不再执�
 `MessagesTest` 验证中文风险原文、参数渲染和双语键一致性；`MapWorldCommandTest` 覆盖设置参数反馈、开启二次确认、防重放、过期、地图/设置/玩家绑定、权限复核、关闭取消确认、非法确认参数与失败不报成功。
 
 真实 Paper 验收：通过 `/mapadmin create`、`/mapadmin import` 和 API 分别创建/导入地图，确认初次加载即阻止方块更新、落沙和爆炸；重启后设置仍为 false。依次执行 physics/explosion 的 true、true confirm，核对风险说明、10 秒有效期和成功参数。已有地图和 v3 迁移维持原设置；显式执行 `/mapadmin init` 或 API `initialize` 后两项均关闭，公开状态等其他数据保留，重启后仍关闭；后续世界初始化失败时也保持关闭。此场景须在测试服另行验证。
+
+## 2026-10-28 / 4.0.2 全代码审查回归
+
+JDK 25 执行 `mvn -o --no-transfer-progress clean package`，并在 Biome 兼容修正后再次执行 `package`：API 5 项、plugin 164 项，共 169 项全部通过，无失败、错误或跳过。基线 158 项，本轮新增 11 项并扩展已有用例。
+
+新 `CommandCompletionTest` 使用真实 JsonStorage/CachedStorage 与地图、角色、准入服务；`DeletedPlanRecoveryTest` 使用真实存储和恢复文件验证实际恢复收尾方法，只有外部权限适配器替身。其他回归覆盖非法路径/JSON、空组删除、BlockData 保留、基础组大小写保护、帮助与创建选项。
+
+运行现有 `plugin/src/test/integration/run.py`，在独立临时目录执行三轮 Paper 26.2 build 129 / Multiverse-Core 5.7.2 / LuckPerms 5.5.71 启停全部通过；脚本现按 POM 选择当前构建版本。扩展 ApiProbe 覆盖真实生物群系补全、未加载目标补全、帮助路由、同名大小写出生点保存和已在默认世界时的受限目标重生回退。既有创建、角色与 LP 投影、按需加载、删除恢复、目录替换保护、v3 迁移和快照导出也全部通过。
+
+- Maven 日志：`/tmp/mmc-v4-review-package.log`。
+- 集成脚本日志：`/tmp/mmc-v4-review-integration.log`。
+- 集成报告：`/var/folders/hs/bq2njdx955169mcb_b3mf6jw0000gn/T/mmc-v4-todo-4dw_ruz2/report.json`；同目录保留三轮 phase 日志，测试实例已退出。
+- 初次真实测试捕获新增 Biome 补全的类/接口二进制差异，已改为经共同 Keyed 接口读取键并复跑通过。
+
+本轮未连接真实 MySQL（此前使用的临时二进制已不存在），未启动 Paper 1.20.1 或 26.3，未用真实玩家客户端验证命令树和 TAB 交互，也未进行生产规模压测。合成玩家/事件不等于真实客户端登录与重生验收。历史 MySQL 报告仍为历史结果。
+
+### 同日补审（六项实现约束）
+
+最终 173 项单测通过（API 5、plugin 168），相对首轮增加 4 项：设置补全单次查询与授权、已提交生成器类型的补全、删除恢复完全成功与共享组保留、持久权限任务及成员账本保留组保护。扩展已有用例，验证 .json 目录不作为恢复候选、wtp 空参用法、单项帮助范围、自由导出文件名不推荐固定值，以及非法 surface_y 与持久生成器 ID 拒绝。
+
+平坦层解析、命令执行、JSON 存储和恢复收尾均调用生产实现；新增外部适配器替身只记录撤权参数并返回成功/失败/待同步信号，不实现业务规则。创建补全及版本回退改为内部直接使用已解析类型/已校验名称；无需为这些内部信任增加新的测试工具或依赖。
+
+复跑原有三轮 Paper 26.2 build 129 / MV 5.7.2 / LP 5.5.71 隔离验收全部通过，新增探针直接调用公开 create API，确认坏 JSON 和非数值 surface_y 返回 INVALID_INPUT 且不遗留 PENDING 地图。原生命周期、补全、别名、出生点、权限队列、恢复和迁移检查仍通过；测试实例已停止。
+
+- 构建日志：`/tmp/mmc-v4-rereview-package.log`。
+- 修复前复现日志：`/tmp/mmc-v4-rereview-red.log`。
+- 集成日志：`/tmp/mmc-v4-rereview-integration.log`。
+- 集成报告：`/var/folders/hs/bq2njdx955169mcb_b3mf6jw0000gn/T/mmc-v4-todo-6o7whaou/report.json`。
+
+本次仍未验证真实客户端、MySQL、Paper 1.20.1/26.3 或生产规模负载，历史结果不充当本轮验收。

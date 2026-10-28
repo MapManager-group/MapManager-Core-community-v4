@@ -153,7 +153,11 @@ public final class JsonStorage implements MapRepository, RoleRepository, Operati
         change(next -> { next.groups.add(group.id()); return null; });
     }
     @Override public void deleteGroup(String groupId) {
-        change(next -> { next.groups.remove(groupId); return null; });
+        change(next -> {
+            next.groups.remove(groupId);
+            next.grants.removeIf(grant -> grant.role() != MapRole.VISITOR && grant.scopeId().equals(groupId));
+            return null;
+        });
     }
     @Override public synchronized Set<UUID> members(String scopeId, MapRole role) {
         return state.grants.stream().filter(grant -> grant.scopeId().equals(scopeId) && grant.role() == role)

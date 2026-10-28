@@ -2,7 +2,7 @@
 
 本文面向目前编译依赖 MapManager v3 的 Paper 插件开发者。v4 API 使用新的 Java 包、模型和服务，不兼容 v3 的 Kotlin API；迁移时需要替换依赖、服务发现和业务调用。
 
-完整功能差异见 [v3/v4 功能对照表](API_INVENTORY.md)，v4 服务的详细契约见 [API 调用指南](API_GUIDE.md)，公开类型索引见 [Javadoc 导出包](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
+完整功能差异见 [v3/v4 功能对照表](API_INVENTORY.md)，v4 服务的详细契约见 [API 调用指南](API_GUIDE.md)，历史公开类型索引见 [4.0.0 Javadoc 导出包](exports/mapmanager-api-4.0.0-SNAPSHOT-javadoc.zip)。
 
 ## 1. 替换编译依赖
 
@@ -12,7 +12,7 @@ v3 扩展插件通常依赖 `work.alsace.mapmanager:MapManager-Core`；v4 将公
 <dependency>
     <groupId>studio.lorian.mapmanager</groupId>
     <artifactId>mapmanager-api</artifactId>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>4.0.2-SNAPSHOT</version>
     <scope>provided</scope>
 </dependency>
 ```
@@ -27,7 +27,7 @@ Gradle Kotlin DSL：
 
 ```kotlin
 dependencies {
-    compileOnly("studio.lorian.mapmanager:mapmanager-api:4.0.0-SNAPSHOT")
+    compileOnly("studio.lorian.mapmanager:mapmanager-api:4.0.2-SNAPSHOT")
 }
 ```
 

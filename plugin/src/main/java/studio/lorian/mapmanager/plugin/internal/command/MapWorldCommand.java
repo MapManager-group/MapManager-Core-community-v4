@@ -98,15 +98,18 @@ public final class MapWorldCommand extends Command {
         String[] args = input;
         // /wtp <地图名> 与 /world tp <地图名> 进入同一子命令处理器。
         if (getName().equals("wtp")) {
+            if (input.length == 0) {
+                sender.sendMessage(Messages.component("command.usage_wtp"));
+                return true;
+            }
             args = new String[input.length + 1];
             args[0] = "tp";
             System.arraycopy(input, 0, args, 1, input.length);
         }
-        if (args.length == 0) {
-            sender.sendMessage(Messages.component(getName().equals("wtp") ? "command.usage_wtp" : "command.usage_world"));
+        if (!getName().equals("wtp") && (args.length == 0 || args[0].equalsIgnoreCase("help"))) {
+            showHelp(sender, args);
             return true;
         }
-
         Subcommand subcommand = subcommands.get(args[0].toLowerCase(Locale.ROOT));
         if (subcommand == null) {
             sender.sendMessage(Messages.component(getName().equals("wtp") ? "command.usage_wtp" : "command.usage_world"));
@@ -134,6 +137,8 @@ public final class MapWorldCommand extends Command {
             if (getName().equals("wtp"))
                 return args.length == 1 && sender instanceof Player
                         ? suggestions(args[0], accessibleWorldNames((Player) sender)) : List.of();
+            if (args.length == 2 && args[0].equalsIgnoreCase("help"))
+                return suggestions(args[1], subcommands.keySet());
             if (args.length == 1) {
                 MapInstance current = sender instanceof Player player
                         ? maps.findByWorldName(player.getWorld().getName()) : null;
@@ -141,12 +146,14 @@ public final class MapWorldCommand extends Command {
                         : access.decide(((Player) sender).getUniqueId(), current.id());
                 boolean canEnter = decision != null && decision.allowed();
                 boolean admin = canEnter && decision.effectiveRole() == MapRole.ADMIN;
-                return suggestions(args[0], subcommands.entrySet().stream()
+                List<String> choices = new ArrayList<>(subcommands.entrySet().stream()
                         .filter(entry -> sender instanceof Player)
                         .filter(entry -> !Set.of("kick", "physics", "explosion",
                                 "public", "setname", "setspawn").contains(entry.getKey()) || admin)
                         .filter(entry -> !Set.of("admin", "builder", "visitor").contains(entry.getKey()) || canEnter)
                         .map(Map.Entry::getKey).toList());
+                if (sender instanceof Player) choices.add("help");
+                return suggestions(args[0], choices);
             }
             String command = args[0].toLowerCase(Locale.ROOT);
             Subcommand subcommand = subcommands.get(command);
@@ -158,12 +165,7 @@ public final class MapWorldCommand extends Command {
                 case "kick" -> args.length == 2
                         ? kickSuggestions((Player) sender, currentArg) : List.of();
                 case "admin", "builder", "visitor" -> roleSuggestions((Player) sender, command, args);
-                case "physics", "explosion" -> !manageableSettingMap((Player) sender) ? List.of()
-                        : args.length == 2 ? suggestions(currentArg, List.of("true", "false", "info"))
-                        : args.length == 3 && args[1].equalsIgnoreCase("true")
-                        ? suggestions(currentArg, List.of("confirm")) : List.of();
-                case "public" -> args.length == 2 && manageableSettingMap((Player) sender)
-                        ? suggestions(currentArg, List.of("true", "false", "info")) : List.of();
+                case "physics", "explosion", "public", "setname" -> settingSuggestions((Player) sender, command, args);
                 default -> List.of();
             };
         } catch (StorageException exception) {
@@ -171,9 +173,17 @@ public final class MapWorldCommand extends Command {
         }
     }
 
+    private void showHelp(CommandSender sender, String[] args) {
+        String topic = args.length == 2 ? args[1].toLowerCase(Locale.ROOT) : "";
+        sender.sendMessage(Messages.component("command.help_header"));
+        for (String command : subcommands.containsKey(topic) ? List.of(topic)
+                : List.of("tp", "kick", "physics", "explosion", "public", "setname", "setspawn", "admin", "builder", "visitor"))
+            sender.sendMessage(Messages.component("command.help_" + command));
+        sender.sendMessage(Messages.component("command.help_roles"));
+    }
+
     private List<String> accessibleWorldNames(Player player) {
         return access.accessibleMaps(player.getUniqueId()).stream()
-                .filter(map -> Bukkit.getWorld(map.worldName()) != null)
                 .map(MapInstance::worldName).toList();
     }
 
@@ -204,7 +214,7 @@ public final class MapWorldCommand extends Command {
                 }).toList());
     }
 
-    private static List<String> suggestions(String prefix, Collection<String> choices) {
+    static List<String> suggestions(String prefix, Collection<String> choices) {
         String lower = prefix.toLowerCase(Locale.ROOT);
         return choices.stream().filter(choice -> choice.toLowerCase(Locale.ROOT).startsWith(lower))
                 .distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
@@ -347,9 +357,18 @@ public final class MapWorldCommand extends Command {
         }
     }
 
-    private boolean manageableSettingMap(Player player) {
+    private List<String> settingSuggestions(Player player, String command, String[] args) {
         MapInstance map = maps.findByWorldName(player.getWorld().getName());
-        return map != null && access.decide(player.getUniqueId(), map.id()).effectiveRole() == MapRole.ADMIN;
+        if (map == null || access.decide(player.getUniqueId(), map.id()).effectiveRole() != MapRole.ADMIN)
+            return List.of();
+        String prefix = args[args.length - 1];
+        if (args.length == 2) return suggestions(prefix, switch (command) {
+            case "setname" -> List.of(map.displayName());
+            case "public" -> List.of("true", "false", "on", "off", "enable", "disable", "yes", "no", "info", "status");
+            default -> List.of("true", "false", "info");
+        });
+        return args.length == 3 && (command.equals("physics") || command.equals("explosion"))
+                && args[1].equalsIgnoreCase("true") ? suggestions(prefix, List.of("confirm")) : List.of();
     }
 
     private void changeSetting(Player actor, NotificationTarget target, String[] args, boolean physics) {
@@ -401,7 +420,9 @@ public final class MapWorldCommand extends Command {
             return;
         }
         boolean enabled = Set.of("true", "on", "enable", "yes").contains(args[1].toLowerCase(Locale.ROOT));
-        notifySetting(target, settings.setPublic(map.id(), enabled), "command.public_updated", "value", enabled);
+        OperationResult<Void> result = settings.setPublic(map.id(), enabled);
+        notifySetting(target, result, "command.public_updated", "value", enabled);
+        if (!enabled && !(result instanceof OperationResult.Failure<?>)) accessListener.checkOnlinePlayers();
     }
 
     private void setName(CommandSender sender, NotificationTarget target, String[] args) {

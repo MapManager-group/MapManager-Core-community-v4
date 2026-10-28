@@ -180,9 +180,8 @@ class StorageRecoveryTest {
         cached.removeScope("team", MapRole.ADMIN); assertTrue(cached.members("team", MapRole.ADMIN).isEmpty());
         assertEquals(Set.of(player), old); assertEquals(Set.of(player), cached.members("team", MapRole.BUILDER));
         assertThrows(UnsupportedOperationException.class, () -> old.clear());
-        assertThrows(IllegalArgumentException.class, () -> cached.deleteGroup("team"));
-        assertNotNull(cached.findGroup("team")); assertEquals(Set.of(player), cached.members("team", MapRole.BUILDER));
-        cached.removeScope("team", MapRole.BUILDER); cached.deleteGroup("team");
+        cached.deleteGroup("team");
+        assertNull(cached.findGroup("team"));
         assertTrue(cached.members("team", MapRole.BUILDER).isEmpty());
         assertTrue(new CachedStorage(disk, disk, disk).allGroups().isEmpty());
     }

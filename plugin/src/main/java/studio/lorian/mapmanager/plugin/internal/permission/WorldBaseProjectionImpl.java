@@ -45,7 +45,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
 
     @Override
     public CompletableFuture<Boolean> ensureGroupInheritance(String groupId, Set<String> worldNames) {
-        if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE))
+        if (groupId == null || groupId.equalsIgnoreCase("default") || groupId.equalsIgnoreCase(WORLD_BASE))
             throw new IllegalArgumentException(Messages.text("errors.reserved_group"));
         GroupManager manager = luckPerms.getGroupManager();
         return ensureWorldBase().thenCompose(ignored -> manager.loadGroup(groupId)).thenCompose(existing -> existing
@@ -69,7 +69,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
 
     @Override
     public boolean setBuilderAccess(String groupId, UUID playerId, boolean enabled) {
-        if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE))
+        if (groupId == null || groupId.equalsIgnoreCase("default") || groupId.equalsIgnoreCase(WORLD_BASE))
             throw new IllegalArgumentException(Messages.text("errors.reserved_group"));
         var manager = luckPerms.getUserManager();
         var user = manager.loadUser(playerId).join();
@@ -82,7 +82,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
 
     @Override
     public boolean removeGroup(String groupId) {
-        if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE)) return false;
+        if (groupId == null || groupId.equalsIgnoreCase("default") || groupId.equalsIgnoreCase(WORLD_BASE)) return false;
         GroupManager manager = luckPerms.getGroupManager();
         var group = manager.loadGroup(groupId).join();
         if (group.isEmpty()) return true;
@@ -92,7 +92,7 @@ public final class WorldBaseProjectionImpl implements WorldBaseProjection {
 
     @Override
     public boolean removeWorldInheritance(String groupId, String worldName) {
-        if (groupId == null || groupId.equals("default") || groupId.equals(WORLD_BASE)) return false;
+        if (groupId == null || groupId.equalsIgnoreCase("default") || groupId.equalsIgnoreCase(WORLD_BASE)) return false;
         GroupManager manager = luckPerms.getGroupManager();
         var group = manager.loadGroup(groupId).join();
         if (group.isEmpty()) return true;

@@ -59,6 +59,13 @@ class WorldLifeCycleValidationTest {
                     OperationName.CREATE, FailureReason.INVALID_INPUT);
         }
     }
+    @Test void malformedFlatJsonReturnsInvalidInputWithoutPendingData() {
+        for (String settings : List.of("{broken", "[]", "null", "{\"layers\":false}",
+                "{\"surface_y\":\"invalid\",\"layers\":[{\"block\":\"stone\",\"height\":4}]}"))
+            failure(lifecycle.create(new CreateMapRequest("arena", null, null, null, WorldType.FLAT, Environment.NETHER,
+                    Map.of("generator-settings", settings))), OperationName.CREATE, FailureReason.INVALID_INPUT);
+    }
+
     @Test void backendFailureKeepsTargetHeightDetailAndPendingState() throws Exception {
         String detail = "flat.height=-60 is outside the world's actual available Y range 0 to 255";
         var backend = org.mvplugins.multiverse.core.utils.result.Attempt.failure(

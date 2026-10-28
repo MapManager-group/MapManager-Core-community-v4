@@ -21,10 +21,10 @@ class MapListenersTest {
     private final World world = proxy(World.class, (o, m, a) -> switch (m.getName()) {
         case "getName" -> "arena"; case "getBlockAt" -> this.block; default -> throw new AssertionError(m);
     });
-    private Material restored;
+    private BlockData restored;
     private final Block block = proxy(Block.class, (o, m, a) -> switch (m.getName()) {
         case "getWorld" -> world;
-        case "setType" -> { restored = (Material) a[0]; assertEquals(false, a[1]); yield null; }
+        case "setBlockData" -> { restored = (BlockData) a[0]; assertEquals(false, a[1]); yield null; }
         default -> throw new AssertionError(m);
     });
     private MapInstance map(boolean physical, boolean explosion) {
@@ -73,7 +73,7 @@ class MapListenersTest {
             case "getLocation" -> new Location(world, 0, 64, 0); case "getBlockData" -> data; default -> throw new AssertionError(m);
         });
         var event = new EntitySpawnEvent(falling); settings(map(false, true)).onFallingBlock(event);
-        assertTrue(event.isCancelled()); assertEquals(Material.SAND, restored);
+        assertTrue(event.isCancelled()); assertSame(data, restored);
         restored = null; event = new EntitySpawnEvent(falling); settings(map(true, false)).onFallingBlock(event);
         assertFalse(event.isCancelled()); assertNull(restored);
     }

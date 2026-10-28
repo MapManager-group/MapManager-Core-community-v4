@@ -23,12 +23,14 @@ class FlatChunkGeneratorTest {
                 generate(new FlatChunkGenerator(FlatChunkGenerator.generatorId(SETTINGS)), 0, 32));
     }
     @Test void rejectsMalformedSettingsAndInvalidMaterialsOrHeights() {
-        for (String invalid : List.of("not-json", "[]", "{}", "{\"layers\":[]}", "{\"layers\":[1]}",
+        for (String invalid : List.of("not-json", "{broken", "null", "[]", "{}", "{\"layers\":[]}", "{\"layers\":[1]}",
                 "{\"layers\":[{\"block\":\"stone\"}]}", "{\"layers\":[{\"block\":\"missing_block\",\"height\":1}]}",
                 "{\"layers\":[{\"block\":\"diamond_sword\",\"height\":1}]}",
                 "{\"layers\":[{\"block\":\"stone\",\"height\":0}]}",
                 "{\"layers\":[{\"block\":\"stone\",\"height\":-1}]}")) {
-            assertThrows(IllegalArgumentException.class, () -> FlatChunkGenerator.generatorId(invalid), invalid);
+            assertThrows(IllegalArgumentException.class, () -> FlatChunkGenerator.totalHeight(invalid), invalid);
+            String id = FlatChunkGenerator.generatorId(invalid);
+            assertThrows(IllegalArgumentException.class, () -> new FlatChunkGenerator(id), invalid);
         }
         for (String id : new String[]{null, "normal:abc", "flat:%%%"})
             assertThrows(IllegalArgumentException.class, () -> new FlatChunkGenerator(id));

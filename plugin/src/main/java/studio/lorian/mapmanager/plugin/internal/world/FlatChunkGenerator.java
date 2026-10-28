@@ -38,54 +38,53 @@ public final class FlatChunkGenerator extends ChunkGenerator {
             String settings = new String(Base64.getUrlDecoder().decode(encoded), StandardCharsets.UTF_8);
             JsonObject input = JsonParser.parseString(settings).getAsJsonObject();
             this.surfaceY = input.has("surface_y") ? Integer.valueOf(input.get("surface_y").getAsString()) : null;
-            this.layers = surfaceY == null ? parseLayers(settings) : List.of();
+            this.layers = surfaceY == null ? parseLayers(input) : List.of();
             this.biomeId = input.has("biome") ? input.get("biome").getAsString() : "minecraft:plains";
         } catch (RuntimeException exception) {
             throw new IllegalArgumentException("Invalid MapManager flat generator settings", exception);
         }
     }
 
+    /** 编码已校验的设置；持久 ID 在构造生成器时独立校验。
+     * @param settings 已校验的平坦世界 JSON 设置
+     * @return 可供 Multiverse 保存的生成器 ID
+     */
     public static String generatorId(String settings) {
-        JsonElement input = JsonParser.parseString(settings);
-        if (input.isJsonObject() && input.getAsJsonObject().has("surface_y"))
-            Integer.parseInt(input.getAsJsonObject().get("surface_y").getAsString());
-        else parseLayers(settings);
         String encoded = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(settings.getBytes(StandardCharsets.UTF_8));
         return ID_PREFIX + encoded;
     }
 
     public static long totalHeight(String settings) {
-        return parseLayers(settings).stream().mapToLong(Layer::height).sum();
-    }
-
-    private static List<Layer> parseLayers(String settings) {
         try {
-            JsonElement parsed = JsonParser.parseString(settings);
-            if (!parsed.isJsonObject() || !parsed.getAsJsonObject().has("layers")) {
-                throw new IllegalArgumentException("Flat generator settings require a layers array");
-            }
-            JsonArray input = parsed.getAsJsonObject().getAsJsonArray("layers");
-            if (input.isEmpty()) throw new IllegalArgumentException("Flat generator layers cannot be empty");
-            List<Layer> result = new ArrayList<>(input.size());
-            for (JsonElement element : input) {
-                if (!element.isJsonObject()) throw new IllegalArgumentException("Invalid flat generator layer");
-                JsonObject layer = element.getAsJsonObject();
-                if (!layer.has("block") || !layer.has("height"))
-                    throw new IllegalArgumentException("Flat generator layers require block and height");
-                String block = layer.get("block").getAsString();
-                int height = layer.get("height").getAsInt();
-                Material material = Material.matchMaterial(block);
-                if (material == null || !material.isBlock() || height < 1) {
-                    throw new IllegalArgumentException("Invalid flat generator layer: " + block);
-                }
-                result.add(new Layer(material, height));
-            }
-            return List.copyOf(result);
+            JsonObject input = JsonParser.parseString(settings).getAsJsonObject();
+            if (input.has("surface_y")) Integer.parseInt(input.get("surface_y").getAsString());
+            return parseLayers(input).stream().mapToLong(Layer::height).sum();
         } catch (RuntimeException exception) {
             if (exception instanceof IllegalArgumentException) throw exception;
             throw new IllegalArgumentException("Invalid flat generator settings", exception);
         }
+    }
+
+    private static List<Layer> parseLayers(JsonObject settings) {
+        if (!settings.has("layers"))
+            throw new IllegalArgumentException("Flat generator settings require a layers array");
+        JsonArray input = settings.getAsJsonArray("layers");
+        if (input.isEmpty()) throw new IllegalArgumentException("Flat generator layers cannot be empty");
+        List<Layer> result = new ArrayList<>(input.size());
+        for (JsonElement element : input) {
+            if (!element.isJsonObject()) throw new IllegalArgumentException("Invalid flat generator layer");
+            JsonObject layer = element.getAsJsonObject();
+            if (!layer.has("block") || !layer.has("height"))
+                throw new IllegalArgumentException("Flat generator layers require block and height");
+            String block = layer.get("block").getAsString();
+            int height = layer.get("height").getAsInt();
+            Material material = Material.matchMaterial(block);
+            if (material == null || !material.isBlock() || height < 1)
+                throw new IllegalArgumentException("Invalid flat generator layer: " + block);
+            result.add(new Layer(material, height));
+        }
+        return List.copyOf(result);
     }
 
     @Override

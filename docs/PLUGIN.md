@@ -34,7 +34,7 @@ MySQL 自动创建五张 InnoDB 表：
 
 `settings_json` 和 `spawn_json` 在 `mm_maps` 中各占一个 JSON 字段，出生点可为 `NULL`。删除地图时访客授权级联删除；仍有地图引用的组不能删除。JSON 后端以相同的逻辑关系写入单文件，每次写入使用临时文件和原子替换。
 
-地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admin|builder|visitor info` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名或 UUID>`、`/world kick`、`/world public`、`/world setname` 和 `/world setspawn` 仅由 MMC 当前地图组管理员执行；`/world tp` 与 `/wtp` 可进入玩家有地图角色或公开的已加载地图，补全使用相同准入结果。玩家命令不检查 Bukkit 权限节点。组角色持久化后立即改变 MMC 准入；LP 入队返回 `Partial(PERMISSION_SYNC_PENDING)`，失败自动重试和重启重放。启动时会检查相邻插件目录 `MapManager-Core`；其中同时存在 `worlds.json` 和 `groups.json` 时，插件备份旧文件并迁移地图、组和角色数据到所选仓储。严格准入监听已实现并默认开启；LP 由持久队列异步执行和自动重试。存储迁移和 LP `worldbase` 初始化成功后，`MapManager` 会注册到 Bukkit ServicesManager，外部插件依赖与调用方法见 [API_GUIDE.md](API_GUIDE.md)。
+地图查询、地图设置、角色持久化与准入决策已接上存储。`/world admin|builder|visitor info` 仅允许能进入当前地图的玩家查询直接授予成员，`/world admin|builder|visitor add|remove <用户名或 UUID>`、`/world kick`、`/world public`、`/world setname` 和 `/world setspawn` 仅由 MMC 当前地图组管理员执行；`/world tp` 与 `/wtp` 可进入玩家有地图角色或公开的 ACTIVE 地图，未加载时按需加载，补全使用相同准入结果。玩家命令不检查 Bukkit 权限节点。组角色持久化后立即改变 MMC 准入；LP 入队返回 `Partial(PERMISSION_SYNC_PENDING)`，失败自动重试和重启重放。启动时会检查相邻插件目录 `MapManager-Core`；其中同时存在 `worlds.json` 和 `groups.json` 时，插件备份旧文件并迁移地图、组和角色数据到所选仓储。严格准入监听已实现并默认开启；LP 由持久队列异步执行和自动重试。存储迁移和 LP `worldbase` 初始化成功后，`MapManager` 会注册到 Bukkit ServicesManager，外部插件依赖与调用方法见 [API_GUIDE.md](API_GUIDE.md)。
 
 控制台或 RCON 先执行 `/mapadmin delete <地图名>`，然后在 10 秒内执行 `/mapadmin delete <6 位随机字符串>`；玩家不能执行。`config.yml` 的 `deletion.allowed-world-name-regex` 使用 Java 正则匹配整个地图名，默认 `.*_bak$`；仅 `/mapadmin delete` 命令执行该正则限制，生命周期 API 不受此正则限制。删除检查默认世界、玩家、目录和版本；先保存完整请求及目录身份，再变更世界。世界删除成功后将 LP 清理任务持久化，再清理 MMC 地图、角色和空组；LP 等待同步时返回 Partial。
 
@@ -66,3 +66,13 @@ MySQL 自动创建五张 InnoDB 表：
 ## 控制台与 RCON 命令入口
 
 所有生命周期与运维命令统一使用 `/mapadmin`：create、import、init、delete、load、recover、operations、migration、storage。`/world` 与 `/wtp` 只提供玩家地图操作。旧 `/world create|import|init|delete` 不再执行；创建/导入选项保持原格式，删除改用 `/mapadmin delete <地图>` 后输入 `/mapadmin delete <六位码>`。
+
+## 帮助与补全（4.0.2）
+
+`/world` 或 `/world help [子命令]` 显示用途、参数、角色范围和开启风险确认；`/mapadmin` 或 `/mapadmin help [子命令]` 显示控制台/RCON 的生命周期与维护命令。`/wtp` 不带参数继续提示传送用法。
+
+补全沿用当前权限规则，按前缀匹配并去重排序。`/world tp` 与 `/wtp` 包含有权进入的未加载地图；角色命令补全 add/remove/info 与在线或已授予成员；设置补全 true/false/info、已有公开状态别名及 confirm；setname 推荐当前显示名，setspawn 无额外参数。帮助主题可补全。
+
+维护补全覆盖生成器、已支持环境、未填写的选项、空组在内的现有地图组、在线管理员、服务器生物群系、布尔值、可导入目录、已登记地图、恢复请求文件名、迁移模式和 export 子命令。非 FLAT 不推荐 flat.height，flat.height 与 generator-settings 互斥，SIFT 不推荐。种子、高度、新世界名、显示名、导出文件名、任意生成器/属性值等自由输入不枚举；删除确认码仍须按提示输入。补全不代替执行时的权限与参数校验。
+
+通过 `/world public false`（及关闭别名）保存关闭状态后，即使 MV 别名同步只部分完成，也会按严格准入配置排队复核在线玩家；仍有角色准入的玩家保留。直接 API 修改方负责授权和既有在线会话处理，见 [审查风险说明](CODE_REVIEW_2026-10-28.md)。

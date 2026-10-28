@@ -36,6 +36,9 @@ public final class ApiProbe extends JavaPlugin implements Listener {
                         var loaded = MultiverseCoreApi.get().getWorldManager().getLoadedWorld("probe-flat").get();
                         check(MultiverseCoreApi.get().getWorldManager().unloadWorld(UnloadWorldOptions.world(loaded)).isSuccess(), "native unload");
                         check(Bukkit.getWorld("probe-flat") == null, "unload precondition");
+                        Player owner = fakePlayer(OWNER, Bukkit.getWorld("world"));
+                        check(getServer().getCommandMap().getCommand("mapmanager:wtp")
+                                .tabComplete(owner, "wtp", new String[]{"probe-"}).contains("probe-flat"), "unloaded map completion");
                         accepted(api().worldLifeCycle().load("probe-flat"));
                         check(Bukkit.getWorld("probe-flat") != null, "public lifecycle load");
                         getLogger().info("PROBE LOAD_PASS");
@@ -103,6 +106,13 @@ public final class ApiProbe extends JavaPlugin implements Listener {
         check(api() != null, "service");
         check(api().maps() != null && api().roles() != null && api().settings() != null && api().access() != null
                 && api().aliases() != null && api().travel() != null && api().worldVersions() != null && api().worldLifeCycle() != null, "service graph");
+        for (String settings : List.of("{broken", "{\"surface_y\":\"invalid\",\"layers\":[{\"block\":\"stone\",\"height\":4}]}")) {
+            var invalid = api().worldLifeCycle().create(new CreateMapRequest("badflat", null, null, OWNER,
+                    WorldType.FLAT, Environment.NETHER, Map.of("generator-settings", settings)));
+            check(invalid instanceof OperationResult.Failure<?> failure && failure.reason() == FailureReason.INVALID_INPUT,
+                    "flat request rejected at boundary");
+            check(api().maps().findByWorldName("badflat") == null, "invalid flat request leaves no pending map");
+        }
         for (Environment environment : List.of(Environment.NORMAL, Environment.NETHER, Environment.THE_END)) {
             String name = environment == Environment.NORMAL ? "probe-flat" : environment == Environment.NETHER ? "probe-nether" : "probe-end";
             MapInstance map = accepted(api().worldLifeCycle().create(new CreateMapRequest(name, name, "team", OWNER,
@@ -116,6 +126,16 @@ public final class ApiProbe extends JavaPlugin implements Listener {
         UUID guest = UUID.fromString("00000000-0000-0000-0000-000000000002");
         MapInstance map = api().maps().findByWorldName("probe-flat");
         check(api().roles().hasRole(map.id(), OWNER, MapRole.ADMIN), "owner role");
+        var commands = getServer().getCommandMap();
+        var console = getServer().getConsoleSender();
+        check(commands.getCommand("mapmanager:mapadmin").tabComplete(console, "mapadmin", new String[]{"create", "newmap", "biome=minecraft:pla"})
+                .contains("biome=minecraft:plains"), "runtime biome registry completion");
+        check(commands.getCommand("mapmanager:mapadmin").tabComplete(console, "mapadmin", new String[]{""}).contains("help"), "maintenance help completion");
+        commands.getCommand("mapmanager:mapadmin").execute(console, "mapadmin", new String[]{"help", "create"});
+        commands.getCommand("mapmanager:world").execute(console, "world", new String[]{"help", "physics"});
+        var spawn = Bukkit.getWorld(map.worldName()).getSpawnLocation();
+        accepted(api().settings().setSpawn(map.id(), new SpawnPoint("PROBE-FLAT", spawn.getX(), spawn.getY(), spawn.getZ(), spawn.getYaw(), spawn.getPitch())));
+        check(api().settings().getSpawn(map.id()).worldName().equals(map.worldName()), "spawn canonical world name");
         check(!api().access().decide(guest, map.id()).allowed(), "private denies guest");
         Player fake = fakePlayer(guest, Bukkit.getWorld("probe-flat"));
         check(teleportEvent(fake).isCancelled(), "other-plugin teleport denied");
@@ -126,6 +146,10 @@ public final class ApiProbe extends JavaPlugin implements Listener {
         PlayerRespawnEvent respawn = new PlayerRespawnEvent(fake, Bukkit.getWorld("probe-flat").getSpawnLocation(), false);
         Bukkit.getPluginManager().callEvent(respawn);
         check(respawn.getRespawnLocation().getWorld() == Bukkit.getWorld("world"), "respawn fallback");
+        Player alreadyInDefault = fakePlayer(guest, Bukkit.getWorld("world"));
+        PlayerRespawnEvent fromDefault = new PlayerRespawnEvent(alreadyInDefault, Bukkit.getWorld("probe-flat").getSpawnLocation(), false);
+        Bukkit.getPluginManager().callEvent(fromDefault);
+        check(fromDefault.getRespawnLocation().getWorld() == Bukkit.getWorld("world"), "respawn fallback from default world");
         accepted(api().roles().addMember(map.id(), guest, MapRole.BUILDER));
         accepted(api().roles().addMember(map.id(), guest, MapRole.ADMIN));
         accepted(api().roles().removeMember(map.id(), guest, MapRole.ADMIN));

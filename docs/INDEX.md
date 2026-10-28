@@ -15,9 +15,12 @@
 | JSON/MySQL 存储、缓存、恢复备份或显式后端切换 | [`STORAGE.md`](STORAGE.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
 | 通知、错误文本或翻译 | [`MESSAGES.md`](MESSAGES.md)、[`PLUGIN.md`](PLUGIN.md) |
 | 仅审阅/文档任务 | 本索引及用户点名的文档；涉及实现现状时再读 `CLASS_STATUS.md` 和 `STRUCTURE.md` |
+| 全代码审查与安全风险 | [`CODE_REVIEW_2026-10-28.md`](CODE_REVIEW_2026-10-28.md)、[`TEST_CASES.md`](TEST_CASES.md) |
 | 功能验收/测试设计 | [`TEST_CASES.md`](TEST_CASES.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md)、相关专题文档 |
 
 ## 文档职责
+
+- [`CODE_REVIEW_2026-10-28.md`](CODE_REVIEW_2026-10-28.md)：4.0.2 全代码审查、修复、安全风险与验证边界。
 
 - [`CLASS_STATUS.md`](CLASS_STATUS.md)：类型清单、当前实现状态、主要待办。修改类职责或状态时维护。
 - [`ARCHITECTURE.md`](ARCHITECTURE.md)：架构边界、设计原则和未完成事项。

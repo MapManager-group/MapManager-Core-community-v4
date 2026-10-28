@@ -25,13 +25,14 @@ class MapAdminCommandTest {
     private final List<Object> requests = new ArrayList<>();
     private String code;
     private String lastKey;
+    private final List<String> keys = new ArrayList<>();
     private OperationResult<?> lastResult;
     private final OperationNotifier notifier = new OperationNotifier() {
         public void notify(NotificationTarget target, OperationResult<?> result) { lastResult = result; }
         public void notify(NotificationTarget target, String message) { }
         public void notify(NotificationTarget target, Component message) { }
         public void notifyKey(NotificationTarget target, String key, Object... arguments) {
-            lastKey = key;
+            lastKey = key; keys.add(key);
             if (key.equals("command.delete_confirm")) code = (String) arguments[3];
         }
     };
@@ -49,6 +50,29 @@ class MapAdminCommandTest {
     private CachedStorage store() throws Exception {
         var storage = new JsonStorage(directory.resolve("maps.json")); return new CachedStorage(storage, storage, storage);
     }
+    @Test void helpListsAllMaintenanceCommandsAndSupportsSingleTopic() throws Exception {
+        var command = command(store()); var console = sender(ConsoleCommandSender.class);
+        command.execute(console, "mapadmin", new String[]{"help"});
+        for (String topic : List.of("create", "import", "init", "delete", "load", "recover", "operations", "migration", "storage"))
+            assertTrue(keys.contains("maintenance.help_" + topic));
+        keys.clear();
+        command.execute(console, "mapadmin", new String[]{"help", "CREATE"});
+        assertEquals(List.of("maintenance.help_header", "maintenance.help_create", "maintenance.help_options"), keys);
+        keys.clear();
+        command.execute(console, "mapadmin", new String[]{"help", "delete"});
+        assertEquals(List.of("maintenance.help_header", "maintenance.help_delete"), keys);
+        assertTrue(calls.isEmpty());
+    }
+
+    @Test void recoveryCompletionIncludesJournalsWithoutMapRecords() throws Exception {
+        assertTrue(MapAdminCommand.recoveryWorldNames(directory.resolve("missing")).isEmpty());
+        java.nio.file.Files.writeString(directory.resolve("deleted_bak.json"), "{}");
+        java.nio.file.Files.writeString(directory.resolve("arena.json"), "{}");
+        java.nio.file.Files.writeString(directory.resolve("ignore.tmp"), "{}");
+        java.nio.file.Files.createDirectory(directory.resolve("not-a-request.json"));
+        assertEquals(Set.of("deleted_bak", "arena"), Set.copyOf(MapAdminCommand.recoveryWorldNames(directory)));
+    }
+
     @Test void lifecycleRoutesMoveToAdminAndImportStillRejectsParameters() throws Exception {
         var command = command(store()); var console = sender(ConsoleCommandSender.class);
         command.execute(console, "mapadmin", new String[]{"create", "arena", "flat", "nether", "flat.height=64"});
@@ -168,13 +192,27 @@ class MapAdminCommandTest {
         command.execute(console, "mapadmin", new String[]{"delete", code});
         assertEquals("command.delete_expired", lastKey); assertNull(field.get(command)); assertTrue(calls.isEmpty());
     }
+    @Test void completionUsesCommittedTypeAndLeavesFileNamesToTheOperator() throws Exception {
+        var command = command(store()); var console = sender(ConsoleCommandSender.class);
+        assertTrue(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "normal", ""}).contains("nether"));
+        assertFalse(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "normal", ""}).contains("flat.height="));
+        assertTrue(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "group=team", ""}).contains("flat.height="));
+        assertTrue(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "invalid", ""}).isEmpty());
+        assertTrue(command.tabComplete(console, "mapadmin", new String[]{"storage", "export", ""}).isEmpty());
+    }
+
     @Test void completionSeparatesCreationAndImportAndHidesUsedKeys() throws Exception {
         var command = command(store()); var console = sender(ConsoleCommandSender.class);
-        assertEquals(List.of("flat"), command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "FL"}));
+        assertEquals(List.of("flat", "flat.height="), command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "FL"}));
         assertTrue(command.tabComplete(console, "mapadmin", new String[]{"import", "arena", ""}).contains("alias="));
         assertFalse(command.tabComplete(console, "mapadmin", new String[]{"import", "arena", "flat", "normal", ""}).contains("seed="));
         var options = command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "flat", "normal", "seed=1", ""});
         assertFalse(options.contains("seed=")); assertTrue(options.contains("flat.height="));
+        assertTrue(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", ""}).contains("alias="));
+        assertFalse(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "flat", ""}).contains("sift"));
+        assertFalse(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "normal", "normal", ""}).contains("flat.height="));
+        assertFalse(command.tabComplete(console, "mapadmin", new String[]{"create", "arena", "flat", "flat.height=64", ""}).contains("generator-settings="));
+        assertTrue(command.tabComplete(console, "mapadmin", new String[]{"storage", "export", ""}).isEmpty());
         assertEquals(List.of("structures=false", "structures=true"), command.tabComplete(console, "mapadmin",
                 new String[]{"create", "arena", "flat", "normal", "structures="}));
     }

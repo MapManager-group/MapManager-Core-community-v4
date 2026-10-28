@@ -30,6 +30,17 @@ class DefaultWorldProjectionTest {
         });
     }
 
+    @Test void reservedGroupsAreRejectedRegardlessOfCaseBeforeCallingLuckPerms() {
+        var lp = proxy(LuckPerms.class, (o, m, a) -> { throw new AssertionError(m); });
+        var projection = new WorldBaseProjectionImpl(lp);
+        for (String group : List.of("default", "DEFAULT", "Default", "WorldBase", "WORLDBASE")) {
+            assertThrows(IllegalArgumentException.class, () -> projection.ensureGroupInheritance(group, Set.of("arena")));
+            assertThrows(IllegalArgumentException.class, () -> projection.setBuilderAccess(group, UUID.randomUUID(), true));
+            assertFalse(projection.removeGroup(group));
+            assertFalse(projection.removeWorldInheritance(group, "arena"));
+        }
+    }
+
     @Test void removesOldDefaultWorldGrantAndDoesNotRecreateItForSharedGroup() throws Exception {
         List<Node> nodes = new ArrayList<>(List.of(node("worldbase", "lobby"), node("worldbase", "arena")));
         var data = proxy(NodeMap.class, (o, m, a) -> {

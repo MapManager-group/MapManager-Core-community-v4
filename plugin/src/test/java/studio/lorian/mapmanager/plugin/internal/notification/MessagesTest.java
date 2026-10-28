@@ -65,6 +65,19 @@ class MessagesTest {
     }
 
     @Test
+    void helpRetainsSyntaxAndExplainsRoleAndConfirmationBoundaries() throws Exception {
+        for (var language : java.util.List.of(english, load("/langs/zh_CN.yml"))) {
+            field("selected").set(null, language);
+            assertTrue(Messages.text("command.help_tp").contains("/wtp"));
+            assertTrue(Messages.text("command.help_physics").contains("/world physics true confirm"));
+            assertTrue(Messages.text("command.help_explosion").contains("/world explosion true confirm"));
+            assertTrue(Messages.text("maintenance.help_create").contains("[flat|normal|void]"));
+            assertTrue(Messages.text("maintenance.help_storage").contains("exports/"));
+            assertTrue(Messages.text("maintenance.help_options").contains("VoidGen"));
+        }
+    }
+
+    @Test
     void fallsBackToChineseWhenSelectedLanguageKeyIsMissing() {
         english.set("command.kicked", null);
 

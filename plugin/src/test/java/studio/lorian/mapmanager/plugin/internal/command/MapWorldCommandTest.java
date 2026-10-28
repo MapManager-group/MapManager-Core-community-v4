@@ -25,7 +25,12 @@ class MapWorldCommandTest {
     private OperationResult<?> result;
     private String key;
     private List<Object> keyArguments;
+    private int mapReads;
+    private int accessReads;
+    private final List<Object> messages = new ArrayList<>();
     private boolean settingFails;
+    private boolean settingPartial;
+    private final List<Runnable> accessChecks = new ArrayList<>();
     private MapWorldCommand worldCommand, wtp;
     private Player player;
     private BukkitTestServer server;
@@ -34,18 +39,31 @@ class MapWorldCommandTest {
         player = proxy(Player.class, (o, m, a) -> switch (m.getName()) {
             case "getName" -> "Builder"; case "getUniqueId" -> playerId; case "getWorld" -> world;
             case "getLocation" -> new Location(world, 10, 70, 20, 90, 15);
-            case "sendMessage" -> null; default -> throw new AssertionError(m);
+            case "sendMessage" -> { messages.add(a[0]); yield null; } default -> throw new AssertionError(m);
         });
-        server = new BukkitTestServer((o, m, a) -> { assertEquals("getWorld", m.getName()); return world; });
+        var scheduler = proxy(org.bukkit.scheduler.BukkitScheduler.class, (o, m, a) -> {
+            assertEquals("runTask", m.getName()); accessChecks.add((Runnable) a[1]); return null;
+        });
+        server = new BukkitTestServer((o, m, a) -> switch (m.getName()) {
+            case "getWorld" -> world;
+            case "getOnlinePlayers" -> List.of(player);
+            case "getScheduler" -> scheduler;
+            default -> throw new AssertionError(m);
+        });
         MapService maps = proxy(MapService.class, (o, m, a) -> {
+            mapReads++;
             if (failRead) throw new StorageException("injected", null); return map;
         });
-        MapAccessService access = proxy(MapAccessService.class, (o, m, a) ->
-                m.getName().equals("accessibleMaps") ? List.of(map) : new AccessDecision(allowed, role, allowed ? null : FailureReason.NO_PERMISSION));
+        MapAccessService access = proxy(MapAccessService.class, (o, m, a) -> {
+            accessReads++;
+            return m.getName().equals("accessibleMaps") ? List.of(map)
+                    : new AccessDecision(allowed, role, allowed ? null : FailureReason.NO_PERMISSION);
+        });
         MapSettingsService settings = proxy(MapSettingsService.class, (o, m, a) -> {
             calls.add(m.getName()); assertEquals(map.id(), a[0]); values.add(a[1]);
             return settingFails
                     ? new OperationResult.Failure<>(OperationName.SET_PHYSICAL, UUID.randomUUID(), FailureReason.STORAGE_FAILED)
+                    : settingPartial ? new OperationResult.Partial<>(OperationName.SET_PUBLIC, UUID.randomUUID(), null, FailureReason.WORLD_BACKEND_FAILED)
                     : new OperationResult.Success<>(OperationName.SET_PHYSICAL, UUID.randomUUID(), null);
         });
         MapTravelService travel = proxy(MapTravelService.class, (o, m, a) -> {
@@ -63,15 +81,36 @@ class MapWorldCommandTest {
             assertEquals("assignedMembers", m.getName());
             assertEquals(map.id(), a[0]); listedRoles.add((MapRole) a[1]); return Set.of();
         });
-        worldCommand = new MapWorldCommand(null, maps, roles, access, settings, travel, null, notifier, null);
+        worldCommand = new MapWorldCommand(null, maps, roles, access, settings, travel, null, notifier,
+                new studio.lorian.mapmanager.plugin.internal.listener.MapAccessListener(null, maps, access, true));
         wtp = new MapWorldCommand("wtp", null, maps, null, access, settings, travel, null, notifier, null);
     }
     @AfterEach void tearDown() throws Exception { server.close(); }
+    @Test void nameCompletionQueriesAndAuthorizesTheMapOnce() {
+        assertEquals(List.of("Arena"), worldCommand.tabComplete(player, "world", new String[]{"setname", ""}));
+        assertEquals(1, mapReads);
+        assertEquals(1, accessReads);
+    }
+
+    @Test void closingPublicAccessSchedulesRealListenerChecksAfterSuccessOrPartialOnly() {
+        worldCommand.execute(player, "world", new String[]{"public", "false"});
+        assertEquals(1, accessChecks.size());
+        settingPartial = true;
+        worldCommand.execute(player, "world", new String[]{"public", "off"});
+        assertEquals(2, accessChecks.size());
+        assertInstanceOf(OperationResult.Partial.class, result);
+        settingFails = true;
+        worldCommand.execute(player, "world", new String[]{"public", "no"});
+        assertEquals(2, accessChecks.size());
+        assertInstanceOf(OperationResult.Failure.class, result);
+    }
+
     @Test void worldTeleportAndWtpUseSameTravelService() {
         worldCommand.execute(player, "world", new String[]{"tp", "arena"});
         wtp.execute(player, "wtp", new String[]{"arena"}); assertEquals(List.of("teleport", "teleport"), calls);
         wtp.execute(player, "wtp", new String[]{});
-        assertEquals(FailureReason.INVALID_INPUT, assertInstanceOf(OperationResult.Failure.class, result).reason());
+        assertEquals(List.of("teleport", "teleport"), calls);
+        assertEquals(Messages.component("command.usage_wtp"), messages.getLast());
     }
     @Test void administratorSettingCommandsRouteBooleanNameAndSpawn() {
         worldCommand.execute(player, "world", new String[]{"physics", "false"});

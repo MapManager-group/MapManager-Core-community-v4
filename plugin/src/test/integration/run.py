@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+import xml.etree.ElementTree as ET
 
 REPO = Path(__file__).resolve().parents[4]
 OWNER = "00000000-0000-0000-0000-000000000001"
@@ -22,6 +23,7 @@ def main():
     parser.add_argument("--java-home", type=Path, required=True, help="测试 Paper 要求的 JDK（当前 Paper 26.2 为 JDK 25）")
     parser.add_argument("--port", type=int, default=25576)
     args = parser.parse_args()
+    version = ET.parse(REPO / "pom.xml").getroot().findtext("{http://maven.apache.org/POM/4.0.0}version")
     runtime = args.runtime.resolve()
     work = Path(tempfile.mkdtemp(prefix="mmc-v4-todo-"))
     print(f"Integration directory: {work}", flush=True)
@@ -33,7 +35,7 @@ def main():
     plugins.mkdir()
     for pattern in ("LuckPerms*.jar", "multiverse-core*.jar"):
         shutil.copy2(next((runtime / "plugins").glob(pattern)), plugins)
-    shutil.copy2(REPO / "plugin/target/mapmanager-plugin-4.0.0-SNAPSHOT.jar", plugins)
+    shutil.copy2(REPO / f"plugin/target/mapmanager-plugin-{version}.jar", plugins)
     data = plugins / "MapManager-Core"
     data.mkdir()
     config = (REPO / "plugin/src/main/resources/config.yml").read_text().replace(
@@ -44,7 +46,7 @@ def main():
     classes = work / "probe-classes"
     classes.mkdir()
     dependencies = list((runtime / "libraries").rglob("*.jar")) + [
-        REPO / "api/target/mapmanager-api-4.0.0-SNAPSHOT.jar",
+        REPO / f"api/target/mapmanager-api-{version}.jar",
         next((runtime / "plugins").glob("multiverse-core*.jar")),
         Path.home() / ".m2/repository/net/luckperms/api/5.4/api-5.4.jar",
         sorted((Path.home() / ".m2/repository/org/jetbrains/annotations").rglob("*.jar"))[-1],

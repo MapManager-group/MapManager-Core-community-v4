@@ -81,7 +81,7 @@ public final class MapSettingsListener implements Listener {
         MapInstance map = map(event.getLocation().getWorld().getName());
         if (map != null && !map.settings().physical()) {
             event.setCancelled(true);
-            event.getLocation().getBlock().setType(falling.getBlockData().getMaterial(), false);
+            event.getLocation().getBlock().setBlockData(falling.getBlockData(), false);
         }
     }
 

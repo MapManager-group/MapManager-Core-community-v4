@@ -111,7 +111,8 @@ public final class MapSettingsServiceImpl implements MapSettingsService {
             if (bukkitWorld == null || multiverseWorld == null)
                 return new OperationResult.Failure<>(OperationName.SET_SPAWN, operationId, FailureReason.WORLD_NOT_FOUND);
 
-            maps.save(with(old, old.displayName(), old.settings(), spawn));
+            SpawnPoint canonical = new SpawnPoint(old.worldName(), spawn.x(), spawn.y(), spawn.z(), spawn.yaw(), spawn.pitch());
+            maps.save(with(old, old.displayName(), old.settings(), canonical));
             Location location = new Location(bukkitWorld, spawn.x(), spawn.y(), spawn.z(), spawn.yaw(), spawn.pitch());
             if (!bukkitWorld.setSpawnLocation(location))
                 return new OperationResult.Partial<>(OperationName.SET_SPAWN, operationId, null,

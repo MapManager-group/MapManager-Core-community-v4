@@ -219,9 +219,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         }
     }
 
-    /**
-     * 判断可选文本是否缺省。
-     */
     private static boolean blank(String value) {
         return value == null || value.isBlank();
     }
@@ -246,12 +243,11 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
      * 检查创建专用参数的键名和基本长度，具体数值由生成器选项解析。
      */
     private static boolean validParameters(Map<String, String> parameters) {
-        if (parameters == null) return false;
         for (var entry : parameters.entrySet()) {
             if (!Set.of("flat.height", "seed", "structures", "biome", "generator", "generator-settings")
                     .contains(entry.getKey()) && !entry.getKey().matches("property\\.[a-zA-Z0-9_-]{1,80}"))
                 return false;
-            if (entry.getValue() == null || entry.getValue().isBlank() || entry.getValue().length() > 4096)
+            if (entry.getValue().isBlank() || entry.getValue().length() > 4096)
                 return false;
         }
         return true;
@@ -261,8 +257,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
      * 按生成器类型、维度环境和键值参数构造 Multiverse 创建选项。
      */
     static CreateWorldOptions options(CreateMapRequest request) {
-        if (request == null || request.worldType() == null || request.environment() == null)
-            throw new IllegalArgumentException("World type and environment are required");
         Map<String, String> params = request.parameters();
         WorldType type = request.worldType();
         World.Environment environment = bukkitEnvironment(request.environment());
@@ -300,12 +294,12 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 if (otherDimensionEnvironment || params.containsKey("flat.height")) {
                     if (flatSettings == null) flatSettings = defaultFlatSettings();
                     // Absolute surface Y needs the actual world bounds, which are only available during generation.
-                    String generatorId = FlatChunkGenerator.generatorId(flatSettings);
                     if (!params.containsKey("flat.height")) {
                         long layerHeight = FlatChunkGenerator.totalHeight(flatSettings);
                         if (layerHeight < 2 || layerHeight > flatHeightLimit)
                             throw new IllegalArgumentException(Messages.text("errors.flat_dimension_height_range"));
                     }
+                    String generatorId = FlatChunkGenerator.generatorId(flatSettings);
                     options.generatorSettings(flatSettings);
                     if (!params.containsKey("biome")) {
                         String settingsBiome = flatSettingsBiome(flatSettings);
@@ -410,8 +404,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
 
     /** 构造导入时使用的环境和生成器配置；已有区块数据不会被替换。 */
     static ImportWorldOptions importOptions(ImportMapRequest request) {
-        if (request == null || request.worldType() == null || request.environment() == null)
-            throw new IllegalArgumentException("World type and environment are required");
         ImportWorldOptions options = ImportWorldOptions.worldName(request.worldName()).doFolderCheck(true)
                 .environment(bukkitEnvironment(request.environment()));
         switch (request.worldType()) {
@@ -535,9 +527,6 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         bukkitWorld.save();
     }
 
-    /**
-     * 校验 gamerule 已被 Bukkit 接受。
-     */
     private static <T> void setRule(World world, GameRule<T> rule, T value) {
         if (!world.setGameRule(rule, value))
             throw new IllegalStateException(Messages.text("errors.gamerule_failed", "rule", rule.getName()));
@@ -749,15 +738,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 if (MultiverseCoreApi.get().getWorldManager().isWorld(worldName)
                         || Files.exists(worldGateway.worldDirectory(worldName), LinkOption.NOFOLLOW_LINKS))
                     return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.WORLD_BACKEND_FAILED);
-                if (maps.findAll().stream().noneMatch(m -> m.groupId().equals(plan.map().groupId()))) {
-                    for (UUID member : plan.members()) permissions.setBuilderAccess(plan.map().groupId(), member, false);
-                    permissions.removeGroup(plan.map().groupId());
-                    roles.removeScope(plan.map().groupId(), MapRole.ADMIN);
-                    roles.removeScope(plan.map().groupId(), MapRole.BUILDER);
-                    maps.deleteGroup(plan.map().groupId());
-                } else permissions.removeWorldInheritance(plan.map().groupId(), worldName);
-                completePlan(plan);
-                return new OperationResult.Success<>(OperationName.RECOVER, id, null);
+                return finishDeletedPlan(plan);
             }
             if (plan.operation() != OperationName.CREATE && plan.operation() != OperationName.IMPORT)
                 return new OperationResult.Failure<>(OperationName.RECOVER, id, FailureReason.INVALID_INPUT);
@@ -824,6 +805,26 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                     "world", worldName, "error", error.getMessage()));
             return failed(id, worldName, FailureReason.WORLD_BACKEND_FAILED, OperationName.RECOVER);
         }
+    }
+
+    OperationResult<MapInstance> finishDeletedPlan(RecoveryJournal.Plan plan) {
+        String group = plan.map().groupId();
+        if (maps.findAll().stream().noneMatch(map -> map.groupId().equals(group))) {
+            for (UUID member : plan.members())
+                if (!permissions.setBuilderAccess(group, member, false))
+                    return new OperationResult.Failure<>(OperationName.RECOVER, plan.operationId(), FailureReason.PERMISSION_SYNC_FAILED);
+            if (!permissions.removeGroup(group))
+                return new OperationResult.Failure<>(OperationName.RECOVER, plan.operationId(), FailureReason.PERMISSION_SYNC_FAILED);
+            roles.removeScope(group, MapRole.ADMIN);
+            roles.removeScope(group, MapRole.BUILDER);
+            maps.deleteGroup(group);
+        } else if (!permissions.removeWorldInheritance(group, plan.map().worldName())) {
+            return new OperationResult.Failure<>(OperationName.RECOVER, plan.operationId(), FailureReason.PERMISSION_SYNC_FAILED);
+        }
+        completePlan(plan);
+        return permissions.pending()
+                ? new OperationResult.Partial<>(OperationName.RECOVER, plan.operationId(), null, FailureReason.PERMISSION_SYNC_PENDING)
+                : new OperationResult.Success<>(OperationName.RECOVER, plan.operationId(), null);
     }
 
     public void recoverAll() {

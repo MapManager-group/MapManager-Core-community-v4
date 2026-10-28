@@ -128,6 +128,8 @@ MMC 不使用自定义 Bukkit 权限节点决定地图操作权限。地图准�
 
 | 命令 | 使用者 | 说明 |
 |---|---|---|
+| `/world help [子命令]` | 所有人 | 查看参数、角色范围和确认说明 |
+| `/mapadmin help [子命令]` | 控制台 / RCON | 查看生命周期与维护帮助 |
 | `/mapadmin create <地图名> [生成器类型] [环境] [选项...]` | 控制台 / RCON | 创建并初始化地图；默认生成器为 `flat`，环境为 `normal` |
 | `/mapadmin import <地图名> [生成器类型] [环境] [选项...]` | 控制台 / RCON | 导入服务端根目录下的已有世界；默认生成器为 `flat`，环境为 `normal` |
 | `/mapadmin init <地图名>` | 控制台 / RCON | 对已加载的 MMC 地图重新应用初始化规则 |
@@ -188,7 +190,7 @@ mvn test
 mvn clean package
 ```
 
-插件 JAR 构建输出为 `plugin/target/mapmanager-plugin-4.0.0-SNAPSHOT.jar`；将该文件复制到服务器的 `plugins/` 目录。Paper、LuckPerms 和 Multiverse-Core 是运行时依赖，不会随插件重复打包；MySQL 驱动及 API 等依赖由构建配置处理。
+插件 JAR 构建输出为 `plugin/target/mapmanager-plugin-4.0.2-SNAPSHOT.jar`；将该文件复制到服务器的 `plugins/` 目录。Paper、LuckPerms 和 Multiverse-Core 是运行时依赖，不会随插件重复打包；MySQL 驱动及 API 等依赖由构建配置处理。
 
 ### 外部插件接入
 

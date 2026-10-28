@@ -157,13 +157,13 @@ public final class MapAccessListener implements Listener {
         player.sendMessage(Messages.component(messageKey, "world", deniedWorld));
     }
 
-    /** 获取玩家有权进入且不同于当前世界的 Multiverse 默认世界出生点。 */
+    /** 获取玩家有权进入的 Multiverse 默认世界出生点。 */
     private Location defaultSpawn(Player player) {
         try {
             var defaultWorld = MultiverseCoreApi.get().getWorldManager().getDefaultWorld().getOrNull();
             if (defaultWorld == null) return null;
             Location spawn = defaultWorld.getSpawnLocation();
-            if (spawn == null || spawn.getWorld() == null || spawn.getWorld().equals(player.getWorld())) return null;
+            if (spawn == null || spawn.getWorld() == null) return null;
             return canEnter(player, spawn.getWorld()) ? spawn : null;
         } catch (RuntimeException exception) {
             plugin.getLogger().log(Level.SEVERE, "Could not find a safe default world for " + player.getName(), exception);

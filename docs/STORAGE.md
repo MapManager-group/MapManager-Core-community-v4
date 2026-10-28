@@ -16,7 +16,7 @@ JSON 写入使用临时文件后替换；MySQL 使用 JDBC 和 InnoDB 外键约�
 | `mm_map_visitors` | 单地图访客 |
 | `mm_operations` | 生命周期操作阶段和失败原因 |
 
-地图访客授权关联地图并级联清理；仍被地图引用的组不能删除。`MapGroup.worldNames` 由地图记录计算，不独立重复存储。
+地图访客授权关联地图并级联清理；仍被地图引用的组不能删除；删除空组时，JSON 与 MySQL 均级联移除该组 ADMIN/BUILDER 授权。`MapGroup.worldNames` 由地图记录计算，不独立重复存储。
 
 ## 边界
 
@@ -42,3 +42,5 @@ JSON 写入使用临时文件后替换；MySQL 使用 JDBC 和 InnoDB 外键约�
 - JSON 当前版本为 1；未知格式拒绝读取。MySQL 当前五表没有新增列，迁移快照版本为 1。
 
 实际验证结果与适用版本见 [TEST_CASES.md](TEST_CASES.md)；生产负载和数据库大版本升级仍需独立验收。
+
+删除恢复在地图元数据已移除的收尾分支，也须确认权限撤销、删除组或移除世界继承成功后才清理请求。返回 false 时保留组角色与请求供重试；入持久队列但未执行完时返回 PERMISSION_SYNC_PENDING。
