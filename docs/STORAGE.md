@@ -1,46 +1,51 @@
-# 存储与后端
+# 存储与恢复
 
-## 配置与数据目录
+配置见 [config.yml](../plugin/src/main/resources/config.yml)。默认 JSON；MySQL 数据库和账户须提前创建，插件自动建表。
 
-配置资源：[`plugin/src/main/resources/config.yml`](../plugin/src/main/resources/config.yml)。默认 JSON 后端在插件数据目录保存 `maps.json`；MySQL 后端启动时自动建表，数据库和账户需由管理员预先创建。`storage-backend.txt` 记录选中的存储目标；若后端或 MySQL 目标变化，启动会拒绝继续，避免静默切换到另一份数据。
+## 数据与备份
 
-JSON 写入使用临时文件后替换；MySQL 使用 JDBC 和 InnoDB 外键约束。两个实现共享 plugin 内部的 `MapRepository`、`RoleRepository`、`OperationRepository` 接口。更换后端通过下述显式启动迁移；`/mapadmin storage export <文件名>` 将完整快照保存到 `exports/<文件名>.json`，包含空组、地图、角色和所有操作。导出快照不替代整个插件目录备份；恢复请求和 LP 队列也需保留。
+以下路径均相对 `plugins/MapManager-Core/`：
 
-## MySQL 表
-
-| 表 | 内容 |
+| 文件 / 目录 | 用途 |
 |---|---|
-| `mm_groups` | 地图组 ID |
-| `mm_maps` | 地图、设置 JSON、出生点 JSON；世界名规范化后唯一 |
-| `mm_group_roles` | 组管理员和建筑者 |
-| `mm_map_visitors` | 单地图访客 |
-| `mm_operations` | 生命周期操作阶段和失败原因 |
+| `maps.json` | JSON 后端的组、地图、角色和操作，格式版本 1 |
+| `storage-backend.txt` | 已选择的后端及 MySQL 目标指纹 |
+| `world-recovery/<world>.json` | 创建/导入/删除的完整请求、原地图身份；删除还含目录身份和成员快照 |
+| `permission-sync.json` | 未完成 LP 投影 FIFO |
+| `permission-members.json` | 历史投影成员，启动补偿撤权 |
+| `exports/<文件名>.json` | `mapadmin storage export <文件名>` 的业务快照 |
 
-地图访客授权关联地图并级联清理；仍被地图引用的组不能删除；删除空组时，JSON 与 MySQL 均级联移除该组 ADMIN/BUILDER 授权。`MapGroup.worldNames` 由地图记录计算，不独立重复存储。
+快照包含空组、地图、角色和全部操作，不含世界、恢复请求和 LP 队列。完整备份应停服保存世界、LP、整个插件数据目录及所用 MySQL 数据；没有通用快照导入命令，恢复备份需保持这些数据一致，不要只回滚地图记录或删除日志。
 
-## 边界
+JSON 临时文件替换成功后才发布状态，未知格式拒绝读取。MySQL 五表为 `mm_groups`、`mm_maps`、`mm_group_roles`、`mm_map_visitors`、`mm_operations`；世界名规范化后唯一，访客随地图级联删除，空组删除级联清理组角色，仍有地图的组不能删除。
 
-存储接口、配置类、JSON/SQL 实体和连接实现仅属于 `plugin`。API 模块不暴露存储细节。操作阶段与 `world-recovery/` 完整请求共同用于生命周期恢复。主类通过 `CachedStorage` 暴露地图/组/角色不可变索引；高频读取不执行 JDBC/文件 I/O，也不等待写锁。持久化写成功后才发布新快照，禁止绕过缓存直接修改底层仓储；离线改文件后需重启。
+地图/组/角色读取使用不可变缓存，持久写成功后更新；离线修改文件后须重启。仓储及后端实现仅属于 plugin，不是公开 API。
 
-## 显式后端切换
+## 切换 JSON / MySQL 或 MySQL 目标
 
-1. 停服并备份整个插件数据目录；准备新的独立 MySQL 数据库，或空的 JSON 目标。
-2. 修改 `storage.type` 与新目标的 `storage.mysql`，在 `storage.migrate-from` 填原后端 `json` 或 `mysql`。
-3. 原后端为 MySQL 时，在 `storage.migration-source.mysql` 填原连接。源指纹必须与 `storage-backend.txt` 一致；同为 MySQL 的不同目标也按此流程迁移。
-4. 启动先保存 `storage-transfer.json` 完整源快照，目标只能为空或为该快照的精确子集。冲突检查通过后幂等补齐数据，核对完整目标一致后原子更新后端标记。
-5. 成功后以 `storage-transfer-completed.txt` 记录已核对的目标，再更新后端标记并归档迁移备份。随后自动将 `storage.migrate-from` 设为空字符串，原子保存到 `config.yml`，最后移除完成标记；不再使用的原连接配置由管理员自行清理。
+直接修改后端或 MySQL 主机、端口、数据库会被拒绝。切换时：
 
-收尾只处理与当前目标匹配的完成标记；普通启动、未完成或目标不匹配的迁移不清空来源配置。若配置保存失败，恢复内存中的来源值并保留完成标记，启动报错；修复写入问题后重启会重试保存，无需重新复制已迁移数据。
+1. 停服并完整备份，确保源和目标均无外部写入；准备空目标或与源精确一致的部分目标。
+2. 设置目标 `storage.type`、`storage.mysql.*`，在 `storage.migrate-from` 填原类型 `json` 或 `mysql`。
+3. 来源为 MySQL 时填写 `storage.migration-source.mysql.*`；源指纹须匹配原后端标记。MySQL 换目标也走此流程。
+4. 启动保存 `storage-transfer.json` 源快照，检查目标无额外或不一致记录，再幂等补齐；核对完整目标后写 `storage-transfer-completed.txt`、更新后端标记并归档迁移备份。
+5. 自动清空 `storage.migrate-from` 并原子保存配置，最后清除完成标记。旧连接配置按需自行清理。
 
-数据迁移失败时标记保持原目标；修复连接/写入问题后继续同一份快照。源变化或目标有额外/不一致记录时停止，不覆盖目标。由 MySQL 切回 JSON 时，原有 `maps.json` 若并非当前快照的子集需先归档，不能直接覆盖。迁移时两个后端都不能由外部进程继续写入。
+源数据与备份不一致或目标冲突时停止，不覆盖目标；排除冲突后继续同一快照。MySQL 切回 JSON 时，旧 `maps.json` 若不是源快照子集，先在备份后移出运行目录。配置保存失败会保留完成标记并阻止启动，修复写入问题后重启即可收尾，不需重复制数据。不要手动删除迁移标记来绕过检查。
 
-## 恢复与权限队列
+## 生命周期失败处理
 
-- `world-recovery/<world>.json`：副作用前保存原地图 ID、请求、所有者、生成参数；删除包含目录身份和成员快照。完成后清理；失败创建确认没有世界及目录时，释放 PENDING 占位并删除该恢复请求，保留 FAILED 操作审计和地图组角色，启动同样处理旧失败记录。其他失败和未明确失败的中断请求继续保留。
-- `permission-sync.json`：LP 未完成 FIFO，后台执行和自动重试；停服保留队列。
-- `permission-members.json`：历史投影成员，启动时按 MMC 状态补偿入队前中断的撤权。
-- JSON 当前版本为 1；未知格式拒绝读取。MySQL 当前五表没有新增列，迁移快照版本为 1。
+先执行 `mapadmin operations`：它包含 FAILED 和其他非 COMPLETED 操作；内部 `unfinished()` 不包含 FAILED。再按地图处理：
 
-实际验证结果与适用版本见 [TEST_CASES.md](TEST_CASES.md)；生产负载和数据库大版本升级仍需独立验收。
+| 现场 | 处理 |
+|---|---|
+| ACTIVE 已登记但未加载 | `mapadmin load <地图>`，或由正常传送按需加载 |
+| 有完整创建/导入/删除请求 | `mapadmin recover <地图>`；启动也自动恢复可恢复请求 |
+| 创建失败且没有运行世界、目录 | 自动释放 PENDING 和请求，可重新创建；保留 FAILED 审计、组和角色 |
+| 失败后已有世界/目录，或中断尚未明确失败 | 保留完整请求，排查原错误后恢复，不删除占位强行重建 |
+| 旧 PENDING 没有完整请求 | 人工核查世界和备份，不能猜原管理员或生成参数 |
+| 删除目录已被替换 | 拒绝恢复；核对备份与目录身份，不继续删新目录 |
 
-删除恢复在地图元数据已移除的收尾分支，也须确认权限撤销、删除组或移除世界继承成功后才清理请求。返回 false 时保留组角色与请求供重试；入持久队列但未执行完时返回 PERMISSION_SYNC_PENDING。
+删除在元数据已移除的收尾阶段仍检查撤权、删组或移除继承结果；失败保留请求和组角色供重试。投影已入队但未完成时返回 PERMISSION_SYNC_PENDING。
+
+LP 失败按持久 FIFO 自动重试，队首持续失败会阻塞后续投影；保留队列和历史成员文件，处理依赖或连接故障。MMC 准入已按新角色生效，不代表旧 LP 建造权限已撤销。v3 数据恢复另见[数据迁移](MIGRATION.md)。

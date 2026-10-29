@@ -1,47 +1,26 @@
-# 文档索引与任务阅读规则
+# 文档索引
 
-开始任务前先读仓库根目录的 [`AGENTS.md`](../AGENTS.md)，然后按任务范围读取以下文档。跨领域任务应组合阅读相关项；源码状态不确定时直接核对实现。
+先读根目录 [AGENTS.md](../AGENTS.md)，再按任务阅读。描述与实现冲突时，以源码为准并修正文档。
 
-## 按任务阅读
+## 使用插件
 
-| 任务类型 | 必读文档 |
+| 读者 / 任务 | 文档 |
 |---|---|
-| 任意代码或功能任务 | [`CLASS_STATUS.md`](CLASS_STATUS.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
-| API、模型、角色或准入 | [`CLASS_STATUS.md`](CLASS_STATUS.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`API_INVENTORY.md`](API_INVENTORY.md)、[`API_GUIDE.md`](API_GUIDE.md) |
-| 默认世界豁免、准入与建造权限投影 | [`PLUGIN.md`](PLUGIN.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`API_GUIDE.md`](API_GUIDE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
-| v3 外部插件迁移到 v4 | [`V3_TO_V4_API_MIGRATION.md`](V3_TO_V4_API_MIGRATION.md)、[`API_INVENTORY.md`](API_INVENTORY.md)、[`API_GUIDE.md`](API_GUIDE.md) |
-| `/world`、`/mapadmin` 命令、配置或玩家用法 | [`PLUGIN.md`](PLUGIN.md)、[`README.md`](README.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md) |
-| v3 预检、迁移或中断恢复 | [`MIGRATION.md`](MIGRATION.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| JSON/MySQL 存储、缓存、恢复备份或显式后端切换 | [`STORAGE.md`](STORAGE.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`STRUCTURE.md`](STRUCTURE.md) |
-| 通知、错误文本或翻译 | [`MESSAGES.md`](MESSAGES.md)、[`PLUGIN.md`](PLUGIN.md) |
-| 仅审阅/文档任务 | 本索引及用户点名的文档；涉及实现现状时再读 `CLASS_STATUS.md` 和 `STRUCTURE.md` |
-| 全代码审查与安全风险 | [`CODE_REVIEW_2026-10-28.md`](CODE_REVIEW_2026-10-28.md)、[`TEST_CASES.md`](TEST_CASES.md) |
-| 功能验收/测试设计 | [`TEST_CASES.md`](TEST_CASES.md)、[`CLASS_STATUS.md`](CLASS_STATUS.md)、相关专题文档 |
+| 安装、配置、权限和日常运维 | [安装指南](README.md) |
+| 玩家操作、控制台维护、补全与确认 | [命令手册](COMMANDS.md) |
+| v3 数据升级 | [数据迁移](MIGRATION.md) |
+| JSON/MySQL、备份、后端切换与故障恢复 | [存储](STORAGE.md) |
 
-## 文档职责
+## 开发与维护
 
-- [`CODE_REVIEW_2026-10-28.md`](CODE_REVIEW_2026-10-28.md)：4.0.2 全代码审查、修复、安全风险与验证边界。
+| 任务 | 阅读路径 |
+|---|---|
+| 任意代码修改 | [架构与调用关系](ARCHITECTURE.md) → [类职责与状态](CLASS_STATUS.md) |
+| 外部插件接入、模型、角色或准入 | [API 指南](API_GUIDE.md) |
+| v3 扩展插件升级 | [API 迁移](V3_TO_V4_API_MIGRATION.md) → [API 指南](API_GUIDE.md) |
+| 命令、配置、地图规则 | [命令手册](COMMANDS.md) → [安装指南](README.md) |
+| 生命周期、迁移或存储 | [架构](ARCHITECTURE.md)及对应的[存储](STORAGE.md) / [数据迁移](MIGRATION.md)专题 |
+| 通知与翻译 | [消息规范](MESSAGES.md) |
+| 测试、验收或审查 | [测试指南](TEST_CASES.md)及所审查领域的文档 |
 
-- [`CLASS_STATUS.md`](CLASS_STATUS.md)：类型清单、当前实现状态、主要待办。修改类职责或状态时维护。
-- [`ARCHITECTURE.md`](ARCHITECTURE.md)：架构边界、设计原则和未完成事项。
-- [`STRUCTURE.md`](STRUCTURE.md)：目录、入口、关键调用关系。
-- [`API_INVENTORY.md`](API_INVENTORY.md)：v3 能力到 v4 API/实现的对照。
-- [`API_GUIDE.md`](API_GUIDE.md)：外部 Paper 插件依赖、获取及调用 v4 API（含实际地图目录）的指南，包括命令专用删除正则与 API 安全校验的区别，以及删除状态、在线玩家和恢复冲突的独立失败码。
-- [`V3_TO_V4_API_MIGRATION.md`](V3_TO_V4_API_MIGRATION.md)：v3 外部插件迁移到 v4 的依赖、服务获取、调用替换与行为差异。
-- [`README.md`](README.md)：中文用户介绍、安装、权限、命令、配置和开发接入。
-- [`PLUGIN.md`](PLUGIN.md)：插件安装配置、数据结构、命令和运行行为，包括画/展示框及 26.3 坐垫的全局支撑保护、单地图方块物理约束、准入、设置、控制台/RCON create/import/init/delete、设置参数反馈、平坦世界绝对表层 Y、Multiverse 生物群系选项兼容、实际范围最终校验与失败详情回传、物理/爆炸开启确认、创建/导入/初始化保护默认值、维护命令、按需加载、失败创建占位释放与生命周期恢复。
-- [`MIGRATION.md`](MIGRATION.md)：v3 自动迁移触发、字段映射、保护和限制。
-- [`STORAGE.md`](STORAGE.md)：存储配置、文件/表结构、后端约束及迁移成功后自动清空来源配置与保存失败恢复。
-- [`MESSAGES.md`](MESSAGES.md)：语言选择、资源位置、MiniMessage、玩家结果隐藏操作 ID 与控制台记录、翻译维护。
-- [`PROJECT_NOTES.md`](PROJECT_NOTES.md)：长期项目约定和阶段记录；可能随源码演进，执行前核对源码。
-- [`TEST_CASES.md`](TEST_CASES.md)：自动化单元测试映射，以及需 Paper/依赖服务的启动、命令、API、存储和迁移验收用例，含 2026-10-27 真实 MySQL 配置落盘与独立 JVM 重启结果。
-
-## HTTP 测试环境验收
-
-- [2026-10-01 MMW / Tuff HTTP 测试报告](HTTP_TEST_REPORT_2026-10-01.md)：32 个 HTTP 操作的实际覆盖、已发现问题、恢复结果与未完成流程；[脱敏请求证据](HTTP_TEST_EVIDENCE_2026-10-01.jsonl)。
-
-## 文档维护约定
-
-- 所有项目 Markdown 放在本目录；根目录 `AGENTS.md` 是唯一例外，用于强制任务入口。
-- 文档间使用相对链接。移动或新增文档后检查链接并更新本索引。
-- 以当前源码和配置为准；不把 v3 能力、目标设计或待办写成 v4 已实现事实。
+修改类职责或实现状态时更新类清单；修改行为时更新对应指南。Markdown 放在 `docs/`，根目录仅保留 `AGENTS.md`；文档间使用相对链接，不保留重复说明和失效的阶段记录。
