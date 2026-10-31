@@ -6,7 +6,7 @@
 
 | 命令 | 使用条件与作用 |
 |---|---|
-| `/world tp <地图名>`、`/wtp <地图名>` | 准入通过后按需加载地图并传送 |
+| `/world tp <地图名>`、`/wtp <地图名>` | 准入通过后按需加载地图并传送；默认世界无需 MMC 登记即可传送至其出生点 |
 | `/world admin add\|remove <玩家名或UUID>` | 当前地图管理员；修改整个地图组的管理员 |
 | `/world builder add\|remove <玩家名或UUID>` | 当前地图管理员；修改整个地图组的建筑者 |
 | `/world visitor add\|remove <玩家名或UUID>` | 当前地图管理员；修改当前地图访客 |
@@ -82,7 +82,7 @@ mapadmin import oldbuild normal normal group=buildworld admin=Steve
 
 ## 自动补全
 
-- `/world tp`、`/wtp` 按 MMC 准入推荐地图，包括尚未加载的地图；`access-control.strict-map-entry=false` 时，额外推荐拥有 `multiverse.access.<地图名>` 权限的已登记 ACTIVE 地图。候选去重并按输入前缀过滤；实际传送仍执行 MMC 准入检查。
+- `/world tp`、`/wtp` 推荐默认世界及 MMC 准入通过的地图，包括尚未加载的 MMC 地图；`access-control.strict-map-entry=false` 时，额外推荐拥有 `multiverse.access.<地图名>` 权限的已登记 ACTIVE 地图。候选去重并按输入前缀过滤；实际传送仍执行 MMC 准入检查。
 - 角色移除仅推荐直接授权成员，踢人仅推荐同图在线玩家。
 - 设置命令补全开关、确认参数和当前展示名；帮助补全子命令。
 - `/mapadmin` 补全类型、已支持环境、选项键、现有组、在线管理员、生物群系、导入目录、地图、实际恢复请求及维护子命令。

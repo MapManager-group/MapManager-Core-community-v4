@@ -40,7 +40,7 @@ plugin/src/test/          单元测试及隔离服务器/数据库验收
 
 | 入口 | 调用路径 |
 |---|---|
-| 玩家传送 | `MapWorldCommand` → `MapTravelServiceImpl` → `MapAccessServiceImpl` → 生命周期 load → 玩家传送 |
+| 玩家传送 | `MapWorldCommand`（默认世界直接传送至出生点）→ 其余地图由 `MapTravelServiceImpl` → `MapAccessServiceImpl` → 生命周期 load → 玩家传送 |
 | 外部传送、登录、重生 | `MapAccessListener` → 准入；拒绝时返回默认世界，不能安全返回则断开 |
 | 角色修改 | 命令授权和身份解析 → `MapRoleServiceImpl` → 缓存仓储持久化 → LP 队列；命令另触发在线准入复核 |
 | 地图设置 | 命令授权 → `MapSettingsServiceImpl` → 仓储；展示名/公开状态同步 MV 别名，出生点同步 Bukkit/MV |

@@ -162,12 +162,12 @@ public final class MapManagerPlugin extends JavaPlugin {
                     try {
                     getLogger().info(migration.join());
                     refresh.run();
-                    Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand(this,
+                    Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("world", this,
                             api.maps(), api.roles(), api.access(), api.settings(), api.travel(), players,
-                            notifier, accessListener));
+                            notifier, accessListener, () -> Bukkit.getWorld(defaultWorldName.get())));
                     Bukkit.getCommandMap().register("mapmanager", new MapWorldCommand("wtp", this,
                             api.maps(), api.roles(), api.access(), api.settings(), api.travel(), players,
-                            notifier, accessListener));
+                            notifier, accessListener, () -> Bukkit.getWorld(defaultWorldName.get())));
                     Bukkit.getServicesManager().register(MapManager.class, api, this, ServicePriority.Normal);
                     Bukkit.getCommandMap().register("mapmanager", new MapAdminCommand(this, repository,
                             api.worldLifeCycle(), migrator, notifier, refresh, players, deletionPattern));

@@ -112,6 +112,47 @@ class MapWorldCommandTest {
         assertEquals(List.of("teleport", "teleport"), calls);
         assertEquals(Messages.component("command.usage_wtp"), messages.getLast());
     }
+    @Test void defaultWorldTeleportAndCompletionDoNotRequireMmcRegistrationOrRole() {
+        World lobby = proxy(World.class, (o, m, a) -> switch (m.getName()) {
+            case "getName" -> "beachlobby";
+            case "getSpawnLocation" -> new Location((World) o, 12, 75, -8, 90, 10);
+            default -> throw new AssertionError(m);
+        });
+        List<Location> destinations = new ArrayList<>();
+        boolean[] success = {true};
+        Player visitor = proxy(Player.class, (o, m, a) -> switch (m.getName()) {
+            case "getName" -> "Visitor";
+            case "getUniqueId" -> playerId;
+            case "teleport" -> { destinations.add((Location) a[0]); yield success[0]; }
+            default -> throw new AssertionError(m);
+        });
+        MapService maps = proxy(MapService.class, (o, m, a) -> {
+            assertEquals("findByWorldName", m.getName()); return null;
+        });
+        MapAccessService access = proxy(MapAccessService.class, (o, m, a) -> {
+            assertEquals("accessibleMaps", m.getName()); return List.of();
+        });
+        OperationNotifier notifier = proxy(OperationNotifier.class, (o, m, a) -> {
+            result = (OperationResult<?>) a[1]; return null;
+        });
+        for (String name : List.of("wtp", "world")) {
+            var command = new MapWorldCommand(name, null, maps, null, access, null, null, null,
+                    notifier, null, () -> lobby);
+            String[] args = name.equals("wtp") ? new String[]{"BEACHLOBBY"} : new String[]{"tp", "beachlobby"};
+            command.execute(visitor, name, args);
+            assertInstanceOf(OperationResult.Success.class, result);
+            assertEquals(new Location(lobby, 12, 75, -8, 90, 10), destinations.getLast());
+            assertEquals(List.of("beachlobby"), command.tabComplete(visitor, name,
+                    name.equals("wtp") ? new String[]{"BEACH"} : new String[]{"tp", "BEACH"}));
+            success[0] = false;
+            command.execute(visitor, name, args);
+            assertEquals(FailureReason.WORLD_BACKEND_FAILED, assertInstanceOf(OperationResult.Failure.class, result).reason());
+            command.execute(visitor, name, name.equals("wtp") ? new String[]{"missing"} : new String[]{"tp", "missing"});
+            assertEquals(FailureReason.MAP_NOT_FOUND, assertInstanceOf(OperationResult.Failure.class, result).reason());
+            success[0] = true;
+        }
+    }
+
     @Test void administratorSettingCommandsRouteBooleanNameAndSpawn() {
         worldCommand.execute(player, "world", new String[]{"physics", "false"});
         assertEquals("command.physics_updated", key); assertEquals(List.of("value", false), keyArguments);

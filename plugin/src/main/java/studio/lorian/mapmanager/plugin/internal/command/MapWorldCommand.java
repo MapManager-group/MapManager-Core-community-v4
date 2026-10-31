@@ -1,6 +1,7 @@
 package studio.lorian.mapmanager.plugin.internal.command;
 
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -35,6 +36,7 @@ public final class MapWorldCommand extends Command {
     private static final long SETTING_CONFIRM_NANOS = java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
     private record PendingSetting(UUID mapId, OperationName operation, long issuedAtNanos) {}
     private final Map<UUID, PendingSetting> pendingSettings = new HashMap<>();
+    private final java.util.function.Supplier<World> defaultWorld;
     private final JavaPlugin plugin;
     private final MapService maps;
     private final MapAccessService access;
@@ -64,7 +66,16 @@ public final class MapWorldCommand extends Command {
                            MapAccessService access, MapSettingsService settings, MapTravelService travel,
                            PlayerGateway players, OperationNotifier notifier,
                            MapAccessListener accessListener) {
+        this(name, plugin, maps, roles, access, settings, travel, players, notifier, accessListener, () -> null);
+    }
+
+    /** 创建命令并复用插件识别的默认世界，允许未登记的大厅作为传送目标。 */
+    public MapWorldCommand(String name, JavaPlugin plugin, MapService maps, MapRoleService roles,
+                           MapAccessService access, MapSettingsService settings, MapTravelService travel,
+                           PlayerGateway players, OperationNotifier notifier,
+                           MapAccessListener accessListener, java.util.function.Supplier<World> defaultWorld) {
         super(name);
+        this.defaultWorld = defaultWorld;
         this.plugin = plugin;
         this.maps = maps;
         this.access = access;
@@ -192,6 +203,8 @@ public final class MapWorldCommand extends Command {
                     .filter(map -> player.hasPermission("multiverse.access." + map.worldName()))
                     .map(MapInstance::worldName).forEach(names::add);
         }
+        World lobby = defaultWorld.get();
+        if (lobby != null) names.add(lobby.getName());
         return names;
     }
 
@@ -231,6 +244,15 @@ public final class MapWorldCommand extends Command {
     private void teleport(CommandSender sender, NotificationTarget target, String[] args) {
         if (args.length != 2) {
             fail(target, OperationName.TELEPORT, FailureReason.INVALID_INPUT);
+            return;
+        }
+        World lobby = defaultWorld.get();
+        if (lobby != null && lobby.getName().equalsIgnoreCase(args[1])) {
+            UUID operationId = UUID.randomUUID();
+            boolean teleported = ((Player) sender).teleport(lobby.getSpawnLocation());
+            notifier.notify(target, teleported
+                    ? new OperationResult.Success<Void>(OperationName.TELEPORT, operationId, null)
+                    : new OperationResult.Failure<Void>(OperationName.TELEPORT, operationId, FailureReason.WORLD_BACKEND_FAILED));
             return;
         }
         MapInstance map;
