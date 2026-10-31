@@ -248,7 +248,8 @@ public final class MapAdminCommand extends Command {
         final Registration request;
         try { request = parseRegistration(args, importing); }
         catch (IllegalArgumentException error) {
-            fail(target, operation, FailureReason.INVALID_INPUT);
+            notifier.notify(target, new OperationResult.Failure<>(operation, UUID.randomUUID(),
+                    FailureReason.INVALID_INPUT, error.getMessage()));
             return;
         }
         if (request.admin() == null) {
@@ -265,22 +266,34 @@ public final class MapAdminCommand extends Command {
     }
 
     private static Registration parseRegistration(String[] args, boolean importing) {
-        if (args.length < 2) throw new IllegalArgumentException();
+        if (args.length < 2) throw new IllegalArgumentException(Messages.text("errors.map_required"));
         int index = 2;
         WorldType type = WorldType.FLAT;
         Environment environment = Environment.NORMAL;
         if (index < args.length && !args[index].contains("=")) {
-            type = WorldType.valueOf(args[index++].toUpperCase(Locale.ROOT));
-            if (index < args.length && !args[index].contains("="))
-                environment = Environment.valueOf(args[index++].toUpperCase(Locale.ROOT));
+            try { type = WorldType.valueOf(args[index].toUpperCase(Locale.ROOT)); }
+            catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException(Messages.text("errors.world_type", "value", args[index]));
+            }
+            index++;
+            if (index < args.length && !args[index].contains("=")) {
+                try { environment = Environment.valueOf(args[index].toUpperCase(Locale.ROOT)); }
+                catch (IllegalArgumentException error) {
+                    throw new IllegalArgumentException(Messages.text("errors.environment", "value", args[index]));
+                }
+                index++;
+            }
         }
         Map<String, String> options = new HashMap<>();
         for (; index < args.length; index++) {
             int separator = args[index].indexOf('=');
-            if (separator < 1 || separator == args[index].length() - 1) throw new IllegalArgumentException();
+            if (separator < 1 || separator == args[index].length() - 1)
+                throw new IllegalArgumentException(Messages.text("errors.option_format", "value", args[index]));
             String key = args[index].substring(0, separator);
-            if (importing && !Set.of("alias", "group", "admin").contains(key)) throw new IllegalArgumentException();
-            if (options.putIfAbsent(key, args[index].substring(separator + 1)) != null) throw new IllegalArgumentException();
+            if (importing && !Set.of("alias", "group", "admin").contains(key))
+                throw new IllegalArgumentException(Messages.text("errors.import_option", "key", key));
+            if (options.putIfAbsent(key, args[index].substring(separator + 1)) != null)
+                throw new IllegalArgumentException(Messages.text("errors.duplicate_option", "key", key));
         }
         String alias = options.remove("alias"), group = options.remove("group"), admin = options.remove("admin");
         return new Registration(args[1], alias, group, admin, type, environment, options);

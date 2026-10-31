@@ -152,6 +152,23 @@ migration:
   invalid_world: 'Invalid v3 data: invalid world name <value>'
   invalid_group: 'Invalid v3 data: invalid group ID <value>'
 errors:
+  map_required: 'Missing map name. Usage: mapadmin create/import <map> [type] [environment] [key=value...]'
+  world_type: 'Invalid world type "<value>"; use flat, normal or void.'
+  environment: 'Invalid environment "<value>"; use normal, nether or the_end (sift is unsupported).'
+  option_format: 'Invalid option "<value>"; expected key=value with a nonempty value and no token spaces.'
+  import_option: 'Import does not support "<key>"; only alias, group and admin are allowed.'
+  duplicate_option: 'Duplicate option "<key>"; specify it once.'
+  world_name: 'Invalid map name "<value>"; use 4–16 lowercase letters, digits, underscores or hyphens.'
+  default_world: 'Map "<value>" is the default world and cannot be created or imported.'
+  blocked_world: 'Map name "<value>" is blocked by reserved-name rules or creation.blocked-world-name-regex.'
+  group_id: 'Invalid group "<value>"; use 1–16 lowercase letters, digits, underscores or hyphens.'
+  reserved_group: 'Group "<value>" is reserved.'
+  alias: 'Invalid alias; it must be nonempty after removing colors and at most 255 characters.'
+  unknown_option: 'Unknown create option "<key>"; see mapadmin help create.'
+  option_length: 'Option "<key>" must have a nonblank value of at most 4096 characters.'
+  seed: 'Invalid seed "<value>"; expected a signed 64-bit integer.'
+  flat_height: 'Invalid flat.height "<value>"; expected a signed 32-bit integer specifying absolute surface Y.'
+  level_dat: 'Map "<world>" has a missing, nonregular or symbolic-link level.dat.'
   reserved_group: Map groups cannot use LuckPerms base group names
   no_primary_world: Cannot determine the primary world because no world is loaded
   invalid_world_name: Invalid world name

@@ -152,6 +152,23 @@ migration:
   invalid_world: 'v3 数据无效：无效世界名 <value>'
   invalid_group: 'v3 数据无效：无效地图组 ID <value>'
 errors:
+  map_required: '缺少地图名。用法：mapadmin create/import <地图名> [类型] [环境] [键=值...]'
+  world_type: '类型“<value>”无效，可选：flat、normal、void。'
+  environment: '环境“<value>”无效，可选：normal、nether、the_end（sift 尚未支持）。'
+  option_format: '选项“<value>”格式无效，必须为非空的 键=值；值不能包含命令分词空格。'
+  import_option: '导入不支持选项“<key>”，仅支持 alias、group、admin。'
+  duplicate_option: '选项“<key>”重复，请只填写一次。'
+  world_name: '地图名“<value>”无效：须为 4–16 位小写字母、数字、下划线或连字符。'
+  default_world: '地图名“<value>”是默认世界，不允许创建或导入。'
+  blocked_world: '地图名“<value>”被内置保留名规则或 creation.blocked-world-name-regex 禁止。'
+  group_id: 'group“<value>”无效：须为 1–16 位小写字母、数字、下划线或连字符。'
+  reserved_group: 'group“<value>”是保留组名，不允许使用。'
+  alias: 'alias 无效：去除颜色后须非空，且展示名不能超过 255 字符。'
+  unknown_option: '未知创建选项“<key>”，请查看 mapadmin help create。'
+  option_length: '选项“<key>”的值须非空且不超过 4096 字符。'
+  seed: 'seed“<value>”无效：须为 64 位有符号整数。'
+  flat_height: 'flat.height“<value>”无效：须为 32 位有符号整数，表示表层绝对 Y 坐标。'
+  level_dat: '导入地图“<world>”的 level.dat 缺失、不是普通文件或是符号链接。'
   reserved_group: 地图组不能使用 LuckPerms 基础组名称
   no_primary_world: 无法确定主地图：服务器尚未加载世界
   invalid_world_name: 世界名无效

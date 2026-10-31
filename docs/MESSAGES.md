@@ -8,6 +8,7 @@
 
 - MiniMessage 输出 Adventure Component；动态参数用未解析占位符，避免被当作格式标签。日志使用纯文本。
 - 玩家结果用 `result.player_success/failure/partial`，隐藏操作 ID；完整结果同时发送控制台，用 `result.success/failure/partial` 保留 ID。
+- 创建/导入的地图名、组名、展示名和命令选项校验通过双语 `errors.*` 提供具体原因，保留 `INVALID_INPUT` 失败码。
 - `OperationResult.detail` 非空时优先作为纯文本展示；稳定 reason 代码用于程序分支。依赖库原始异常详情未必有翻译。
 - 设置成功文案带实际参数；物理/爆炸开启使用风险提示和 10 秒确认键。帮助键为 `command.help_*`、`maintenance.help_*`，缺键仍按中文回退。
 

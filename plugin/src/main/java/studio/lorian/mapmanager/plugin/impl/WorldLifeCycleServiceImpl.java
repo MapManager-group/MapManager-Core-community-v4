@@ -111,11 +111,15 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     public synchronized OperationResult<MapInstance> create(CreateMapRequest request) {
         // 先校验 MMC 输入和生成器参数，避免留下无法执行的 PENDING 记录。
         UUID operationId = UUID.randomUUID();
-        if (!Bukkit.isPrimaryThread() || request == null || !validMapInput(request.worldName(),
-                request.groupId(), request.displayName()) || request.worldType() == null
-                || request.environment() == null
-                || !validParameters(request.parameters()))
+        if (!Bukkit.isPrimaryThread() || request == null || request.worldType() == null
+                || request.environment() == null)
             return new OperationResult.Failure<>(OperationName.CREATE, operationId, FailureReason.INVALID_INPUT);
+        String inputError = mapInputError(request.worldName(), request.groupId(), request.displayName());
+        if (inputError != null)
+            return new OperationResult.Failure<>(OperationName.CREATE, operationId, FailureReason.INVALID_INPUT, inputError);
+        String parameterError = parameterError(request.parameters());
+        if (parameterError != null)
+            return new OperationResult.Failure<>(OperationName.CREATE, operationId, FailureReason.INVALID_INPUT, parameterError);
         if (request.environment() == Environment.SIFT)
             return new OperationResult.Failure<>(OperationName.CREATE, operationId,
                     FailureReason.UNSUPPORTED_ENVIRONMENT);
@@ -125,7 +129,7 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         try {
             options = options(request);
         } catch (IllegalArgumentException exception) {
-            return new OperationResult.Failure<>(OperationName.CREATE, operationId, FailureReason.INVALID_INPUT);
+            return new OperationResult.Failure<>(OperationName.CREATE, operationId, FailureReason.INVALID_INPUT, exception.getMessage());
         }
         // 世界生成方式只属于创建流程；其余注册步骤与导入共用。
         return registerWorld(OperationName.CREATE, operationId, request.worldName(), request.groupId(),
@@ -226,12 +230,21 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     /**
      * 创建和导入共用的地图名、组名与显示名限制。
      */
-    private boolean validMapInput(String worldName, String groupId, String displayName) {
-        return worldName != null && !defaultWorld.test(worldName) && worldName.matches("[a-z0-9_-]{4,16}")
-                && !blockedWorldName(worldName)
-                && (blank(groupId) || groupId.matches("[a-z0-9_-]{1,16}"))
-                && !Set.of("default", "worldbase").contains(blank(groupId) ? worldName : groupId)
-                && (blank(displayName) || displayName.length() <= 255);
+    private String mapInputError(String worldName, String groupId, String displayName) {
+        if (worldName == null || !worldName.matches("[a-z0-9_-]{4,16}"))
+            return Messages.text("errors.world_name", "value", worldName);
+        if (defaultWorld.test(worldName)) return Messages.text("errors.default_world", "value", worldName);
+        if (blockedWorldName(worldName)) return Messages.text("errors.blocked_world", "value", worldName);
+        if (!blank(groupId) && !groupId.matches("[a-z0-9_-]{1,16}"))
+            return Messages.text("errors.group_id", "value", groupId);
+        if (Set.of("default", "worldbase").contains(blank(groupId) ? worldName : groupId))
+            return Messages.text("errors.reserved_group", "value", blank(groupId) ? worldName : groupId);
+        if (!blank(displayName)) {
+            String alias = MapAliasServiceImpl.stripColor(displayName);
+            if (displayName.length() > 255 || alias.isBlank() || alias.length() > 255)
+                return Messages.text("errors.alias");
+        }
+        return null;
     }
 
     /** 内置与配置的正则分别检查完整地图名，任一匹配即禁止创建或导入。 */
@@ -242,15 +255,15 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
     /**
      * 检查创建专用参数的键名和基本长度，具体数值由生成器选项解析。
      */
-    private static boolean validParameters(Map<String, String> parameters) {
+    private static String parameterError(Map<String, String> parameters) {
         for (var entry : parameters.entrySet()) {
             if (!Set.of("flat.height", "seed", "structures", "biome", "generator", "generator-settings")
                     .contains(entry.getKey()) && !entry.getKey().matches("property\\.[a-zA-Z0-9_-]{1,80}"))
-                return false;
+                return Messages.text("errors.unknown_option", "key", entry.getKey());
             if (entry.getValue().isBlank() || entry.getValue().length() > 4096)
-                return false;
+                return Messages.text("errors.option_length", "key", entry.getKey());
         }
-        return true;
+        return null;
     }
 
     /**
@@ -269,7 +282,12 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
             throw new IllegalArgumentException(Messages.text("errors.flat_only"));
         if (params.containsKey("flat.height") && params.containsKey("generator-settings"))
             throw new IllegalArgumentException(Messages.text("errors.flat_generator_conflict"));
-        if (params.containsKey("seed")) options.seed(Long.parseLong(params.get("seed")));
+        if (params.containsKey("seed")) {
+            try { options.seed(Long.parseLong(params.get("seed"))); }
+            catch (NumberFormatException error) {
+                throw new IllegalArgumentException(Messages.text("errors.seed", "value", params.get("seed")));
+            }
+        }
         if (params.containsKey("biome")) options.biome(biomeProvider(params.get("biome")));
         if (params.containsKey("generator")) options.generator(params.get("generator"));
         if (params.containsKey("generator-settings")) options.generatorSettings(params.get("generator-settings"));
@@ -284,7 +302,11 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
                 String flatSettings = params.get("generator-settings");
                 int flatHeightLimit = otherDimensionEnvironment ? 254 : 320;
                 if (params.containsKey("flat.height")) {
-                    int surfaceY = Integer.parseInt(params.get("flat.height"));
+                    final int surfaceY;
+                    try { surfaceY = Integer.parseInt(params.get("flat.height")); }
+                    catch (NumberFormatException error) {
+                        throw new IllegalArgumentException(Messages.text("errors.flat_height", "value", params.get("flat.height")));
+                    }
                     // Keep vanilla flat settings valid while the plugin resolves the actual world bounds.
                     JsonObject settings = JsonParser.parseString(defaultFlatSettings()).getAsJsonObject();
                     settings.addProperty("surface_y", surfaceY);
@@ -373,9 +395,11 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         // 导入仅接收服务端根目录中的现有世界；先校验名称和文件，再写入 MMC 数据。
         UUID operationId = UUID.randomUUID();
         if (!Bukkit.isPrimaryThread() || request == null || request.worldType() == null
-                || request.environment() == null
-                || !validMapInput(request.worldName(), request.groupId(), request.displayName()))
+                || request.environment() == null)
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.INVALID_INPUT);
+        String inputError = mapInputError(request.worldName(), request.groupId(), request.displayName());
+        if (inputError != null)
+            return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.INVALID_INPUT, inputError);
         if (request.environment() == Environment.SIFT)
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId,
                     FailureReason.UNSUPPORTED_ENVIRONMENT);
@@ -385,7 +409,8 @@ public final class WorldLifeCycleServiceImpl implements WorldLifeCycleService {
         if (!Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS))
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.WORLD_NOT_FOUND);
         if (!Files.isRegularFile(folder.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS))
-            return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.INVALID_INPUT);
+            return new OperationResult.Failure<>(OperationName.IMPORT, operationId, FailureReason.INVALID_INPUT,
+                    Messages.text("errors.level_dat", "world", name));
         if (!worldVersions.isCompatible(folder))
             return new OperationResult.Failure<>(OperationName.IMPORT, operationId,
                     FailureReason.WORLD_VERSION_INCOMPATIBLE);

@@ -144,6 +144,26 @@ class MapAdminCommandTest {
         }
         assertTrue(calls.isEmpty());
     }
+    @Test void registrationParserReportsSpecificFailures() throws Exception {
+        var command = command(store()); var console = sender(ConsoleCommandSender.class);
+        record Case(String[] args, String key, String placeholder, String value) { }
+        var cases = List.of(
+                new Case(new String[]{"import"}, "errors.map_required", "", ""),
+                new Case(new String[]{"import", "arena", "bad-type"}, "errors.world_type", "value", "bad-type"),
+                new Case(new String[]{"import", "arena", "flat", "bad-env"}, "errors.environment", "value", "bad-env"),
+                new Case(new String[]{"import", "arena", "alias="}, "errors.option_format", "value", "alias="),
+                new Case(new String[]{"import", "arena", "alias=A", "extra"}, "errors.option_format", "value", "extra"),
+                new Case(new String[]{"import", "arena", "seed=1"}, "errors.import_option", "key", "seed"),
+                new Case(new String[]{"create", "arena", "alias=A", "alias=B"}, "errors.duplicate_option", "key", "alias"));
+        for (var input : cases) {
+            command.execute(console, "mapadmin", input.args());
+            var failure = assertInstanceOf(OperationResult.Failure.class, lastResult);
+            assertEquals(FailureReason.INVALID_INPUT, failure.reason());
+            assertEquals(Messages.text(input.key(), input.placeholder(), input.value()), failure.detail());
+        }
+        assertTrue(calls.isEmpty());
+    }
+
     @Test void omittedOptionsUseDefaultsAndValuesPreserveEqualsSigns() throws Exception {
         var command = command(store()); var console = sender(ConsoleCommandSender.class);
         command.execute(console, "mapadmin", new String[]{"CREATE", "arena", "alias=A=B", "group=team"});

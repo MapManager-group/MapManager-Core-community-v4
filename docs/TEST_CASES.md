@@ -36,7 +36,7 @@ python3 plugin/src/test/integration/run_mysql.py --mysql-base /path/to/mysql --r
 | 传送 | `MapTravelServiceImplTest` | 准入、按需加载、在线状态与踢出条件 |
 | 生命周期 | `WorldLifeCycleServiceImplTest`、`WorldLifeCycleValidationTest` | 创建/导入/初始化/删除/加载；非法请求在副作用前拒绝 |
 | 失败与恢复 | `RecoveryJournalTest`、`DeletedPlanRecoveryTest`、`FailedCreationRetryTest` | 请求重开、目录身份、失败占位释放、删除收尾失败/待同步/共享组 |
-| 命令 | `MapAdminCommandTest`、`MapWorldCommandTest`、`CommandCompletionTest` | 帮助、参数、默认选项、确认、当前值、授权与一次查询的上下文补全；非严格模式 MV 权限候选、状态过滤与去重；未登记默认世界的传送、失败结果及补全 |
+| 命令 | `MapAdminCommandTest`、`MapWorldCommandTest`、`CommandCompletionTest` | 帮助、参数及具体失败原因、默认选项、确认、当前值、授权与一次查询的上下文补全；非严格模式 MV 权限候选、状态过滤与去重；未登记默认世界的传送、失败结果及补全 |
 | 监听 | `MapListenersTest` | 撤权和关闭公开复核、默认世界回退、物理/爆炸、落沙 BlockData 与全局实体保护 |
 | 存储 | `JsonStorageTest`、`StorageConfigTest`、`StorageRecoveryTest` | 实际 JSON 重开、约束、失败不发布缓存、快照、后端切换与配置保存失败恢复 |
 | v3 迁移 | `V3MigrationSourceTest`、`V3MigrationRecoveryTest` | 实际旧 JSON、UUID/关系冲突、报告、冻结计划、源变化和中断重试 |

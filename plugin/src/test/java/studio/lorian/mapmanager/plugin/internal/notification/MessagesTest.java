@@ -78,6 +78,19 @@ class MessagesTest {
     }
 
     @Test
+    void registrationErrorsShowValuesAndRulesInBothLanguages() throws Exception {
+        for (var language : java.util.List.of(english, load("/langs/zh_CN.yml"))) {
+            field("selected").set(null, language);
+            String name = Messages.text("errors.world_name", "value", "sit");
+            assertTrue(name.contains("sit"));
+            assertTrue(name.contains("4–16"));
+            assertTrue(Messages.text("errors.option_format", "value", "<red>bad").contains("<red>bad"));
+            assertTrue(Messages.text("errors.duplicate_option", "key", "alias").contains("alias"));
+            assertTrue(Messages.text("errors.import_option", "key", "seed").contains("seed"));
+        }
+    }
+
+    @Test
     void fallsBackToChineseWhenSelectedLanguageKeyIsMissing() {
         english.set("command.kicked", null);
 

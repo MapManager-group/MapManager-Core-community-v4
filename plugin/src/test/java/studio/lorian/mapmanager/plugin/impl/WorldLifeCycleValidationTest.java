@@ -45,6 +45,32 @@ class WorldLifeCycleValidationTest {
             failure(lifecycle.importWorld(new ImportMapRequest(name, null, null, null)), OperationName.IMPORT, FailureReason.INVALID_INPUT);
         }
     }
+    @Test void registrationFailuresIdentifyTheRejectedFieldWithoutPersistence() {
+        String nameError = studio.lorian.mapmanager.plugin.internal.notification.Messages.text("errors.world_name", "value", "sit");
+        for (var result : List.of(lifecycle.create(new CreateMapRequest("sit", null, null, null)),
+                lifecycle.importWorld(new ImportMapRequest("sit", null, null, null)))) {
+            assertEquals(nameError, result.detail());
+            failure(result, result.operation(), FailureReason.INVALID_INPUT);
+        }
+        for (var input : List.of(
+                new String[]{"arena_bak", null, null, "errors.blocked_world"},
+                new String[]{"arena", "TEAM", null, "errors.group_id"},
+                new String[]{"arena", "default", null, "errors.reserved_group"},
+                new String[]{"arena", null, "A".repeat(256), "errors.alias"},
+                new String[]{"arena", null, "&a", "errors.alias"})) {
+            var result = lifecycle.importWorld(new ImportMapRequest(input[0], input[2], input[1], null));
+            String value = input[3].equals("errors.blocked_world") ? input[0] : input[1];
+            assertEquals(studio.lorian.mapmanager.plugin.internal.notification.Messages.text(input[3], "value", value), result.detail());
+            failure(result, OperationName.IMPORT, FailureReason.INVALID_INPUT);
+        }
+        for (var entry : Map.of("seed", "errors.seed", "flat.height", "errors.flat_height").entrySet()) {
+            var result = lifecycle.create(new CreateMapRequest("arena", null, null, null,
+                    WorldType.FLAT, Environment.NORMAL, Map.of(entry.getKey(), "bad")));
+            assertEquals(studio.lorian.mapmanager.plugin.internal.notification.Messages.text(entry.getValue(), "value", "bad"), result.detail());
+            failure(result, OperationName.CREATE, FailureReason.INVALID_INPUT);
+        }
+    }
+
     @Test void invalidGroupsAndLongDisplayNamesAreRejected() {
         for (String group : new String[]{"default", "worldbase", "TEAM", "a".repeat(17), "../team"}) {
             failure(lifecycle.create(new CreateMapRequest("arena", "Arena", group, null)), OperationName.CREATE, FailureReason.INVALID_INPUT);
