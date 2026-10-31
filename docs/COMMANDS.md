@@ -82,7 +82,8 @@ mapadmin import oldbuild normal normal group=buildworld admin=Steve
 
 ## 自动补全
 
-- `/world tp`、`/wtp` 按准入推荐地图，包括尚未加载的地图；角色移除仅推荐直接授权成员，踢人仅推荐同图在线玩家。
+- `/world tp`、`/wtp` 按 MMC 准入推荐地图，包括尚未加载的地图；`access-control.strict-map-entry=false` 时，额外推荐拥有 `multiverse.access.<地图名>` 权限的已登记 ACTIVE 地图。候选去重并按输入前缀过滤；实际传送仍执行 MMC 准入检查。
+- 角色移除仅推荐直接授权成员，踢人仅推荐同图在线玩家。
 - 设置命令补全开关、确认参数和当前展示名；帮助补全子命令。
 - `/mapadmin` 补全类型、已支持环境、选项键、现有组、在线管理员、生物群系、导入目录、地图、实际恢复请求及维护子命令。
 - 新地图名、别名、种子、高度、导出文件名、自定义生成器和属性值由操作者填写；删除确认码人工输入。

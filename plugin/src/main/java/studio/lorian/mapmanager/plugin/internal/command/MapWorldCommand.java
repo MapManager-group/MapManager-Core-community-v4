@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import studio.lorian.mapmanager.api.model.MapInstance;
 import studio.lorian.mapmanager.api.model.MapRole;
+import studio.lorian.mapmanager.api.model.MapStatus;
 import studio.lorian.mapmanager.api.model.SpawnPoint;
 import studio.lorian.mapmanager.api.result.FailureReason;
 import studio.lorian.mapmanager.api.result.OperationName;
@@ -183,8 +184,15 @@ public final class MapWorldCommand extends Command {
     }
 
     private List<String> accessibleWorldNames(Player player) {
-        return access.accessibleMaps(player.getUniqueId()).stream()
-                .map(MapInstance::worldName).toList();
+        List<String> names = new ArrayList<>(access.accessibleMaps(player.getUniqueId()).stream()
+                .map(MapInstance::worldName).toList());
+        if (accessListener != null && !accessListener.isStrictEnabled()) {
+            maps.listMaps().stream()
+                    .filter(map -> map.status() == MapStatus.ACTIVE)
+                    .filter(map -> player.hasPermission("multiverse.access." + map.worldName()))
+                    .map(MapInstance::worldName).forEach(names::add);
+        }
+        return names;
     }
 
     private List<String> kickSuggestions(Player sender, String prefix) {

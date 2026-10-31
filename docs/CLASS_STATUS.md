@@ -45,9 +45,9 @@
 | `MapTravelServiceImpl` | 准入、按需加载、传送与同图踢出 |
 | `WorldLifeCycleServiceImpl` | 创建、导入、初始化、删除、加载、恢复；请求及操作阶段落盘 |
 | `WorldVersionServiceImpl` | 读取服务端 dataVersion 并查询存档版本；String 入口先校验世界名 |
-| `MapWorldCommand` | 玩家命令、帮助、补全、授权、开关确认和在线准入复核 |
+| `MapWorldCommand` | 玩家命令、帮助、补全（非严格模式兼容 MV 准入权限候选）、授权、开关确认和在线准入复核 |
 | `MapAdminCommand` | 控制台/RCON 生命周期与维护命令、解析、帮助和补全 |
-| `MapAccessListener` | 严格准入的传送、加入、重生、换世界和撤权复核，安全返回或断线 |
+| `MapAccessListener` | 严格准入的传送、加入、重生、换世界和撤权复核，安全返回或断线；向命令提供严格开关状态 |
 | `MapSettingsListener` | 单图物理、完整 BlockData 落沙还原和爆炸；全局实体支撑保护 |
 
 ## plugin 内部适配、迁移与通知

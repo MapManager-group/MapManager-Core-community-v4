@@ -44,6 +44,11 @@ public final class MapAccessListener implements Listener {
         this.strictEnabled = strictEnabled;
     }
 
+    /** 返回启动时配置的严格准入开关，供命令补全保持一致。 */
+    public boolean isStrictEnabled() {
+        return strictEnabled;
+    }
+
     /** 在传送前校验玩家是否有权进入目标地图。 */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {

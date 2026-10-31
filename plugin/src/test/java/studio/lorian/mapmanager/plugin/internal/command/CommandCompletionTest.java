@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import studio.lorian.mapmanager.api.model.*;
 import studio.lorian.mapmanager.plugin.impl.*;
+import studio.lorian.mapmanager.plugin.internal.listener.MapAccessListener;
 import studio.lorian.mapmanager.plugin.internal.storage.*;
 import studio.lorian.mapmanager.plugin.testsupport.BukkitTestServer;
 import java.nio.file.Path;
@@ -57,4 +58,45 @@ class CommandCompletionTest {
         var console = proxy(org.bukkit.command.ConsoleCommandSender.class, (o, m, a) -> null);
         assertEquals(List.of("group=empty"), admin.tabComplete(console, "mapadmin", new String[]{"create", "arena", "group=e"}));
     }
+
+    @Test void nonStrictCompletionAlsoIncludesMultiversePermissionTargets() throws Exception {
+        var backend = new JsonStorage(directory.resolve("maps.json"));
+        var store = new CachedStorage(backend, backend, backend);
+        store.saveGroup(new MapGroup("team", Set.of()));
+        for (String name : List.of("public", "permitted", "private", "pending", "deleting")) {
+            MapStatus status = switch (name) {
+                case "pending" -> MapStatus.PENDING;
+                case "deleting" -> MapStatus.DELETING;
+                default -> MapStatus.ACTIVE;
+            };
+            store.save(new MapInstance(UUID.randomUUID(), name, "team", name,
+                    new MapSettings(false, false, name.equals("public")), status, null));
+        }
+        var maps = new MapServiceImpl(store);
+        var roles = new MapRoleServiceImpl(store, store, null);
+        var access = new MapAccessServiceImpl(store, roles);
+        UUID playerId = UUID.randomUUID();
+        Set<String> permissions = new HashSet<>(Set.of("multiverse.access.permitted",
+                "multiverse.access.public", "multiverse.access.pending", "multiverse.access.deleting"));
+        var player = proxy(Player.class, (o, m, a) -> switch (m.getName()) {
+            case "getUniqueId" -> playerId;
+            case "hasPermission" -> permissions.contains((String) a[0]);
+            default -> throw new AssertionError("Completion must not query loaded worlds: " + m);
+        });
+        for (boolean strict : List.of(true, false)) {
+            var listener = new MapAccessListener(null, maps, access, strict);
+            var wtp = new MapWorldCommand("wtp", null, maps, roles, access, null, null, null, null, listener);
+            var world = new MapWorldCommand(null, maps, roles, access, null, null, null, null, listener);
+            List<String> expected = strict ? List.of("public") : List.of("permitted", "public");
+            assertEquals(expected, wtp.tabComplete(player, "wtp", new String[]{""}));
+            assertEquals(expected, world.tabComplete(player, "world", new String[]{"tp", ""}));
+            assertEquals(strict ? List.of() : List.of("permitted"),
+                    wtp.tabComplete(player, "wtp", new String[]{"PER"}));
+        }
+        permissions.clear();
+        var listener = new MapAccessListener(null, maps, access, false);
+        var wtp = new MapWorldCommand("wtp", null, maps, roles, access, null, null, null, null, listener);
+        assertEquals(List.of("public"), wtp.tabComplete(player, "wtp", new String[]{""}));
+    }
+
 }
